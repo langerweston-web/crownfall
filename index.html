@@ -13944,6 +13944,103 @@ installCompat();
   }
 })();
 
+/* ===== v1.6 balance (logic): longer peace, starter garrison, fair AI ramp (alerts live in alert_ops.js) ===== */
+(function(){
+  // 1) Two-year peace. A month is 0.7 s at 1x, so one year vanished in ~2 s at 4x.
+  PEACE_MONTHS=18;
+
+  // 2) Free starter garrison for the player: three rifle formations around the capital.
+  if(typeof startAs==="function"){
+    const _sa=startAs;
+    startAs=function(id){
+      const r=_sa(id);
+      try{
+        const n=nations[id];
+        if(n&&n.alive&&state.player===id&&!(typeof mpActive==="function"&&mpActive())&&!unitsOf(id).length){
+          const ps=nProvs(id);
+          const cap=ps.find(p=>p.capital)||ps[0];
+          if(cap){
+            const spots=[cap].concat(ps.filter(p=>p!==cap&&(p.neighbors||[]).some(j=>provinces[j]&&provinces[j].owner!==id)).sort((a,b)=>b.pop-a.pop).slice(0,2));
+            while(spots.length<3)spots.push(cap);
+            for(const p of spots) spawnUnit(id,p.id,7000,"rifle");
+            if(typeof recountArmy==="function") recountArmy(n);
+            log("sys","A starter garrison of three rifle formations stands guard at "+cap.name+" and your borders. Build a Military Base to train more.");
+          }
+        }
+      }catch(e){console.warn("starter garrison",e);}
+      return r;
+    };
+  }
+
+  // 3) AI ramps up against the player instead of rushing an undefended newcomer.
+  function playerDefended(){
+    const pid=state.player; if(pid==null||pid<0)return true;
+    const us=unitsOf(pid);
+    const str=us.reduce((s,u)=>s+(u.str||0),0);
+    return us.length>=2 && str>=9000;
+  }
+  function aiMayAttackPlayer(a){
+    const t=state.tick||0;
+    if(t<24) return false;                                   // never in the first two years
+    const P=nations[state.player];
+    const wars=(P&&P.wars||[]).filter(o=>!(nations[o]&&nations[o].overlord===a)).length;
+    if(t<60 && wars>=1) return false;                        // one front at a time early on
+    if(t<108 && wars>=2) return false;
+    if(!playerDefended() && t<36) return false;              // short grace for an empty army
+    return true;
+  }
+  if(typeof declareWar==="function"){
+    const _dw=declareWar;
+    declareWar=function(a,b,silent){
+      if(b===state.player && a!==state.player && !(typeof mpIsHuman==="function"&&mpIsHuman(a))){
+        const A=nations[a];
+        const viaAlliance=A&&A.allies&&A.allies.some(x=>nations[x]&&(nations[x].wars||[]).includes(b));
+        if(!viaAlliance && !aiMayAttackPlayer(a)) return false;
+      }
+      return _dw(a,b,silent);
+    };
+  }
+
+
+  // 5) Early-game pressure: the base AI waits 13-20 years for a "reason". After the peace,
+  // ambitious AIs with troops pick a weaker neighbor (player included) within the first few years.
+  if(typeof gameTick==="function"){
+    const _gt=gameTick;
+    gameTick=function(){
+      const r=_gt.apply(this,arguments);
+      try{ if(state.phase==="play") earlyPressure(); }catch(e){console.warn("earlyPressure",e);}
+      return r;
+    };
+  }
+  function earlyPressure(){
+    const t=state.tick||0;
+    if(t<PEACE_MONTHS || t>180) return;
+    const active=nations.filter(n=>n.alive&&n.wars&&n.wars.length).length;
+    const alive=nations.filter(n=>n.alive).length;
+    if(active>alive*0.25) return;                            // world is already busy enough
+    for(const n of nations){
+      if(!n.alive||n.id===state.player||(n.wars||[]).length) continue;
+      if(typeof mpIsHuman==="function"&&mpIsHuman(n.id)) continue;
+      if(n.overlord!=null&&n.overlord>=0) continue;
+      const pers=n.personality||"peaceful";
+      const pm=pers==="expansionist"?0.03:pers==="opportunist"?0.014:0.003;
+      if(Math.random()>pm) continue;
+      if(t-(n.lastOffensive==null?-99:n.lastOffensive)<12) continue;
+      if(unitsOf(n.id).length<1 || (n.money||0)<150) continue;
+      const my=warPower(n);
+      let best=null,bestR=0;
+      for(const oid of neighNats(n.id)){
+        const o=nations[oid]; if(!o||!o.alive) continue;
+        if(atWar(n.id,oid)||allied(n.id,oid)||((n.truce||{})[oid]||0)>0) continue;
+        if(oid===state.player && !aiMayAttackPlayer(n.id)) continue;
+        const r=my/(defensePower(o,n.id)+1)*(oid===state.player?0.85:1);
+        if(r>bestR){bestR=r;best=oid;}
+      }
+      if(best!=null && bestR>1.25){ n.lastOffensive=t; declareWar(n.id,best); }
+    }
+  }
+})();
+
 })();
 </script>
 </body>
