@@ -6,7 +6,13 @@ A real-world grand strategy game that runs in your browser. Pick any country, bu
 - **In your browser:** https://langerweston-web.github.io/crownfall/
 - **Windows:** download `Crownfall-World.zip` from [Releases](https://github.com/langerweston-web/crownfall/releases), unzip, and run `Crownfall.exe`. If Windows SmartScreen warns, click **More info → Run anyway**. Needs Edge or Chrome installed.
 - **Offline:** download `index.html` and open it in any browser.
-- **v1.3 mirrors:** [HTML](https://files.catbox.moe/umtu9i.html) · [Windows zip](https://files.catbox.moe/xkrkma.zip)
+- **v1.4 mirrors:** [HTML](https://files.catbox.moe/yqh6bh.html) · [Windows zip](https://files.catbox.moe/30s7a5.zip)
+
+## What's new in v1.4
+- The camera no longer pans when you move the pointer to the edge of the screen. Turn **Edge scroll** on in the title screen or the Help (?) panel if you want it back. The setting is remembered. WASD, arrow keys, drag, and the scroll wheel still pan and zoom.
+- 3D unit and building models on the map are smaller by default (about half the old size) so they don't crowd the provinces. A **Model size** setting of Small (default), Medium, or Large is on the title screen and in Help. Click targets stay a comfortable size.
+
+![v1.4 smaller models](screenshots/v14.png)
 
 ## What's new in v1.3
 - A full civic building set you buy with money and place by drag-and-drop: Factory, Mine, Oil Well, Power Plant, Farm, Bank, Market, Research Lab, University, Hospital, Bunker, Anti-Air Battery, Coastal Gun, Radar Station, Missile Silo, Airfield, Spy HQ, Propaganda Office, and one Monument per nation. Each has levels 1–3, hit points, upkeep, and a panel to upgrade, repair, demolish, or switch off.

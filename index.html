@@ -276,6 +276,11 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
   <div class="lab">Unit icons</div>
   <span id="helpUnits" class="inotify" style="display:contents"></span>
  </div>
+ <div class="notifyrow">
+  <div class="lab">Model size</div>
+  <span id="helpModel" class="inotify" style="display:contents"></span>
+ </div>
+ <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="helpEdge"> Edge scroll (map moves when the pointer is at the screen edge)</label></div>
  <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="helpAbstain"> Auto-abstain in World Congress</label></div>
  <div class="row"><button class="btn gold" id="helpX">Close</button></div>
 </div></div>
@@ -306,6 +311,11 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
     <div class="lab">Unit icons</div>
     <span id="tUnits" class="inotify" style="display:contents"></span>
   </div>
+  <div class="notifyrow">
+    <div class="lab">Model size</div>
+    <span id="tModel" class="inotify" style="display:contents"></span>
+  </div>
+  <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="tEdge"> Edge scroll (map moves when the pointer is at the screen edge)</label></div>
   <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="tAbstain" checked> Auto-abstain in World Congress</label></div>
   <div class="row"><button class="btn gold" id="tNew">New Game</button><button class="btn" id="tCont">Continue</button></div>
   <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="tTut"> Interactive tutorial</label></div>
@@ -8400,8 +8410,8 @@ function armyPanTick(dt){
   if(kd.arrowright||kd.d) dx-=sp;
   if(kd.arrowup||kd.w) dy+=sp;
   if(kd.arrowdown||kd.s) dy-=sp;
-  // edge scroll
-  if(state.phase==="play" && !state.boxSel && !state.buildDrag){
+  // edge scroll (off by default; Settings → Edge scroll)
+  if(state.edgeScroll && state.phase==="play" && !state.boxSel && !state.buildDrag){
     const wrap=$("mapwrap");
     if(wrap && state._mouseCss){
       const r=wrap.getBoundingClientRect();
@@ -11697,6 +11707,7 @@ function installUx(){
       "M":"Toggle minimap",
       "Drag a box":"Shift-drag, or drag starting on your troops, to select",
       "Middle-drag, WASD, arrows":"Pan: left-drag empty ground, WASD/arrows, middle-drag, or right-drag",
+      "Edge of the screen":"Edge scroll (off by default — turn on in Settings / Help)",
       "Ctrl+S":"Save"
     };
     for(const row of HELP_KEYS){ if(upd[row[0]]) row[1]=upd[row[0]]; }
@@ -12831,7 +12842,8 @@ function collectBaseFigures(now){
     // modules around the compound
     const mods=Object.keys(b.modules||{}).filter(k=>b.modules[k]);
     mods.forEach((mid,i)=>{
-      const ang=i*0.9, rr=26+i*2;
+      const mul=(typeof modelSizeMul==="function"?modelSizeMul():0.55);
+      const ang=i*0.9, rr=(26+i*2)*mul;
       const sx=scr.x+Math.cos(ang)*rr, sy=scr.y+8+Math.sin(ang)*rr*0.6;
       const mtyp="bld_mod_"+mid;
       out.push({typ:mtyp,x:sx,y:sy,scl:scl*0.55,rot:0,bob:0,col,ghost:false,base:true,bid:b.id,phase:t*(mid==="radar"?1.5:0),anim:0});
@@ -13036,6 +13048,165 @@ function installModelsHQ(){
 }
 
 installModelsHQ();
+
+/* ===== v1.4: edge scroll off by default + smaller 3D models ===== */
+const EDGEKEY="crownfall-edgescroll";
+const MODELSIZEKEY="crownfall-modelsize";
+
+function modelSizeMul(){
+  const s=state.modelSize||"small";
+  if(s==="large") return 1;
+  if(s==="medium") return 0.8;
+  return 0.55; // Small (default): ~55% of the v1.3 on-map size
+}
+
+function loadV14Prefs(){
+  try{
+    const e=localStorage.getItem(EDGEKEY);
+    // missing or "0" => off; only "1" enables
+    state.edgeScroll=e==="1";
+  }catch(err){ state.edgeScroll=false; }
+  try{
+    const s=localStorage.getItem(MODELSIZEKEY);
+    state.modelSize=(s==="medium"||s==="large"||s==="small")?s:"small";
+  }catch(err){ state.modelSize="small"; }
+}
+
+function saveV14Prefs(){
+  try{
+    localStorage.setItem(EDGEKEY, state.edgeScroll?"1":"0");
+    localStorage.setItem(MODELSIZEKEY, state.modelSize||"small");
+  }catch(err){}
+}
+
+function setEdgeScroll(on){
+  state.edgeScroll=!!on;
+  saveV14Prefs();
+  syncV14SettingsUI();
+  return state.edgeScroll;
+}
+
+function setModelSize(s){
+  state.modelSize=(s==="medium"||s==="large")?s:"small";
+  saveV14Prefs();
+  syncV14SettingsUI();
+  if(typeof draw==="function") try{ draw(); }catch(e){}
+  return state.modelSize;
+}
+
+function fillModelSizeButtons(el){
+  if(!el) return;
+  const cur=state.modelSize||"small";
+  el.innerHTML=["small","medium","large"].map(s=>{
+    const lab=s[0].toUpperCase()+s.slice(1);
+    return `<button class="btn${s===cur?" on":""}" type="button" data-ms="${s}">${lab}</button>`;
+  }).join("");
+  el.querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>setModelSize(b.dataset.ms);
+  });
+}
+
+function syncV14SettingsUI(){
+  const edgeBoxes=["tEdge","helpEdge"].map(id=>document.getElementById(id)).filter(Boolean);
+  edgeBoxes.forEach(el=>{ el.checked=!!state.edgeScroll; });
+  fillModelSizeButtons(document.getElementById("tModel"));
+  fillModelSizeButtons(document.getElementById("helpModel"));
+}
+
+function bindV14Settings(){
+  const bindEdge=id=>{
+    const el=document.getElementById(id); if(!el) return;
+    el.checked=!!state.edgeScroll;
+    el.onchange=()=>setEdgeScroll(el.checked);
+  };
+  bindEdge("tEdge");
+  bindEdge("helpEdge");
+  syncV14SettingsUI();
+}
+
+function padHitList(arr, minR){
+  if(!arr) return;
+  for(const h of arr){
+    if(!h) continue;
+    const cx=h.x+(h.w||0)/2, cy=h.y+(h.h||0)/2;
+    const w=Math.max(h.w||0, minR*2), ht=Math.max(h.h||0, minR*2);
+    h.x=cx-w/2; h.y=cy-ht/2; h.w=w; h.h=ht;
+  }
+}
+
+function installV14(){
+  loadV14Prefs();
+
+  // Scale every 3D figure (units + buildings) by the Model size setting.
+  // Hits stay a usable click target even when Small is selected.
+  if(typeof figureScale==="function"){
+    const _fs=figureScale;
+    figureScale=function(){
+      return _fs() * modelSizeMul();
+    };
+  }
+
+  if(typeof Unit3D!=="undefined" && Unit3D.drawAndHit){
+    const _dh=Unit3D.drawAndHit.bind(Unit3D);
+    Unit3D.drawAndHit=function(ctx, now){
+      const r=_dh(ctx, now);
+      padHitList(state._unitHits, 16);
+      padHitList(state._baseHits, 18);
+      padHitList(state._bldHits, 16);
+      return r;
+    };
+  }
+
+  if(typeof armyPanTick==="function"){
+    const _apt=armyPanTick;
+    armyPanTick=function(dt){
+      if(!state.edgeScroll){
+        const prev=state._mouseCss;
+        state._mouseCss=null;
+        const r=_apt(dt);
+        state._mouseCss=prev;
+        return r;
+      }
+      return _apt(dt);
+    };
+  }
+
+  const _bto=typeof bindTitleOptions==="function"?bindTitleOptions:null;
+  if(_bto){
+    bindTitleOptions=function(){
+      _bto();
+      bindV14Settings();
+    };
+  }
+  const _bh=typeof bindHelp==="function"?bindHelp:null;
+  if(_bh){
+    bindHelp=function(){
+      _bh();
+      bindV14Settings();
+    };
+  }
+  bindV14Settings();
+
+  if(typeof refreshCExports==="function"){
+    const _r=refreshCExports;
+    refreshCExports=function(){
+      _r();
+      const C=window.CROWNFALL||(window.CROWNFALL={});
+      C.setEdgeScroll=setEdgeScroll;
+      C.setModelSize=setModelSize;
+      C.modelSizeMul=modelSizeMul;
+      C.edgeScroll=()=>!!state.edgeScroll;
+      C.modelSize=()=>state.modelSize||"small";
+      if(typeof armyPanTick==="function") C.armyPanTick=armyPanTick;
+    };
+    refreshCExports();
+  }
+}
+
+if(typeof document!=="undefined"){
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", installV14);
+  else installV14();
+}
 
 })();
 </script>
