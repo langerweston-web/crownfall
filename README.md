@@ -3,10 +3,13 @@
 A real-world grand strategy game that runs in your browser. Pick any country, build bases and cities, buy troops, research tech, and conquer the world on a flat map or a 3D globe.
 
 ## Play
-- **In your browser:** https://langerweston-web.github.io/crownfall/
-- **Windows:** download `Crownfall-World.zip` from [Releases](https://github.com/langerweston-web/crownfall/releases), unzip, and run `Crownfall.exe`. If Windows SmartScreen warns, click **More info → Run anyway**. Needs Edge or Chrome installed.
+- **In your browser (no install):** https://langerweston-web.github.io/crownfall/
+- **Windows:** download `Crownfall-Windows.zip` from the [v1.5.1 release](https://github.com/langerweston-web/crownfall/releases/tag/v1.5.1), unzip, and run `Crownfall\Crownfall.exe`. This is a standard Electron app — the game runs inside it, so you do not need Chrome or Edge installed. The app is unsigned, so Windows SmartScreen or your antivirus may warn on first launch. Click **More info → Run anyway**. If you would rather not run the .exe, use the browser version above.
 - **Offline:** download `index.html` and open it in any browser.
-- **v1.5 mirrors:** [HTML](https://files.catbox.moe/8n9oib.html) · [Windows zip](https://files.catbox.moe/apvqea.zip)
+- **v1.5.1 mirrors:** [HTML](https://files.catbox.moe/8n9oib.html) · [Windows zip](https://files.catbox.moe/5vrvjk.zip)
+
+## What's new in v1.5.1
+- The Windows package is now a standard [Electron](https://www.electronjs.org/) app. The older custom launcher (which wrote a cache file and opened Edge or Chrome) is retired, because some antivirus tools flagged that pattern as a false positive. This release is the same v1.5 game, just packaged like ordinary desktop software: no self-extraction, no launching other programs, and no packing or obfuscation.
 
 ## What's new in v1.5
 - 3D models are much smaller: the new default is **Tiny** (about half of v1.4 Small, ~27% of the v1.3 size). Options are Tiny, Small, Medium, and Large on the title screen and in Help (?). An older saved size is ignored so everyone gets Tiny.

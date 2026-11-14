@@ -1,0 +1,61 @@
+{
+  "name": "crownfall",
+  "productName": "Crownfall",
+  "version": "1.5.1",
+  "description": "Crownfall \u2014 a world-conquest strategy game",
+  "author": "Weston Langer",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "npm run copy-game && electron .",
+    "pack": "npm run copy-game && electron-builder --win --x64 --dir --publish never",
+    "stamp": "node stamp-win-exe.js",
+    "copy-game": "node -e \"require('fs').copyFileSync(require('path').join(__dirname,'..','index.html'), require('path').join(__dirname,'index.html'))\""
+  },
+  "build": {
+    "appId": "com.westonlanger.crownfall",
+    "productName": "Crownfall",
+    "copyright": "Copyright \u00a9 2026 Weston Langer",
+    "asar": true,
+    "compression": "normal",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "icon.png",
+      "icon.ico"
+    ],
+    "extraMetadata": {
+      "author": "Weston Langer"
+    },
+    "win": {
+      "icon": "icon.ico",
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "legalTrademarks": "Weston Langer",
+      "requestedExecutionLevel": "asInvoker",
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false
+    },
+    "electronLanguages": [
+      "en-US"
+    ],
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "buildDependenciesFromSource": false
+  },
+  "devDependencies": {
+    "electron": "^45.3.2",
+    "electron-builder": "^26.18.0",
+    "resedit": "^3.1.0"
+  }
+}
