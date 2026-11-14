@@ -146,7 +146,9 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
 #scBlurb{min-height:2.4em;margin-top:8px}
 #endExtra .stats{margin-top:8px}
 #title .card{max-width:520px}
-#bMusic.on,#bHelp.on{color:var(--gold)}
+#bMusic.on,#bHelp.on,#bFull.on{color:var(--gold)}
+.compatnote{margin-top:10px;padding:8px 10px;border:1px solid rgba(42,59,85,.55);border-radius:8px;background:rgba(10,18,32,.45);color:var(--muted);font-size:11.5px;line-height:1.45;text-align:left}
+.compatnote b{color:var(--text);font-weight:600}
 
 
 #bGlobe.on{color:var(--gold);border-color:var(--gold2);background:rgba(224,178,90,.12)}
@@ -260,7 +262,7 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
  <div id="treasuryWrap"><div class="chip" id="treasury">Treasury: —</div><div id="econTip"></div></div>
 </div>
 <div class="hud" id="tr"><div class="seg">
- <button id="bAuto" class="on" title="Automatically move divisions to the front. Toggle off to issue your own orders.">Auto-front</button><button id="bGlobe" title="3D globe view (V)">Globe</button><button id="bMusic" title="Background music">♫</button><button id="bMute" title="Sound">🔊</button><button id="bHelp" title="Hotkeys (H)">?</button><button id="bSave">Save</button><button id="bLoad">Load</button><button id="bMenu">Menu</button>
+ <button id="bAuto" class="on" title="Automatically move divisions to the front. Toggle off to issue your own orders.">Auto-front</button><button id="bGlobe" title="3D globe view (V)">Globe</button><button id="bMusic" title="Background music">♫</button><button id="bMute" title="Sound">🔊</button><button id="bFull" title="Full screen">Full</button><button id="bHelp" title="Hotkeys (H)">?</button><button id="bSave">Save</button><button id="bLoad">Load</button><button id="bMenu">Menu</button>
 </div></div>
 <canvas id="mini" width="372" height="192"></canvas>
 <div id="toast"></div>
@@ -280,6 +282,11 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
   <div class="lab">Model size</div>
   <span id="helpModel" class="inotify" style="display:contents"></span>
  </div>
+ <div class="notifyrow">
+  <div class="lab">Performance</div>
+  <span id="helpPerf" class="inotify" style="display:contents"></span>
+ </div>
+ <div class="compatnote" id="helpCompat"></div>
  <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="helpEdge"> Edge scroll (map moves when the pointer is at the screen edge)</label></div>
  <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="helpAbstain"> Auto-abstain in World Congress</label></div>
  <div class="row"><button class="btn gold" id="helpX">Close</button></div>
@@ -315,10 +322,15 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
     <div class="lab">Model size</div>
     <span id="tModel" class="inotify" style="display:contents"></span>
   </div>
+  <div class="notifyrow">
+    <div class="lab">Performance</div>
+    <span id="tPerf" class="inotify" style="display:contents"></span>
+  </div>
   <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="tEdge"> Edge scroll (map moves when the pointer is at the screen edge)</label></div>
   <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="tAbstain" checked> Auto-abstain in World Congress</label></div>
   <div class="row"><button class="btn gold" id="tNew">New Game</button><button class="btn" id="tCont">Continue</button></div>
   <div class="row"><label class="small" style="display:flex;align-items:center;gap:6px;justify-content:center;width:100%"><input type="checkbox" id="tTut"> Interactive tutorial</label></div>
+  <div class="compatnote" id="tCompat"></div>
   <div class="small" style="margin-top:10px">Map data: Natural Earth (public domain). Borders are approximate and imply no political position.</div>
  </div>
 </div>
@@ -13506,6 +13518,227 @@ if(typeof document!=="undefined"){
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", installSmoothMotion);
   else installSmoothMotion();
 }
+
+/* ===== Browser compatibility: Opera / Opera GX, audio unlock, FPS cap, fullscreen ===== */
+const PERFKEY="crownfall-perf";
+const PERF_MODES={
+  high:{label:"High", cap:0, lite:false},
+  balanced:{label:"Balanced", cap:45, lite:false},
+  low:{label:"Low", cap:30, lite:true}
+};
+
+function isOperaFamily(){
+  const ua=navigator.userAgent||"";
+  return /OPR\/|OPX\//.test(ua) || /\bOpera\b/.test(ua);
+}
+function isOperaGX(){
+  const ua=navigator.userAgent||"";
+  return /OPX\//.test(ua) || /Opera GX/i.test(ua) || /Edition GX/i.test(ua) || /\bGX\//.test(ua);
+}
+function browserCompatNote(){
+  return "<b>Browser compatibility.</b> Crownfall runs in Chrome, Edge, Opera, Opera GX, Firefox, and Safari. In Opera or Opera GX, if the map feels choppy, set Performance to Low — GX RAM and CPU limiters can cap the frame rate. If multiplayer cannot connect, allow this site in Opera's Ad blocker and Tracker blocker, and pause Opera VPN. Or play in the browser with no install, or use Same computer in Multiplayer.";
+}
+function mpBlockerHint(){
+  if(isOperaFamily())
+    return " If you use Opera or Opera GX, allow this site in the Ad blocker and Tracker blocker, and try turning off Opera VPN. You can also use Advanced / having trouble? or play on the same computer.";
+  return " A tracker blocker, ad blocker, or VPN may be blocking the connection. You can also use Advanced / having trouble? or play on the same computer.";
+}
+
+function loadPerf(){
+  let m="high";
+  try{ const s=localStorage.getItem(PERFKEY); if(s&&PERF_MODES[s]) m=s; }catch(e){}
+  state.perfMode=m;
+  return m;
+}
+function getPerf(){ return PERF_MODES[state.perfMode]?state.perfMode:"high"; }
+function perfCapFps(){ return (PERF_MODES[getPerf()]||PERF_MODES.high).cap; }
+function perfIsLite(){ return !!(PERF_MODES[getPerf()]||{}).lite; }
+function setPerf(mode, silent){
+  if(!PERF_MODES[mode]) mode="high";
+  state.perfMode=mode;
+  try{ localStorage.setItem(PERFKEY, mode); }catch(e){}
+  fillPerfButtons(document.getElementById("tPerf"));
+  fillPerfButtons(document.getElementById("helpPerf"));
+  if(!silent && typeof feedback==="function"){
+    const cap=perfCapFps();
+    feedback(cap?("Performance: "+PERF_MODES[mode].label+" (FPS cap "+cap+")."):("Performance: "+PERF_MODES[mode].label+" (uncapped)."), "good", false);
+  }
+  return mode;
+}
+function fillPerfButtons(host){
+  if(!host) return;
+  const cur=getPerf();
+  host.innerHTML=["high","balanced","low"].map(id=>{
+    const on=id===cur?" on":"";
+    return `<button class="btn${on}" data-perf="${id}">${PERF_MODES[id].label}</button>`;
+  }).join("");
+  host.querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>setPerf(b.dataset.perf);
+  });
+}
+function fillCompatNotes(){
+  const html=browserCompatNote();
+  for(const id of ["helpCompat","tCompat"]){
+    const el=$(id); if(el) el.innerHTML=html;
+  }
+}
+
+/* Audio: browsers (including Opera) start AudioContext suspended until a user gesture. */
+const _ensureAudio0=typeof ensureAudio==="function"?ensureAudio:null;
+ensureAudio=function(){
+  if(_ensureAudio0) _ensureAudio0();
+  else if(!actx){ try{actx=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} }
+  if(actx && actx.state==="suspended"){
+    try{ const p=actx.resume(); if(p&&p.catch) p.catch(()=>{}); }catch(e){}
+  }
+  return actx;
+};
+function unlockAudioFromGesture(){
+  ensureAudio();
+  window.__CF_AUDIO_UNLOCKED=!!(actx && actx.state!=="suspended");
+}
+["pointerdown","keydown","touchstart","click"].forEach(ev=>{
+  window.addEventListener(ev, unlockAudioFromGesture, true);
+});
+
+/* Fullscreen: Opera supports the standard API and the webkit prefix. F is Fortify, so use a button (or the browser's F11). */
+function isFullscreen(){ return !!(document.fullscreenElement||document.webkitFullscreenElement); }
+function toggleFullscreen(){
+  try{
+    if(isFullscreen()){
+      const exit=document.exitFullscreen||document.webkitExitFullscreen||document.webkitCancelFullScreen;
+      if(exit) return Promise.resolve(exit.call(document)).catch(()=>{});
+    }else{
+      const el=document.documentElement;
+      const req=el.requestFullscreen||el.webkitRequestFullscreen||el.webkitRequestFullScreen;
+      if(req) return Promise.resolve(req.call(el)).catch(()=>{});
+    }
+  }catch(e){}
+}
+function syncFullButton(){
+  const b=$("bFull"); if(b) b.classList.toggle("on", isFullscreen());
+}
+function bindFullscreen(){
+  const b=$("bFull");
+  if(b && !b._cfBound){
+    b._cfBound=true;
+    b.onclick=()=>{ toggleFullscreen(); };
+  }
+  document.addEventListener("fullscreenchange", syncFullButton);
+  document.addEventListener("webkitfullscreenchange", syncFullButton);
+}
+
+/* FPS cap + lightweight mode (helps when Opera GX RAM/CPU limiters throttle the tab). */
+let _perfLastDraw=0, _fpsEma=60, _fpsSamples=0, _perfHinted=false;
+const _frame0=frame;
+frame=function(now){
+  const cap=perfCapFps();
+  if(cap>0 && _perfLastDraw && (now-_perfLastDraw)<(1000/cap-0.5)){
+    requestAnimationFrame(frame);
+    return;
+  }
+  if(_perfLastDraw){
+    const inst=1000/Math.max(8, now-_perfLastDraw);
+    _fpsEma=_fpsEma*0.9+inst*0.1;
+    _fpsSamples++;
+    if(!_perfHinted && _fpsSamples>90 && _fpsEma<24 && getPerf()==="high"){
+      _perfHinted=true;
+      const why=isOperaGX()||isOperaFamily()
+        ? "This browser is running the game slowly (Opera GX RAM or CPU limiters can do that). Set Performance to Low in Help (?) for a smoother map."
+        : "This computer is running the game slowly. Set Performance to Low in Help (?) for a smoother map.";
+      if(typeof toast==="function") toast(why, 8000);
+      else if(typeof feedback==="function") feedback(why, "ev", false);
+    }
+  }
+  _perfLastDraw=now;
+  if(perfIsLite() && state.particles && state.particles.length>24) state.particles.length=24;
+  _frame0(now);
+};
+
+if(typeof tickParticles==="function"){
+  const _tp=tickParticles;
+  tickParticles=function(dt){
+    if(perfIsLite() && state.particles && state.particles.length>24) state.particles.length=24;
+    _tp(dt);
+  };
+}
+
+/* Friendlier PeerJS errors when Opera's ad/tracker blocker or VPN blocks the broker. */
+if(typeof mpFriendlyError==="function"){
+  const _fe=mpFriendlyError;
+  mpFriendlyError=function(err){
+    const t=String((err&&err.type)||err||"");
+    if(/webrtc|browser-incompatible|browser/i.test(t))
+      return "This browser couldn't start a live game."+mpBlockerHint();
+    if(/network|socket|server-error|disconnected|ssl|websocket/i.test(t))
+      return "Couldn't reach the game service. Trying again…";
+    return _fe(err);
+  };
+}
+if(typeof mpStatus==="function"){
+  const _ms=mpStatus;
+  mpStatus=function(s, kind){
+    if(kind==="error" && s && /Couldn't reach the game service|missing the live-play helper|couldn't start a live game|Couldn't make an invite/i.test(s) && !/Ad blocker|Tracker blocker|Opera VPN/i.test(s)){
+      s=String(s).replace(/\.?\s*$/, ".")+mpBlockerHint();
+    }
+    return _ms(s, kind);
+  };
+}
+
+function browserInfo(){
+  const ua=navigator.userAgent||"";
+  let ls=false;
+  try{ const k="__cf_ls_probe"; localStorage.setItem(k,"1"); ls=localStorage.getItem(k)==="1"; localStorage.removeItem(k); }catch(e){ ls=false; }
+  return {
+    ua,
+    opera:isOperaFamily(),
+    operaGX:isOperaGX(),
+    webgl:!!(typeof UnitGL!=="undefined" && UnitGL.ok),
+    webglInfo:typeof UnitGL!=="undefined"?(UnitGL.info||UnitGL.fail||""):"",
+    unitStyle:typeof unitStyle==="function"?unitStyle():(state.unitStyle||"real"),
+    audioState:actx?actx.state:"none",
+    audioUnlocked:!!window.__CF_AUDIO_UNLOCKED,
+    fullscreenEnabled:!!(document.fullscreenEnabled||document.webkitFullscreenEnabled),
+    fullscreen:isFullscreen(),
+    localStorage:ls,
+    peerjs:typeof Peer==="function",
+    perf:getPerf(),
+    fpsCap:perfCapFps(),
+    fps:Math.round(_fpsEma)
+  };
+}
+
+function installCompat(){
+  loadPerf();
+  fillPerfButtons(document.getElementById("tPerf"));
+  fillPerfButtons(document.getElementById("helpPerf"));
+  fillCompatNotes();
+  bindFullscreen();
+  const _th=toggleHelp;
+  toggleHelp=function(force){
+    _th(force);
+    const el=$("help");
+    const on=el && el.style.display!=="none" && el.style.display!=="";
+    if(on){
+      fillPerfButtons(document.getElementById("helpPerf"));
+      fillCompatNotes();
+    }
+  };
+  if(window.CROWNFALL){
+    window.CROWNFALL.ensureAudio=ensureAudio;
+    window.CROWNFALL.unlockAudio=unlockAudioFromGesture;
+    window.CROWNFALL.audioState=()=>actx?actx.state:"none";
+    window.CROWNFALL.toggleFullscreen=toggleFullscreen;
+    window.CROWNFALL.isFullscreen=isFullscreen;
+    window.CROWNFALL.getPerf=getPerf;
+    window.CROWNFALL.setPerf=setPerf;
+    window.CROWNFALL.perfCapFps=perfCapFps;
+    window.CROWNFALL.browserInfo=browserInfo;
+    window.CROWNFALL.isOperaFamily=isOperaFamily;
+    window.CROWNFALL.keysDown=()=>Object.assign({}, state.keysDown||{});
+  }
+}
+installCompat();
 
 })();
 </script>

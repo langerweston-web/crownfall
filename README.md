@@ -8,6 +8,14 @@ A real-world grand strategy game that runs in your browser. Pick any country, bu
 - **Offline:** download `index.html` and open it in any browser.
 - **v1.5.1 mirrors:** [HTML](https://files.catbox.moe/8n9oib.html) · [Windows zip](https://files.catbox.moe/5vrvjk.zip)
 
+## Browser compatibility
+Crownfall is a web game and runs in Chrome, Edge, Opera, Opera GX, Firefox, and Safari, or as the Windows Electron app. No extra plugin is required.
+
+- **Opera / Opera GX:** if the map feels choppy, open Help (?) and set Performance to Low. Opera GX RAM and CPU limiters can cap the frame rate; Low caps FPS at 30 and lightens effects. If multiplayer cannot connect, allow this site in Opera's Ad blocker and Tracker blocker, and pause Opera VPN. You can still play on the same computer from the Multiplayer menu.
+- **Sound:** the first click or key press unlocks audio (browsers block sound until then).
+- **Full screen:** use the Full button in the top bar, or the browser's F11.
+- **No install:** use the browser link above, or download `index.html` and open it locally.
+
 ## What's new in v1.5.1
 - The Windows package is now a standard [Electron](https://www.electronjs.org/) app. The older custom launcher (which wrote a cache file and opened Edge or Chrome) is retired, because some antivirus tools flagged that pattern as a false positive. This release is the same v1.5 game, just packaged like ordinary desktop software: no self-extraction, no launching other programs, and no packing or obfuscation.
 
