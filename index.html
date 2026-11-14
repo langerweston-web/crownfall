@@ -200,18 +200,49 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
 .modcard.have{border-color:#7dff9a;opacity:.9}
 .modcard.lock{opacity:.7}
 #mpModal{position:fixed;inset:0;background:rgba(4,8,14,.72);z-index:40;display:none;align-items:center;justify-content:center}
+#mpModal.menu{background:rgba(4,8,14,.72);pointer-events:auto;align-items:center;justify-content:center}
+#mpModal.docked{background:transparent;pointer-events:none;align-items:stretch;justify-content:flex-start}
+#mpModal.docked .mpcard{pointer-events:auto;width:min(340px,92vw);margin:70px 12px 60px;max-height:calc(100vh - 140px)}
 .mpcard{position:relative;width:min(480px,92vw);max-height:86vh;overflow:auto;background:rgba(12,18,30,.97);border:1px solid var(--line);border-radius:16px;padding:18px 18px 12px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
 .mpcard h2{margin:0 0 8px;font-size:22px;color:#f3e2a8}
+.mphead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
 .mpx{position:absolute;right:10px;top:8px;background:none;border:0;color:#ccc;font-size:22px;cursor:pointer}
-.mpcode{font:700 28px/1.2 ui-monospace,monospace;letter-spacing:.18em;color:#f3e2a8;margin:4px 0 8px}
+.mpcode{font:800 34px/1.15 ui-monospace,monospace;letter-spacing:.2em;color:#f3e2a8;margin:4px 0 10px;text-align:center}
 #mpChatLog{max-height:140px;overflow:auto;background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px;font-size:12px;margin:8px 0 6px}
 #mpChatForm{display:flex;gap:6px}
-#mpChatForm input,#mpBody input,#mpBody textarea{flex:1;background:rgba(0,0,0,.3);border:1px solid var(--line);color:#eee;border-radius:8px;padding:6px 8px;font:12px system-ui}
+#mpChatForm input,#mpBody input,#mpBody textarea{flex:1;background:rgba(0,0,0,.3);border:1px solid var(--line);color:#eee;border-radius:8px;padding:8px 10px;font:13px system-ui}
 #mpBody textarea{width:100%;min-height:80px}
-.mpline{padding:3px 0;font-size:13px}
+#mpBody input#mpName,#mpBody input#mpHotN{width:100%;box-sizing:border-box;margin:0 0 10px}
+#mpBody input#mpCode{width:100%;box-sizing:border-box;margin:0 0 12px}
+.mpline{padding:5px 0;font-size:13px;display:flex;align-items:center;gap:6px}
+.mpdot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.mphuge{display:block;width:100%;box-sizing:border-box;font-size:20px;padding:14px 16px;margin:10px 0 0;min-height:52px}
+.mplink{display:block;width:100%;background:none;border:0;color:#c9d6e8;text-decoration:underline;cursor:pointer;font:13px system-ui;padding:10px 0 4px;text-align:center}
+.mphint{background:rgba(243,226,168,.14);border:1px solid rgba(243,226,168,.4);color:#f3e2a8;border-radius:10px;padding:10px 12px;font:700 15px/1.35 system-ui;margin:10px 0;text-align:center}
+.mphow{margin:8px 0 12px;padding-left:20px;line-height:1.5;font-size:14px}
+.mpstatus{min-height:1.2em;font-size:13px;color:#d7c48a;margin:0 0 8px}
+.mppill{font:700 11px system-ui;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:3px 8px;background:#2a3340;color:#c5cdd6}
+.mppill.connected{background:#1e4a32;color:#b7e0c2}
+.mppill.connecting,.mppill.retrying{background:#4a3a16;color:#f3e2a8}
+.mppill.error{background:#5a2420;color:#f0b4ae}
 #mpDock{position:absolute;left:10px;bottom:56px;z-index:6}
 #mpDock .mpdock{background:rgba(10,16,28,.92);border:1px solid var(--line);border-radius:10px;padding:6px 8px;font-size:12px}
+#mpRoster{position:absolute;left:10px;top:70px;z-index:6;max-width:220px}
+#mpRoster .mproster{background:rgba(10,16,28,.92);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px}
+.mprowline{display:flex;align-items:center;gap:6px;padding:2px 0}
 .mprow{margin-top:8px}
+#tMulti{min-width:180px;font-size:16px;padding:10px 18px}
+#pickHint,#moveHint{position:absolute;left:50%;transform:translateX(-50%);z-index:7;background:rgba(12,18,30,.94);border:1px solid #d8c07a;color:#f3e2a8;border-radius:12px;padding:10px 16px;font:700 16px/1.35 system-ui;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4);pointer-events:none;max-width:min(520px,86vw)}
+#pickHint{top:58px}
+#moveHint{bottom:86px}
+#selPanel{position:absolute;right:12px;bottom:86px;z-index:7;width:min(240px,42vw);background:rgba(12,18,30,.95);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#selPanel .selrow{display:flex;align-items:center;gap:6px;margin:4px 0}
+#selPanel .selhp{flex:1;height:7px;background:rgba(0,0,0,.4);border-radius:4px;overflow:hidden}
+#selPanel .selhp i{display:block;height:100%;background:#7dce7a}
+#selPanel .selhpt{width:36px;text-align:right;color:#c9d6e8;font-size:11px}
+#selPanel #selMove{width:100%;margin-top:8px}
+#dbgGL{position:absolute;left:10px;bottom:10px;z-index:9;background:rgba(6,10,16,.88);color:#c9e6a8;border:1px solid #3d5a3a;border-radius:8px;padding:8px 10px;font:11px/1.45 ui-monospace,monospace;max-width:min(420px,70vw);pointer-events:none;white-space:normal}
+#c3d{position:absolute;inset:0;pointer-events:none;z-index:2}
 
 </style>
 </head>
@@ -299,10 +330,10 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
     isWebRTCSupported:${this.isWebRTCSupported()}
     isBrowserSupported:${this.isBrowserSupported()}
     isUnifiedPlanSupported:${this.isUnifiedPlanSupported()}`}constructor(){this.isIOS="undefined"!=typeof navigator&&["iPad","iPhone","iPod"].includes(navigator.platform),this.supportedBrowsers=["firefox","chrome","safari"],this.minFirefoxVersion=59,this.minChromeVersion=72,this.minSafariVersion=605}},ew=e=>!e||/^[A-Za-z0-9]+(?:[ _-][A-Za-z0-9]+)*$/.test(e),eE=()=>Math.random().toString(36).slice(2),eD={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:["turn:eu-0.turn.peerjs.com:3478","turn:us-0.turn.peerjs.com:3478"],username:"peerjs",credential:"peerjsp"}],sdpSemantics:"unified-plan"},ex=new class extends n{noop(){}blobToArrayBuffer(e,t){let n=new FileReader;return n.onload=function(e){e.target&&t(e.target.result)},n.readAsArrayBuffer(e),n}binaryStringToArrayBuffer(e){let t=new Uint8Array(e.length);for(let n=0;n<e.length;n++)t[n]=255&e.charCodeAt(n);return t.buffer}isSecure(){return"https:"===location.protocol}constructor(...e){super(...e),this.CLOUD_HOST="0.peerjs.com",this.CLOUD_PORT=443,this.chunkedBrowsers={Chrome:1,chrome:1},this.defaultConfig=eD,this.browser=eP.getBrowser(),this.browserVersion=eP.getVersion(),this.pack=o,this.unpack=i,this.supports=function(){let e;let t={browser:eP.isBrowserSupported(),webRTC:eP.isWebRTCSupported(),audioVideo:!1,data:!1,binaryBlob:!1,reliable:!1};if(!t.webRTC)return t;try{let n;e=new RTCPeerConnection(eD),t.audioVideo=!0;try{n=e.createDataChannel("_PEERJSTEST",{ordered:!0}),t.data=!0,t.reliable=!!n.ordered;try{n.binaryType="blob",t.binaryBlob=!eP.isIOS}catch(e){}}catch(e){}finally{n&&n.close()}}catch(e){}finally{e&&e.close()}return t}(),this.validateId=ew,this.randomToken=eE}};(_=P||(P={}))[_.Disabled=0]="Disabled",_[_.Errors=1]="Errors",_[_.Warnings=2]="Warnings",_[_.All=3]="All";var eI=new class{get logLevel(){return this._logLevel}set logLevel(e){this._logLevel=e}log(...e){this._logLevel>=3&&this._print(3,...e)}warn(...e){this._logLevel>=2&&this._print(2,...e)}error(...e){this._logLevel>=1&&this._print(1,...e)}setLogFunction(e){this._print=e}_print(e,...t){let n=["PeerJS: ",...t];for(let e in n)n[e]instanceof Error&&(n[e]="("+n[e].name+") "+n[e].message);e>=3?console.log(...n):e>=2?console.warn("WARNING",...n):e>=1&&console.error("ERROR",...n)}constructor(){this._logLevel=0}},eM={},eO=Object.prototype.hasOwnProperty,ej="~";function eL(){}function eA(e,t,n){this.fn=e,this.context=t,this.once=n||!1}function eB(e,t,n,r,i){if("function"!=typeof n)throw TypeError("The listener must be a function");var o=new eA(n,r||e,i),s=ej?ej+t:t;return e._events[s]?e._events[s].fn?e._events[s]=[e._events[s],o]:e._events[s].push(o):(e._events[s]=o,e._eventsCount++),e}function eF(e,t){0==--e._eventsCount?e._events=new eL:delete e._events[t]}function eU(){this._events=new eL,this._eventsCount=0}Object.create&&(eL.prototype=Object.create(null),new eL().__proto__||(ej=!1)),eU.prototype.eventNames=function(){var e,t,n=[];if(0===this._eventsCount)return n;for(t in e=this._events)eO.call(e,t)&&n.push(ej?t.slice(1):t);return Object.getOwnPropertySymbols?n.concat(Object.getOwnPropertySymbols(e)):n},eU.prototype.listeners=function(e){var t=ej?ej+e:e,n=this._events[t];if(!n)return[];if(n.fn)return[n.fn];for(var r=0,i=n.length,o=Array(i);r<i;r++)o[r]=n[r].fn;return o},eU.prototype.listenerCount=function(e){var t=ej?ej+e:e,n=this._events[t];return n?n.fn?1:n.length:0},eU.prototype.emit=function(e,t,n,r,i,o){var s=ej?ej+e:e;if(!this._events[s])return!1;var a,c,l=this._events[s],p=arguments.length;if(l.fn){switch(l.once&&this.removeListener(e,l.fn,void 0,!0),p){case 1:return l.fn.call(l.context),!0;case 2:return l.fn.call(l.context,t),!0;case 3:return l.fn.call(l.context,t,n),!0;case 4:return l.fn.call(l.context,t,n,r),!0;case 5:return l.fn.call(l.context,t,n,r,i),!0;case 6:return l.fn.call(l.context,t,n,r,i,o),!0}for(c=1,a=Array(p-1);c<p;c++)a[c-1]=arguments[c];l.fn.apply(l.context,a)}else{var d,h=l.length;for(c=0;c<h;c++)switch(l[c].once&&this.removeListener(e,l[c].fn,void 0,!0),p){case 1:l[c].fn.call(l[c].context);break;case 2:l[c].fn.call(l[c].context,t);break;case 3:l[c].fn.call(l[c].context,t,n);break;case 4:l[c].fn.call(l[c].context,t,n,r);break;default:if(!a)for(d=1,a=Array(p-1);d<p;d++)a[d-1]=arguments[d];l[c].fn.apply(l[c].context,a)}}return!0},eU.prototype.on=function(e,t,n){return eB(this,e,t,n,!1)},eU.prototype.once=function(e,t,n){return eB(this,e,t,n,!0)},eU.prototype.removeListener=function(e,t,n,r){var i=ej?ej+e:e;if(!this._events[i])return this;if(!t)return eF(this,i),this;var o=this._events[i];if(o.fn)o.fn!==t||r&&!o.once||n&&o.context!==n||eF(this,i);else{for(var s=0,a=[],c=o.length;s<c;s++)(o[s].fn!==t||r&&!o[s].once||n&&o[s].context!==n)&&a.push(o[s]);a.length?this._events[i]=1===a.length?a[0]:a:eF(this,i)}return this},eU.prototype.removeAllListeners=function(e){var t;return e?(t=ej?ej+e:e,this._events[t]&&eF(this,t)):(this._events=new eL,this._eventsCount=0),this},eU.prototype.off=eU.prototype.removeListener,eU.prototype.addListener=eU.prototype.on,eU.prefixed=ej,eU.EventEmitter=eU,eM=eU,(C=w||(w={})).Data="data",C.Media="media",(b=E||(E={})).BrowserIncompatible="browser-incompatible",b.Disconnected="disconnected",b.InvalidID="invalid-id",b.InvalidKey="invalid-key",b.Network="network",b.PeerUnavailable="peer-unavailable",b.SslUnavailable="ssl-unavailable",b.ServerError="server-error",b.SocketError="socket-error",b.SocketClosed="socket-closed",b.UnavailableID="unavailable-id",b.WebRTC="webrtc",(v=D||(D={})).NegotiationFailed="negotiation-failed",v.ConnectionClosed="connection-closed",(k=x||(x={})).NotOpenYet="not-open-yet",k.MessageToBig="message-too-big",(T=I||(I={})).Binary="binary",T.BinaryUTF8="binary-utf8",T.JSON="json",T.None="raw",(S=M||(M={})).Message="message",S.Disconnected="disconnected",S.Error="error",S.Close="close",(R=O||(O={})).Heartbeat="HEARTBEAT",R.Candidate="CANDIDATE",R.Offer="OFFER",R.Answer="ANSWER",R.Open="OPEN",R.Error="ERROR",R.IdTaken="ID-TAKEN",R.InvalidKey="INVALID-KEY",R.Leave="LEAVE",R.Expire="EXPIRE";var ez={};ez=JSON.parse('{"name":"peerjs","version":"1.5.4","keywords":["peerjs","webrtc","p2p","rtc"],"description":"PeerJS client","homepage":"https://peerjs.com","bugs":{"url":"https://github.com/peers/peerjs/issues"},"repository":{"type":"git","url":"https://github.com/peers/peerjs"},"license":"MIT","contributors":["Michelle Bu <michelle@michellebu.com>","afrokick <devbyru@gmail.com>","ericz <really.ez@gmail.com>","Jairo <kidandcat@gmail.com>","Jonas Gloning <34194370+jonasgloning@users.noreply.github.com>","Jairo Caro-Accino Viciana <jairo@galax.be>","Carlos Caballero <carlos.caballero.gonzalez@gmail.com>","hc <hheennrryy@gmail.com>","Muhammad Asif <capripio@gmail.com>","PrashoonB <prashoonbhattacharjee@gmail.com>","Harsh Bardhan Mishra <47351025+HarshCasper@users.noreply.github.com>","akotynski <aleksanderkotbury@gmail.com>","lmb <i@lmb.io>","Jairooo <jairocaro@msn.com>","Moritz Stückler <moritz.stueckler@gmail.com>","Simon <crydotsnakegithub@gmail.com>","Denis Lukov <denismassters@gmail.com>","Philipp Hancke <fippo@andyet.net>","Hans Oksendahl <hansoksendahl@gmail.com>","Jess <jessachandler@gmail.com>","khankuan <khankuan@gmail.com>","DUODVK <kurmanov.work@gmail.com>","XiZhao <kwang1imsa@gmail.com>","Matthias Lohr <matthias@lohr.me>","=frank tree <=frnktrb@googlemail.com>","Andre Eckardt <aeckardt@outlook.com>","Chris Cowan <agentme49@gmail.com>","Alex Chuev <alex@chuev.com>","alxnull <alxnull@e.mail.de>","Yemel Jardi <angel.jardi@gmail.com>","Ben Parnell <benjaminparnell.94@gmail.com>","Benny Lichtner <bennlich@gmail.com>","fresheneesz <bitetrudpublic@gmail.com>","bob.barstead@exaptive.com <bob.barstead@exaptive.com>","chandika <chandika@gmail.com>","emersion <contact@emersion.fr>","Christopher Van <cvan@users.noreply.github.com>","eddieherm <edhermoso@gmail.com>","Eduardo Pinho <enet4mikeenet@gmail.com>","Evandro Zanatta <ezanatta@tray.net.br>","Gardner Bickford <gardner@users.noreply.github.com>","Gian Luca <gianluca.cecchi@cynny.com>","PatrickJS <github@gdi2290.com>","jonnyf <github@jonathanfoss.co.uk>","Hizkia Felix <hizkifw@gmail.com>","Hristo Oskov <hristo.oskov@gmail.com>","Isaac Madwed <i.madwed@gmail.com>","Ilya Konanykhin <ilya.konanykhin@gmail.com>","jasonbarry <jasbarry@me.com>","Jonathan Burke <jonathan.burke.1311@googlemail.com>","Josh Hamit <josh.hamit@gmail.com>","Jordan Austin <jrax86@gmail.com>","Joel Wetzell <jwetzell@yahoo.com>","xizhao <kevin.wang@cloudera.com>","Alberto Torres <kungfoobar@gmail.com>","Jonathan Mayol <mayoljonathan@gmail.com>","Jefferson Felix <me@jsfelix.dev>","Rolf Erik Lekang <me@rolflekang.com>","Kevin Mai-Husan Chia <mhchia@users.noreply.github.com>","Pepijn de Vos <pepijndevos@gmail.com>","JooYoung <qkdlql@naver.com>","Tobias Speicher <rootcommander@gmail.com>","Steve Blaurock <sblaurock@gmail.com>","Kyrylo Shegeda <shegeda@ualberta.ca>","Diwank Singh Tomer <singh@diwank.name>","Sören Balko <Soeren.Balko@gmail.com>","Arpit Solanki <solankiarpit1997@gmail.com>","Yuki Ito <yuki@gnnk.net>","Artur Zayats <zag2art@gmail.com>"],"funding":{"type":"opencollective","url":"https://opencollective.com/peer"},"collective":{"type":"opencollective","url":"https://opencollective.com/peer"},"files":["dist/*"],"sideEffects":["lib/global.ts","lib/supports.ts"],"main":"dist/bundler.cjs","module":"dist/bundler.mjs","browser-minified":"dist/peerjs.min.js","browser-unminified":"dist/peerjs.js","browser-minified-msgpack":"dist/serializer.msgpack.mjs","types":"dist/types.d.ts","engines":{"node":">= 14"},"targets":{"types":{"source":"lib/exports.ts"},"main":{"source":"lib/exports.ts","sourceMap":{"inlineSources":true}},"module":{"source":"lib/exports.ts","includeNodeModules":["eventemitter3"],"sourceMap":{"inlineSources":true}},"browser-minified":{"context":"browser","outputFormat":"global","optimize":true,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 80, safari >= 15"},"source":"lib/global.ts"},"browser-unminified":{"context":"browser","outputFormat":"global","optimize":false,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 80, safari >= 15"},"source":"lib/global.ts"},"browser-minified-msgpack":{"context":"browser","outputFormat":"esmodule","isLibrary":true,"optimize":true,"engines":{"browsers":"chrome >= 83, edge >= 83, firefox >= 102, safari >= 15"},"source":"lib/dataconnection/StreamConnection/MsgPack.ts"}},"scripts":{"contributors":"git-authors-cli --print=false && prettier --write package.json && git add package.json package-lock.json && git commit -m \\"chore(contributors): update and sort contributors list\\"","check":"tsc --noEmit && tsc -p e2e/tsconfig.json --noEmit","watch":"parcel watch","build":"rm -rf dist && parcel build","prepublishOnly":"npm run build","test":"jest","test:watch":"jest --watch","coverage":"jest --coverage --collectCoverageFrom=\\"./lib/**\\"","format":"prettier --write .","format:check":"prettier --check .","semantic-release":"semantic-release","e2e":"wdio run e2e/wdio.local.conf.ts","e2e:bstack":"wdio run e2e/wdio.bstack.conf.ts"},"devDependencies":{"@parcel/config-default":"^2.9.3","@parcel/packager-ts":"^2.9.3","@parcel/transformer-typescript-tsc":"^2.9.3","@parcel/transformer-typescript-types":"^2.9.3","@semantic-release/changelog":"^6.0.1","@semantic-release/git":"^10.0.1","@swc/core":"^1.3.27","@swc/jest":"^0.2.24","@types/jasmine":"^4.3.4","@wdio/browserstack-service":"^8.11.2","@wdio/cli":"^8.11.2","@wdio/globals":"^8.11.2","@wdio/jasmine-framework":"^8.11.2","@wdio/local-runner":"^8.11.2","@wdio/spec-reporter":"^8.11.2","@wdio/types":"^8.10.4","http-server":"^14.1.1","jest":"^29.3.1","jest-environment-jsdom":"^29.3.1","mock-socket":"^9.0.0","parcel":"^2.9.3","prettier":"^3.0.0","semantic-release":"^21.0.0","ts-node":"^10.9.1","typescript":"^5.0.0","wdio-geckodriver-service":"^5.0.1"},"dependencies":{"@msgpack/msgpack":"^2.8.0","eventemitter3":"^4.0.7","peerjs-js-binarypack":"^2.1.0","webrtc-adapter":"^9.0.0"},"alias":{"process":false,"buffer":false}}');class eN extends eM.EventEmitter{start(e,t){this._id=e;let n=`${this._baseUrl}&id=${e}&token=${t}`;!this._socket&&this._disconnected&&(this._socket=new WebSocket(n+"&version="+ez.version),this._disconnected=!1,this._socket.onmessage=e=>{let t;try{t=JSON.parse(e.data),eI.log("Server message received:",t)}catch(t){eI.log("Invalid server message",e.data);return}this.emit(M.Message,t)},this._socket.onclose=e=>{this._disconnected||(eI.log("Socket closed.",e),this._cleanup(),this._disconnected=!0,this.emit(M.Disconnected))},this._socket.onopen=()=>{this._disconnected||(this._sendQueuedMessages(),eI.log("Socket open"),this._scheduleHeartbeat())})}_scheduleHeartbeat(){this._wsPingTimer=setTimeout(()=>{this._sendHeartbeat()},this.pingInterval)}_sendHeartbeat(){if(!this._wsOpen()){eI.log("Cannot send heartbeat, because socket closed");return}let e=JSON.stringify({type:O.Heartbeat});this._socket.send(e),this._scheduleHeartbeat()}_wsOpen(){return!!this._socket&&1===this._socket.readyState}_sendQueuedMessages(){let e=[...this._messagesQueue];for(let t of(this._messagesQueue=[],e))this.send(t)}send(e){if(this._disconnected)return;if(!this._id){this._messagesQueue.push(e);return}if(!e.type){this.emit(M.Error,"Invalid message");return}if(!this._wsOpen())return;let t=JSON.stringify(e);this._socket.send(t)}close(){this._disconnected||(this._cleanup(),this._disconnected=!0)}_cleanup(){this._socket&&(this._socket.onopen=this._socket.onmessage=this._socket.onclose=null,this._socket.close(),this._socket=void 0),clearTimeout(this._wsPingTimer)}constructor(e,t,n,r,i,o=5e3){super(),this.pingInterval=o,this._disconnected=!0,this._messagesQueue=[],this._baseUrl=(e?"wss://":"ws://")+t+":"+n+r+"peerjs?key="+i}}class e${startConnection(e){let t=this._startPeerConnection();if(this.connection.peerConnection=t,this.connection.type===w.Media&&e._stream&&this._addTracksToConnection(e._stream,t),e.originator){let n=this.connection,r={ordered:!!e.reliable},i=t.createDataChannel(n.label,r);n._initializeDataChannel(i),this._makeOffer()}else this.handleSDP("OFFER",e.sdp)}_startPeerConnection(){eI.log("Creating RTCPeerConnection.");let e=new RTCPeerConnection(this.connection.provider.options.config);return this._setupListeners(e),e}_setupListeners(e){let t=this.connection.peer,n=this.connection.connectionId,r=this.connection.type,i=this.connection.provider;eI.log("Listening for ICE candidates."),e.onicecandidate=e=>{e.candidate&&e.candidate.candidate&&(eI.log(`Received ICE candidates for ${t}:`,e.candidate),i.socket.send({type:O.Candidate,payload:{candidate:e.candidate,type:r,connectionId:n},dst:t}))},e.oniceconnectionstatechange=()=>{switch(e.iceConnectionState){case"failed":eI.log("iceConnectionState is failed, closing connections to "+t),this.connection.emitError(D.NegotiationFailed,"Negotiation of connection to "+t+" failed."),this.connection.close();break;case"closed":eI.log("iceConnectionState is closed, closing connections to "+t),this.connection.emitError(D.ConnectionClosed,"Connection to "+t+" closed."),this.connection.close();break;case"disconnected":eI.log("iceConnectionState changed to disconnected on the connection with "+t);break;case"completed":e.onicecandidate=()=>{}}this.connection.emit("iceStateChanged",e.iceConnectionState)},eI.log("Listening for data channel"),e.ondatachannel=e=>{eI.log("Received data channel");let r=e.channel;i.getConnection(t,n)._initializeDataChannel(r)},eI.log("Listening for remote stream"),e.ontrack=e=>{eI.log("Received remote stream");let r=e.streams[0],o=i.getConnection(t,n);o.type===w.Media&&this._addStreamToMediaConnection(r,o)}}cleanup(){eI.log("Cleaning up PeerConnection to "+this.connection.peer);let e=this.connection.peerConnection;if(!e)return;this.connection.peerConnection=null,e.onicecandidate=e.oniceconnectionstatechange=e.ondatachannel=e.ontrack=()=>{};let t="closed"!==e.signalingState,n=!1,r=this.connection.dataChannel;r&&(n=!!r.readyState&&"closed"!==r.readyState),(t||n)&&e.close()}async _makeOffer(){let e=this.connection.peerConnection,t=this.connection.provider;try{let n=await e.createOffer(this.connection.options.constraints);eI.log("Created offer."),this.connection.options.sdpTransform&&"function"==typeof this.connection.options.sdpTransform&&(n.sdp=this.connection.options.sdpTransform(n.sdp)||n.sdp);try{await e.setLocalDescription(n),eI.log("Set localDescription:",n,`for:${this.connection.peer}`);let r={sdp:n,type:this.connection.type,connectionId:this.connection.connectionId,metadata:this.connection.metadata};if(this.connection.type===w.Data){let e=this.connection;r={...r,label:e.label,reliable:e.reliable,serialization:e.serialization}}t.socket.send({type:O.Offer,payload:r,dst:this.connection.peer})}catch(e){"OperationError: Failed to set local offer sdp: Called in wrong state: kHaveRemoteOffer"!=e&&(t.emitError(E.WebRTC,e),eI.log("Failed to setLocalDescription, ",e))}}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to createOffer, ",e)}}async _makeAnswer(){let e=this.connection.peerConnection,t=this.connection.provider;try{let n=await e.createAnswer();eI.log("Created answer."),this.connection.options.sdpTransform&&"function"==typeof this.connection.options.sdpTransform&&(n.sdp=this.connection.options.sdpTransform(n.sdp)||n.sdp);try{await e.setLocalDescription(n),eI.log("Set localDescription:",n,`for:${this.connection.peer}`),t.socket.send({type:O.Answer,payload:{sdp:n,type:this.connection.type,connectionId:this.connection.connectionId},dst:this.connection.peer})}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to setLocalDescription, ",e)}}catch(e){t.emitError(E.WebRTC,e),eI.log("Failed to create answer, ",e)}}async handleSDP(e,t){t=new RTCSessionDescription(t);let n=this.connection.peerConnection,r=this.connection.provider;eI.log("Setting remote description",t);try{await n.setRemoteDescription(t),eI.log(`Set remoteDescription:${e} for:${this.connection.peer}`),"OFFER"===e&&await this._makeAnswer()}catch(e){r.emitError(E.WebRTC,e),eI.log("Failed to setRemoteDescription, ",e)}}async handleCandidate(e){eI.log("handleCandidate:",e);try{await this.connection.peerConnection.addIceCandidate(e),eI.log(`Added ICE candidate for:${this.connection.peer}`)}catch(e){this.connection.provider.emitError(E.WebRTC,e),eI.log("Failed to handleCandidate, ",e)}}_addTracksToConnection(e,t){if(eI.log(`add tracks from stream ${e.id} to peer connection`),!t.addTrack)return eI.error("Your browser does't support RTCPeerConnection#addTrack. Ignored.");e.getTracks().forEach(n=>{t.addTrack(n,e)})}_addStreamToMediaConnection(e,t){eI.log(`add stream ${e.id} to media connection ${t.connectionId}`),t.addStream(e)}constructor(e){this.connection=e}}class eJ extends eM.EventEmitter{emitError(e,t){eI.error("Error:",t),this.emit("error",new eV(`${e}`,t))}}class eV extends Error{constructor(e,t){"string"==typeof t?super(t):(super(),Object.assign(this,t)),this.type=e}}class eG extends eJ{get open(){return this._open}constructor(e,t,n){super(),this.peer=e,this.provider=t,this.options=n,this._open=!1,this.metadata=n.metadata}}class eW extends eG{get type(){return w.Media}get localStream(){return this._localStream}get remoteStream(){return this._remoteStream}_initializeDataChannel(e){this.dataChannel=e,this.dataChannel.onopen=()=>{eI.log(`DC#${this.connectionId} dc connection success`),this.emit("willCloseOnRemote")},this.dataChannel.onclose=()=>{eI.log(`DC#${this.connectionId} dc closed for:`,this.peer),this.close()}}addStream(e){eI.log("Receiving stream",e),this._remoteStream=e,super.emit("stream",e)}handleMessage(e){let t=e.type,n=e.payload;switch(e.type){case O.Answer:this._negotiator.handleSDP(t,n.sdp),this._open=!0;break;case O.Candidate:this._negotiator.handleCandidate(n.candidate);break;default:eI.warn(`Unrecognized message type:${t} from peer:${this.peer}`)}}answer(e,t={}){if(this._localStream){eI.warn("Local stream already exists on this MediaConnection. Are you answering a call twice?");return}for(let n of(this._localStream=e,t&&t.sdpTransform&&(this.options.sdpTransform=t.sdpTransform),this._negotiator.startConnection({...this.options._payload,_stream:e}),this.provider._getMessages(this.connectionId)))this.handleMessage(n);this._open=!0}close(){this._negotiator&&(this._negotiator.cleanup(),this._negotiator=null),this._localStream=null,this._remoteStream=null,this.provider&&(this.provider._removeConnection(this),this.provider=null),this.options&&this.options._stream&&(this.options._stream=null),this.open&&(this._open=!1,super.emit("close"))}constructor(e,t,n){super(e,t,n),this._localStream=this.options._stream,this.connectionId=this.options.connectionId||eW.ID_PREFIX+ex.randomToken(),this._negotiator=new e$(this),this._localStream&&this._negotiator.startConnection({_stream:this._localStream,originator:!0})}}eW.ID_PREFIX="mc_";class eH{_buildRequest(e){let t=this._options.secure?"https":"http",{host:n,port:r,path:i,key:o}=this._options,s=new URL(`${t}://${n}:${r}${i}${o}/${e}`);return s.searchParams.set("ts",`${Date.now()}${Math.random()}`),s.searchParams.set("version",ez.version),fetch(s.href,{referrerPolicy:this._options.referrerPolicy})}async retrieveId(){try{let e=await this._buildRequest("id");if(200!==e.status)throw Error(`Error. Status:${e.status}`);return e.text()}catch(t){eI.error("Error retrieving ID",t);let e="";throw"/"===this._options.path&&this._options.host!==ex.CLOUD_HOST&&(e=" If you passed in a `path` to your self-hosted PeerServer, you'll also need to pass in that same path when creating a new Peer."),Error("Could not get an ID from the server."+e)}}async listAllPeers(){try{let e=await this._buildRequest("peers");if(200!==e.status){if(401===e.status){let e="";throw e=this._options.host===ex.CLOUD_HOST?"It looks like you're using the cloud server. You can email team@peerjs.com to enable peer listing for your API key.":"You need to enable `allow_discovery` on your self-hosted PeerServer to use this feature.",Error("It doesn't look like you have permission to list peers IDs. "+e)}throw Error(`Error. Status:${e.status}`)}return e.json()}catch(e){throw eI.error("Error retrieving list peers",e),Error("Could not get list peers from the server."+e)}}constructor(e){this._options=e}}class eY extends eG{get type(){return w.Data}_initializeDataChannel(e){this.dataChannel=e,this.dataChannel.onopen=()=>{eI.log(`DC#${this.connectionId} dc connection success`),this._open=!0,this.emit("open")},this.dataChannel.onmessage=e=>{eI.log(`DC#${this.connectionId} dc onmessage:`,e.data)},this.dataChannel.onclose=()=>{eI.log(`DC#${this.connectionId} dc closed for:`,this.peer),this.close()}}close(e){if(e?.flush){this.send({__peerData:{type:"close"}});return}this._negotiator&&(this._negotiator.cleanup(),this._negotiator=null),this.provider&&(this.provider._removeConnection(this),this.provider=null),this.dataChannel&&(this.dataChannel.onopen=null,this.dataChannel.onmessage=null,this.dataChannel.onclose=null,this.dataChannel=null),this.open&&(this._open=!1,super.emit("close"))}send(e,t=!1){if(!this.open){this.emitError(x.NotOpenYet,"Connection is not open. You should listen for the `open` event before sending messages.");return}return this._send(e,t)}async handleMessage(e){let t=e.payload;switch(e.type){case O.Answer:await this._negotiator.handleSDP(e.type,t.sdp);break;case O.Candidate:await this._negotiator.handleCandidate(t.candidate);break;default:eI.warn("Unrecognized message type:",e.type,"from peer:",this.peer)}}constructor(e,t,n){super(e,t,n),this.connectionId=this.options.connectionId||eY.ID_PREFIX+eE(),this.label=this.options.label||this.connectionId,this.reliable=!!this.options.reliable,this._negotiator=new e$(this),this._negotiator.startConnection(this.options._payload||{originator:!0,reliable:this.reliable})}}eY.ID_PREFIX="dc_",eY.MAX_BUFFERED_AMOUNT=8388608;class eK extends eY{get bufferSize(){return this._bufferSize}_initializeDataChannel(e){super._initializeDataChannel(e),this.dataChannel.binaryType="arraybuffer",this.dataChannel.addEventListener("message",e=>this._handleDataMessage(e))}_bufferedSend(e){(this._buffering||!this._trySend(e))&&(this._buffer.push(e),this._bufferSize=this._buffer.length)}_trySend(e){if(!this.open)return!1;if(this.dataChannel.bufferedAmount>eY.MAX_BUFFERED_AMOUNT)return this._buffering=!0,setTimeout(()=>{this._buffering=!1,this._tryBuffer()},50),!1;try{this.dataChannel.send(e)}catch(e){return eI.error(`DC#:${this.connectionId} Error when sending:`,e),this._buffering=!0,this.close(),!1}return!0}_tryBuffer(){if(!this.open||0===this._buffer.length)return;let e=this._buffer[0];this._trySend(e)&&(this._buffer.shift(),this._bufferSize=this._buffer.length,this._tryBuffer())}close(e){if(e?.flush){this.send({__peerData:{type:"close"}});return}this._buffer=[],this._bufferSize=0,super.close()}constructor(...e){super(...e),this._buffer=[],this._bufferSize=0,this._buffering=!1}}class eX extends eK{close(e){super.close(e),this._chunkedData={}}_handleDataMessage({data:e}){let t=i(e),n=t.__peerData;if(n){if("close"===n.type){this.close();return}this._handleChunk(t);return}this.emit("data",t)}_handleChunk(e){let t=e.__peerData,n=this._chunkedData[t]||{data:[],count:0,total:e.total};if(n.data[e.n]=new Uint8Array(e.data),n.count++,this._chunkedData[t]=n,n.total===n.count){delete this._chunkedData[t];let e=function(e){let t=0;for(let n of e)t+=n.byteLength;let n=new Uint8Array(t),r=0;for(let t of e)n.set(t,r),r+=t.byteLength;return n}(n.data);this._handleDataMessage({data:e})}}_send(e,t){let n=o(e);if(n instanceof Promise)return this._send_blob(n);if(!t&&n.byteLength>this.chunker.chunkedMTU){this._sendChunks(n);return}this._bufferedSend(n)}async _send_blob(e){let t=await e;if(t.byteLength>this.chunker.chunkedMTU){this._sendChunks(t);return}this._bufferedSend(t)}_sendChunks(e){let t=this.chunker.chunk(e);for(let e of(eI.log(`DC#${this.connectionId} Try to send ${t.length} chunks...`),t))this.send(e,!0)}constructor(e,t,r){super(e,t,r),this.chunker=new n,this.serialization=I.Binary,this._chunkedData={}}}class eq extends eK{_handleDataMessage({data:e}){super.emit("data",e)}_send(e,t){this._bufferedSend(e)}constructor(...e){super(...e),this.serialization=I.None}}class eQ extends eK{_handleDataMessage({data:e}){let t=this.parse(this.decoder.decode(e)),n=t.__peerData;if(n&&"close"===n.type){this.close();return}this.emit("data",t)}_send(e,t){let n=this.encoder.encode(this.stringify(e));if(n.byteLength>=ex.chunkedMTU){this.emitError(x.MessageToBig,"Message too big for JSON channel");return}this._bufferedSend(n)}constructor(...e){super(...e),this.serialization=I.JSON,this.encoder=new TextEncoder,this.decoder=new TextDecoder,this.stringify=JSON.stringify,this.parse=JSON.parse}}class eZ extends eJ{get id(){return this._id}get options(){return this._options}get open(){return this._open}get socket(){return this._socket}get connections(){let e=Object.create(null);for(let[t,n]of this._connections)e[t]=n;return e}get destroyed(){return this._destroyed}get disconnected(){return this._disconnected}_createServerConnection(){let e=new eN(this._options.secure,this._options.host,this._options.port,this._options.path,this._options.key,this._options.pingInterval);return e.on(M.Message,e=>{this._handleMessage(e)}),e.on(M.Error,e=>{this._abort(E.SocketError,e)}),e.on(M.Disconnected,()=>{this.disconnected||(this.emitError(E.Network,"Lost connection to server."),this.disconnect())}),e.on(M.Close,()=>{this.disconnected||this._abort(E.SocketClosed,"Underlying socket is already closed.")}),e}_initialize(e){this._id=e,this.socket.start(e,this._options.token)}_handleMessage(e){let t=e.type,n=e.payload,r=e.src;switch(t){case O.Open:this._lastServerId=this.id,this._open=!0,this.emit("open",this.id);break;case O.Error:this._abort(E.ServerError,n.msg);break;case O.IdTaken:this._abort(E.UnavailableID,`ID "${this.id}" is taken`);break;case O.InvalidKey:this._abort(E.InvalidKey,`API KEY "${this._options.key}" is invalid`);break;case O.Leave:eI.log(`Received leave message from ${r}`),this._cleanupPeer(r),this._connections.delete(r);break;case O.Expire:this.emitError(E.PeerUnavailable,`Could not connect to peer ${r}`);break;case O.Offer:{let e=n.connectionId,t=this.getConnection(r,e);if(t&&(t.close(),eI.warn(`Offer received for existing Connection ID:${e}`)),n.type===w.Media){let i=new eW(r,this,{connectionId:e,_payload:n,metadata:n.metadata});t=i,this._addConnection(r,t),this.emit("call",i)}else if(n.type===w.Data){let i=new this._serializers[n.serialization](r,this,{connectionId:e,_payload:n,metadata:n.metadata,label:n.label,serialization:n.serialization,reliable:n.reliable});t=i,this._addConnection(r,t),this.emit("connection",i)}else{eI.warn(`Received malformed connection type:${n.type}`);return}for(let n of this._getMessages(e))t.handleMessage(n);break}default:{if(!n){eI.warn(`You received a malformed message from ${r} of type ${t}`);return}let i=n.connectionId,o=this.getConnection(r,i);o&&o.peerConnection?o.handleMessage(e):i?this._storeMessage(i,e):eI.warn("You received an unrecognized message:",e)}}}_storeMessage(e,t){this._lostMessages.has(e)||this._lostMessages.set(e,[]),this._lostMessages.get(e).push(t)}_getMessages(e){let t=this._lostMessages.get(e);return t?(this._lostMessages.delete(e),t):[]}connect(e,t={}){if(t={serialization:"default",...t},this.disconnected){eI.warn("You cannot connect to a new Peer because you called .disconnect() on this Peer and ended your connection with the server. You can create a new Peer to reconnect, or call reconnect on this peer if you believe its ID to still be available."),this.emitError(E.Disconnected,"Cannot connect to new Peer after disconnecting from server.");return}let n=new this._serializers[t.serialization](e,this,t);return this._addConnection(e,n),n}call(e,t,n={}){if(this.disconnected){eI.warn("You cannot connect to a new Peer because you called .disconnect() on this Peer and ended your connection with the server. You can create a new Peer to reconnect."),this.emitError(E.Disconnected,"Cannot connect to new Peer after disconnecting from server.");return}if(!t){eI.error("To call a peer, you must provide a stream from your browser's `getUserMedia`.");return}let r=new eW(e,this,{...n,_stream:t});return this._addConnection(e,r),r}_addConnection(e,t){eI.log(`add connection ${t.type}:${t.connectionId} to peerId:${e}`),this._connections.has(e)||this._connections.set(e,[]),this._connections.get(e).push(t)}_removeConnection(e){let t=this._connections.get(e.peer);if(t){let n=t.indexOf(e);-1!==n&&t.splice(n,1)}this._lostMessages.delete(e.connectionId)}getConnection(e,t){let n=this._connections.get(e);if(!n)return null;for(let e of n)if(e.connectionId===t)return e;return null}_delayedAbort(e,t){setTimeout(()=>{this._abort(e,t)},0)}_abort(e,t){eI.error("Aborting!"),this.emitError(e,t),this._lastServerId?this.disconnect():this.destroy()}destroy(){this.destroyed||(eI.log(`Destroy peer with ID:${this.id}`),this.disconnect(),this._cleanup(),this._destroyed=!0,this.emit("close"))}_cleanup(){for(let e of this._connections.keys())this._cleanupPeer(e),this._connections.delete(e);this.socket.removeAllListeners()}_cleanupPeer(e){let t=this._connections.get(e);if(t)for(let e of t)e.close()}disconnect(){if(this.disconnected)return;let e=this.id;eI.log(`Disconnect peer with ID:${e}`),this._disconnected=!0,this._open=!1,this.socket.close(),this._lastServerId=e,this._id=null,this.emit("disconnected",e)}reconnect(){if(this.disconnected&&!this.destroyed)eI.log(`Attempting reconnection to server with ID ${this._lastServerId}`),this._disconnected=!1,this._initialize(this._lastServerId);else if(this.destroyed)throw Error("This peer cannot reconnect to the server. It has already been destroyed.");else if(this.disconnected||this.open)throw Error(`Peer ${this.id} cannot reconnect because it is not disconnected from the server!`);else eI.error("In a hurry? We're still trying to make the initial connection!")}listAllPeers(e=e=>{}){this._api.listAllPeers().then(t=>e(t)).catch(e=>this._abort(E.ServerError,e))}constructor(e,t){let n;if(super(),this._serializers={raw:eq,json:eQ,binary:eX,"binary-utf8":eX,default:eX},this._id=null,this._lastServerId=null,this._destroyed=!1,this._disconnected=!1,this._open=!1,this._connections=new Map,this._lostMessages=new Map,e&&e.constructor==Object?t=e:e&&(n=e.toString()),t={debug:0,host:ex.CLOUD_HOST,port:ex.CLOUD_PORT,path:"/",key:eZ.DEFAULT_KEY,token:ex.randomToken(),config:ex.defaultConfig,referrerPolicy:"strict-origin-when-cross-origin",serializers:{},...t},this._options=t,this._serializers={...this._serializers,...this.options.serializers},"/"===this._options.host&&(this._options.host=window.location.hostname),this._options.path&&("/"!==this._options.path[0]&&(this._options.path="/"+this._options.path),"/"!==this._options.path[this._options.path.length-1]&&(this._options.path+="/")),void 0===this._options.secure&&this._options.host!==ex.CLOUD_HOST?this._options.secure=ex.isSecure():this._options.host==ex.CLOUD_HOST&&(this._options.secure=!0),this._options.logFunction&&eI.setLogFunction(this._options.logFunction),eI.logLevel=this._options.debug||0,this._api=new eH(t),this._socket=this._createServerConnection(),!ex.supports.audioVideo&&!ex.supports.data){this._delayedAbort(E.BrowserIncompatible,"The current browser does not support WebRTC");return}if(n&&!ex.validateId(n)){this._delayedAbort(E.InvalidID,`ID "${n}" is invalid`);return}n?this._initialize(n):this._api.retrieveId().then(e=>this._initialize(e)).catch(e=>this._abort(E.ServerError,e))}}eZ.DEFAULT_KEY="peerjs",window.peerjs={Peer:eZ,util:ex},window.Peer=eZ})();
-
 </script>
 <script>
 (() => {
+
 "use strict";
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const TICK = 700, WIN = 0.9, SAVEKEY = "crownfall-world-v6", TIPKEY = "crownfall-tips";
@@ -1174,7 +1205,7 @@ function startAs(id){
   state.playerDeclaredWar=false; state.runAchs=[]; state.history=[];
   state.startPop=n.pop; state.startArmy=n.army; state.startGdp=n.gdp||calcGdp(n);
   recordHistory();
-  log("sys","You take office in "+n.name+". Standing armies have been stood down. Drag a Military Base from the Shop or build bar onto your land, train troops, then box-select them and click their destination. The great powers keep a one-year peace while everyone rebuilds.");
+  log("sys","You take office in "+n.name+". Standing armies have been stood down. Drag a Military Base from the Shop or build bar onto your land, train troops, then click them and right-click where they should go. They will walk there. The great powers keep a one-year peace while everyone rebuilds.");
   SFX.click(); startTutorial(state.tipsOn?1:99);
   state.tab="nation"; state.hover=-1; state.selectedProv=-1; state.selectedUnits=[];
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t==="nation"));
@@ -2994,7 +3025,7 @@ const HELP_KEYS=[
   ["Space","Pause / resume"],["1 / 2 / 4","Game speed"],["Scroll or + / −","Zoom"],["R","Fit the world"],
   ["S","Save"],["M","Mute sound"],["♫ or N","Music on/off"],["V","Globe / flat map"],["H or ?","This help"],
   ["C","World Congress"],["O","Toggle Auto-front"],["X","Split selected unit"],["G","Merge selected units"],
-  ["F","Fortify selected province"],["Right-click","Move selected / declare war"],["Drag a box","Select troops"],["Drag a base card","Found a base"],["Right-drag or Alt-drag","Pan the map"],["Shift-click","Add unit to selection"]
+  ["F","Fortify selected province"],["Right-click","Move selected units (they walk there)"],["Drag a box","Select troops"],["Move button","Then click the destination"],["Drag a base card","Found a base"],["Middle-drag, WASD, arrows","Pan the map"],["Edge of the screen","Scroll the map"],["Shift-click","Add unit to selection"],["F3","3D / army debug"],["Ctrl+S","Save"]
 ];
 function toggleHelp(force){
   const el=$("help"); if(!el)return;
@@ -3309,7 +3340,7 @@ function renderPanel(force){
   if(!nationN){box.innerHTML=`<div class="empty">Click a country on the map.</div>`;return;}
   n=nationN;
   const ps=nProvs(n.id), isP=n.id===state.player;
-  let html=`<div class="head"><div class="flag" style="background:${n.color}"></div><div><h2>${n.name}</h2><div class="sub">${state.phase==="pick"?"Click again to rule this land":(isP?"Your realm":(n.alive?"Foreign power":"Collapsed"))}</div></div></div>`;
+  let html=`<div class="head"><div class="flag" style="background:${n.color}"></div><div><h2>${n.name}</h2><div class="sub">${state.phase==="pick"?`Press Play as ${n.name} when you're ready`:(isP?"Your realm":(n.alive?"Foreign power":"Collapsed"))}</div></div></div>`;
   if(!n.ledger||((n.ledger.income||0)===0&&state.tick===0)) previewLedger(n);
   const L=n.ledger||{income:0,upkeep:0,recruit:0,war:0,net:0};
   const money=Number.isFinite(n.money)?n.money:0;
@@ -3328,7 +3359,7 @@ function renderPanel(force){
   const tags=[];
   if(n.sanction)tags.push("Sanctioned "+n.sanction+" mo"); if(n.trade)tags.push("Trade pact"); if(n.boom)tags.push("Boom"); if(n.revolt)tags.push("Unrest"); if(n.condemned)tags.push("Condemned"); if(n.expelled)tags.push("Suspended"); if(n.nukeArmed)tags.push("Nuclear ("+n.nukes+")");
   if(tags.length)html+=`<div class="small" style="margin:6px 0">${tags.join(" · ")}</div>`;
-  if(state.phase==="pick")html+=`<div class="row"><button class="btn gold" id="rRule">Rule ${n.name}</button></div>`;
+  if(state.phase==="pick")html+=`<div class="row"><button class="btn gold" id="rRule">Play as ${n.name}</button></div>`;
   if(state.phase!=="pick"&&isP){
     html+=`<div class="st">Budget</div><div class="small" style="margin-bottom:6px">Economy and Research take a share of income. The Manpower slider sets how quickly your manpower pool (the cap on paid recruitment) refills — it does not raise free troops. Buy units, ships, bases, forts, and missiles from the treasury.</div>`;
     for(const [id,lab] of [["eco","Economy"],["mil","Manpower"],["res","Research"]]){
@@ -3431,7 +3462,7 @@ function renderDiplo(box,n){
   const isP=n.id===state.player, me=state.player>=0?nations[state.player]:null;
   const ov=isPuppet(n)&&nations[n.overlord]?nations[n.overlord].name:null;
   html+=`<div class="head"><div class="flag" style="background:${displayColor(n)}"></div><div><h2>${n.name}</h2><div class="sub">${ov?"Puppet of "+ov+" · ":""}Relations ${me&&!isP?Math.round(rel(me.id,n.id)): "—"}</div></div></div>`;
-  if(state.phase==="pick")html+=`<div class="row"><button class="btn gold" id="rRule">Rule ${n.name}</button></div>`;
+  if(state.phase==="pick")html+=`<div class="row"><button class="btn gold" id="rRule">Play as ${n.name}</button></div>`;
   else if(me&&!isP&&n.alive){
     const neigh=neighNats(me.id).includes(n.id), war=atWar(me.id,n.id), truce=me.truce[n.id]||0, isAlly=allied(me.id,n.id);
     const reach=canReach(me.id,n.id);
@@ -3838,7 +3869,7 @@ canvas.addEventListener("click",e=>{
       const n=nations[nid]; if(n&&mpPickIso(n.iso)) return;
     }
     if(state.selected===nid)startAs(nid);
-    else{state.selected=nid;state.selectedProv=id;renderPanel();feedback("Rule "+nations[nid].name+"? Click again or press the button.","good",false);}
+    else{state.selected=nid;state.selectedProv=id;renderPanel();feedback("Play as "+nations[nid].name+"? Click again, or press Play as "+nations[nid].name+".","good",false);}
     return;
   }
   state.selected=nid; state.selectedProv=id; state.tab="diplo";
@@ -3897,7 +3928,8 @@ window.addEventListener("keydown",e=>{
   if(e.key==="+"||e.key==="="){zoomAt(view.cssW/2,view.cssH/2,1.15);}
   if(e.key==="-"){zoomAt(view.cssW/2,view.cssH/2,1/1.15);}
   if(e.key==="r"||e.key==="R")fitView();
-  if(e.key==="s"||e.key==="S"){if(state.phase==="play")saveManual();}
+  if((e.key==="s"||e.key==="S")&&(e.ctrlKey||e.metaKey)){e.preventDefault();if(state.phase==="play")saveManual();}
+  if(e.key==="F3"){e.preventDefault();if(typeof toggleGlDebug==="function")toggleGlDebug();}
   if(e.key==="m"||e.key==="M"){$("bMute").click();}
   if(e.key==="c"||e.key==="C"){state.tab="un";document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t==="un"));renderPanel();}
   if(e.key==="x"||e.key==="X"){const id=(state.selectedUnits||[])[0]; if(id){splitUnit(id);renderActionBar();}}
@@ -6129,54 +6161,216 @@ if(params.get("test")==="1"){
   document.body.dataset.errors=String((window.__CF_ERRORS||[]).length);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-/* ===== Procedural WebGL unit models (offline, no external assets) ===== */
-var UnitGL={
-  ok:false, gl:null, canv:null, prog:null, vao:null, ext:null, inst:null, meshes:{},
-  maxInst:800, buf:null, data:null, count:0,
+/* ===== Procedural WebGL unit models + Canvas2D 3D fallback (no external assets) ===== */
+var UnitMesh={
+  _box(x0,y0,z0,x1,y1,z1, tris){
+    const f=[
+      [x0,y0,z1,x1,y0,z1,x1,y1,z1,x0,y1,z1, 0,0,1],
+      [x1,y0,z0,x0,y0,z0,x0,y1,z0,x1,y1,z0, 0,0,-1],
+      [x0,y1,z1,x1,y1,z1,x1,y1,z0,x0,y1,z0, 0,1,0],
+      [x0,y0,z0,x1,y0,z0,x1,y0,z1,x0,y0,z1, 0,-1,0],
+      [x1,y0,z1,x1,y0,z0,x1,y1,z0,x1,y1,z1, 1,0,0],
+      [x0,y0,z0,x0,y0,z1,x0,y1,z1,x0,y1,z0, -1,0,0]
+    ];
+    for(const q of f){
+      const n=[q[12],q[13],q[14]];
+      const v=[[q[0],q[1],q[2]],[q[3],q[4],q[5]],[q[6],q[7],q[8]],[q[9],q[10],q[11]]];
+      for(const idx of [0,1,2,0,2,3]){
+        const a=v[idx];
+        tris.push(a[0],a[1],a[2], n[0],n[1],n[2]);
+      }
+    }
+  },
+  _make(fn){
+    const tris=[]; fn(tris);
+    return tris;
+  },
   init(){
+    if(this.ready)return;
+    const box=this._box.bind(this);
+    const body=(t,sx=1,sy=1,sz=1,hx=0)=>{ // standing person
+      box(-0.16*sx,0.0,-0.1*sz,0.16*sx,0.52*sy,0.1*sz,t);
+      box(-0.12*sx,0.52*sy,-0.12*sz+hx,0.12*sx,0.82*sy,0.12*sz+hx,t);
+      box(-0.36*sx,0.28*sy,-0.07*sz,0.36*sx,0.48*sy,0.07*sz,t);
+    };
+    const rifle=(t)=>{ body(t); box(0.14,0.30,-0.48,0.22,0.40,0.28,t); box(0.15,0.33,0.28,0.20,0.37,0.42,t); };
+    const sniper=(t)=>{ // prone, long rifle
+      box(-0.18,0.02,-0.55,0.18,0.22,0.45,t);
+      box(-0.12,0.16,0.32,0.12,0.36,0.62,t);
+      box(-0.06,0.12,-1.15,0.06,0.20,0.55,t);
+      box(-0.07,0.16,-0.15,0.07,0.28,0.05,t);
+    };
+    const medic=(t)=>{ body(t,1,1,1,0); box(-0.16,0.22,0.12,0.16,0.48,0.32,t); };
+    const cross=(t)=>{ box(-0.06,0.0,-0.22,0.06,0.08,0.22,t); box(-0.22,0.0,-0.06,0.22,0.08,0.06,t); };
+    const eng=(t)=>{ body(t); box(-0.28,0.0,-0.22,0.05,0.22,0.22,t); box(0.22,0.32,-0.08,0.55,0.42,0.08,t); box(0.48,0.28,-0.18,0.58,0.48,0.18,t); };
+    const mg=(t)=>{ // kneeling + wide gun
+      box(-0.18,0.0,-0.16,0.18,0.32,0.16,t);
+      box(-0.12,0.32,-0.12,0.12,0.58,0.12,t);
+      box(-0.35,0.22,-0.10,0.20,0.36,0.12,t);
+      box(-0.08,0.18,-0.7,0.28,0.32,0.4,t);
+      box(0.10,0.14,-0.22,0.42,0.22,0.22,t);
+    };
+    const at=(t)=>{ body(t); box(-0.05,0.38,-0.15,0.85,0.50,0.15,t); box(0.70,0.36,-0.10,1.05,0.52,0.10,t); };
+    const aa=(t)=>{ // gun carriage, vertical barrel
+      box(-0.45,0.0,-0.35,0.45,0.18,0.35,t);
+      box(-0.16,0.18,-0.16,0.16,0.38,0.16,t);
+      box(-0.07,0.30,-0.07,0.07,1.25,0.07,t);
+      box(-0.12,1.12,-0.12,0.12,1.32,0.12,t);
+    };
+    const sf=(t)=>{ // slimmer, beret, short SMG
+      box(-0.14,0.0,-0.09,0.14,0.52,0.09,t);
+      box(-0.11,0.52,-0.11,0.11,0.78,0.11,t);
+      box(-0.16,0.74,-0.14,0.16,0.84,0.14,t);
+      box(-0.30,0.30,-0.06,0.30,0.46,0.06,t);
+      box(0.12,0.32,-0.28,0.20,0.40,0.18,t);
+    };
+    const para=(t)=>{ body(t); box(-0.55,0.95,-0.55,0.55,1.12,0.55,t); box(-0.62,0.88,-0.08,0.62,0.98,0.08,t); box(-0.08,0.80,-0.62,0.08,0.90,0.62,t); box(-0.04,0.72,-0.04,0.04,0.96,0.04,t); };
+    const marine=(t)=>{ body(t,1.05,1,1.05,0); box(-0.18,0.74,-0.16,0.18,0.90,0.16,t); box(-0.14,0.20,0.10,0.14,0.48,0.28,t); };
+    const arm=(t)=>{ // tank: hull, tracks, turret, barrel
+      box(-0.95,0.0,-0.58,0.95,0.22,0.58,t);
+      box(-0.80,0.18,-0.48,0.80,0.48,0.48,t);
+      box(-0.32,0.48,-0.30,0.36,0.78,0.30,t);
+      box(0.30,0.56,-0.09,1.25,0.68,0.09,t);
+      box(-0.70,0.08,-0.62,0.70,0.28, -0.48,t);
+      box(-0.70,0.08,0.48,0.70,0.28,0.62,t);
+    };
+    const art=(t)=>{ // howitzer, trails, wheels
+      box(-0.7,0.0,-0.22,0.15,0.16,0.22,t);
+      box(-0.35,0.10,-0.18,0.25,0.32,0.18,t);
+      box(0.10,0.22,-0.08,1.35,0.34,0.08,t);
+      box(-0.55,0.0,-0.42,-0.25,0.28,-0.18,t);
+      box(-0.55,0.0,0.18,-0.25,0.28,0.42,t);
+    };
+    const air=(t)=>{ // fighter: slim fuselage, swept wings, tail
+      box(-0.95,0.30,-0.10,0.95,0.46,0.10,t);
+      box(-0.15,0.28,-0.85,0.35,0.40,0.85,t);
+      box(-0.85,0.40,-0.05,-0.55,0.72,0.05,t);
+      box(-0.90,0.32,-0.35,-0.55,0.40,0.35,t);
+      box(0.55,0.34,-0.08,1.05,0.44,0.08,t);
+    };
+    const bomb=(t)=>{ // bomber: fat fuselage, long wings, twin engines
+      box(-1.15,0.22,-0.18,1.05,0.48,0.18,t);
+      box(-0.25,0.20,-1.15,0.45,0.40,1.15,t);
+      box(-0.05,0.38,-0.12,0.15,0.62,0.12,t);
+      box(-0.15,0.16,-0.70,0.25,0.36,-0.48,t);
+      box(-0.15,0.16,0.48,0.25,0.36,0.70,t);
+    };
+    const transport=(t)=>{ // high-wing cargo, boxy
+      box(-1.05,0.18,-0.28,1.05,0.55,0.28,t);
+      box(-0.15,0.50,-1.05,0.35,0.62,1.05,t);
+      box(-1.05,0.30,-0.06,-0.75,0.72,0.06,t);
+      box(0.70,0.22,-0.16,1.20,0.42,0.16,t);
+    };
+    const dd=(t)=>{ // destroyer: long thin hull, one stack
+      box(-1.6,0.0,-0.22,1.6,0.22,0.22,t);
+      box(-0.3,0.22,-0.14,0.55,0.55,0.14,t);
+      box(0.10,0.55,-0.08,0.28,0.85,0.08,t);
+      box(0.7,0.22,-0.08,1.2,0.34,0.08,t);
+    };
+    const cl=(t)=>{ // cruiser: longer, two turrets
+      box(-1.9,0.0,-0.26,1.9,0.24,0.26,t);
+      box(-0.5,0.24,-0.16,0.7,0.52,0.16,t);
+      box(-1.2,0.22,-0.14,-0.6,0.42,0.14,t);
+      box(0.8,0.22,-0.14,1.4,0.42,0.14,t);
+      box(-1.15,0.36,-0.06,-0.4,0.46,0.06,t);
+    };
+    const bb=(t)=>{ // battleship: huge, three turrets
+      box(-2.3,0.0,-0.34,2.3,0.26,0.34,t);
+      box(-0.6,0.26,-0.20,0.7,0.58,0.20,t);
+      box(-1.8,0.22,-0.22,-1.0,0.48,0.22,t);
+      box(1.0,0.22,-0.22,1.8,0.48,0.22,t);
+      box(-0.15,0.58,-0.12,0.15,0.95,0.12,t);
+      box(-1.7,0.42,-0.08,-0.5,0.52,0.08,t);
+      box(0.5,0.42,-0.08,1.7,0.52,0.08,t);
+    };
+    const cv=(t)=>{ // carrier: flat deck + island
+      box(-2.2,0.0,-0.45,2.2,0.22,0.45,t);
+      box(-2.1,0.22,-0.42,2.1,0.30,0.42,t);
+      box(0.5,0.30,0.18,1.2,0.85,0.42,t);
+      box(-0.3,0.30,-0.08,0.4,0.40,0.08,t);
+    };
+    const ss=(t)=>{ // submarine: cigar + sail
+      box(-1.5,0.04,-0.18,1.5,0.28,0.18,t);
+      box(-0.2,0.28,-0.10,0.25,0.58,0.10,t);
+      box(0.8,0.16,-0.04,1.55,0.24,0.04,t);
+    };
+    const tent=(t)=>{ box(-0.7,0.0,-0.55,0.7,0.45,0.55,t); box(-0.15,0.45,-0.15,0.15,0.7,0.15,t); };
+    this.meshes={
+      rifle:this._make(rifle), sniper:this._make(sniper), medic:this._make(medic),
+      cross:this._make(cross),
+      eng:this._make(eng), mg:this._make(mg), at:this._make(at), aa:this._make(aa),
+      sf:this._make(sf), para:this._make(para), marine:this._make(marine),
+      arm:this._make(arm), art:this._make(art), air:this._make(air), bomb:this._make(bomb),
+      transport:this._make(transport), tent:this._make(tent),
+      inf:this._make(rifle),
+      dd:this._make(dd), cl:this._make(cl), bb:this._make(bb), cv:this._make(cv), ss:this._make(ss)
+    };
+    this.ready=true;
+
+  }
+};
+
+var UnitGL={
+  ok:false, gl:null, canv:null, prog:null, ext:null, meshes:{},
+  maxInst:800, data:null, fail:"not started", info:"", shaderLog:"",
+  init(){
+    this.fail="not started"; this.ok=false; this.info="";
     try{
       this.canv=$("c3d");
       if(!this.canv){
         this.canv=document.createElement("canvas");
         this.canv.id="c3d";
         const wrap=$("mapwrap");
-        if(!wrap)return;
+        if(!wrap){ this.fail="Map area missing — cannot create a 3D canvas."; return; }
         wrap.insertBefore(this.canv, $("tip")||null);
       }
       this.canv.style.pointerEvents="none";
-      const opt={alpha:true,antialias:true,depth:true,premultipliedAlpha:false,preserveDrawingBuffer:true};
-      let gl=this.canv.getContext("webgl2",opt);
-      let is2=!!gl;
-      if(!gl) gl=this.canv.getContext("webgl",opt)||this.canv.getContext("experimental-webgl",opt);
-      if(!gl) return;
-      this.gl=gl;
+      const opt={alpha:true,antialias:true,depth:true,premultipliedAlpha:false,preserveDrawingBuffer:true,powerPreference:"high-performance"};
+      let gl=null, is2=false, how="";
+      try{ gl=this.canv.getContext("webgl2",opt); if(gl){is2=true; how="webgl2";} }catch(e){ how="webgl2 threw: "+(e&&e.message||e); }
+      if(!gl){
+        try{ gl=this.canv.getContext("webgl",opt); if(gl) how="webgl1"; }catch(e){ how+=(how?"; ":"")+"webgl1 threw: "+(e&&e.message||e); }
+      }
+      if(!gl){
+        try{ gl=this.canv.getContext("experimental-webgl",opt); if(gl) how="experimental-webgl"; }catch(e){ how+=(how?"; ":"")+"experimental-webgl threw: "+(e&&e.message||e); }
+      }
+      if(!gl){
+        this.fail="WebGL is not available ("+(how||"all context requests returned null")+"). Using the Canvas 3D fallback so units still look 3D.";
+        return;
+      }
+      this.gl=gl; this.is2=is2; this.info=how;
+      try{
+        const dbg=gl.getExtension("WEBGL_debug_renderer_info");
+        if(dbg){
+          const vend=gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL);
+          const rend=gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL);
+          this.info=how+" · "+vend+" · "+rend;
+        }
+      }catch(e){}
       if(!is2){
         this.ext=gl.getExtension("ANGLE_instanced_arrays");
-        if(!this.ext) return;
+        if(!this.ext){
+          this.fail="This GPU has no instanced-draw support (ANGLE_instanced_arrays). Using the Canvas 3D fallback.";
+          return;
+        }
       }
-      this.is2=is2;
-      if(!this._compile()) return;
+      if(!this._compile()){
+        this.fail="WebGL shaders failed"+(this.shaderLog?": "+this.shaderLog:".")+" Using the Canvas 3D fallback.";
+        return;
+      }
       this._makeMeshes();
       this.resize();
       this.ok=true;
-    }catch(e){ this.ok=false; }
+      this.fail="";
+    }catch(e){
+      this.ok=false;
+      this.fail="WebGL exception: "+(e&&e.message||e)+". Using the Canvas 3D fallback.";
+    }
   },
   resize(){
     if(!this.canv)return;
-    const r=$("mapwrap").getBoundingClientRect();
+    const wrap=$("mapwrap"); if(!wrap)return;
+    const r=wrap.getBoundingClientRect();
     const dpr=Math.min(2,window.devicePixelRatio||1);
     this.canv.width=Math.max(1,r.width*dpr);
     this.canv.height=Math.max(1,r.height*dpr);
@@ -6199,7 +6393,7 @@ void main(){
   p*=iScl;
   vec3 n=aNrm;
   n.xz=vec2(c*n.x+s*n.z, -s*n.x+c*n.z);
-  float light=0.45+0.55*max(0.0, dot(normalize(n), normalize(vec3(0.35,0.8,0.45))));
+  float light=0.42+0.58*max(0.0, dot(normalize(n), normalize(vec3(0.35,0.85,0.45))));
   vCol=iCol*light;
   vec2 scr=iPos.xy + vec2(p.x, -p.y - p.z*0.35);
   vec2 clip=(scr/uRes)*2.0-1.0;
@@ -6207,11 +6401,11 @@ void main(){
 }`;
     const fs=`precision mediump float; varying vec3 vCol; void main(){ gl_FragColor=vec4(vCol,1.0); }`;
     const vsO=gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vsO,vs); gl.compileShader(vsO);
-    if(!gl.getShaderParameter(vsO,gl.COMPILE_STATUS)) return false;
+    if(!gl.getShaderParameter(vsO,gl.COMPILE_STATUS)){ this.shaderLog=gl.getShaderInfoLog(vsO)||"vertex compile"; return false; }
     const fsO=gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fsO,fs); gl.compileShader(fsO);
-    if(!gl.getShaderParameter(fsO,gl.COMPILE_STATUS)) return false;
+    if(!gl.getShaderParameter(fsO,gl.COMPILE_STATUS)){ this.shaderLog=gl.getShaderInfoLog(fsO)||"fragment compile"; return false; }
     const p=gl.createProgram(); gl.attachShader(p,vsO); gl.attachShader(p,fsO); gl.linkProgram(p);
-    if(!gl.getProgramParameter(p,gl.LINK_STATUS)) return false;
+    if(!gl.getProgramParameter(p,gl.LINK_STATUS)){ this.shaderLog=gl.getProgramInfoLog(p)||"link"; return false; }
     this.prog=p;
     this.loc={
       aPos:gl.getAttribLocation(p,"aPos"), aNrm:gl.getAttribLocation(p,"aNrm"),
@@ -6221,63 +6415,16 @@ void main(){
     };
     return true;
   },
-  _box(x0,y0,z0,x1,y1,z1, pos,nrm){
-    const f=[
-      [x0,y0,z1,x1,y0,z1,x1,y1,z1,x0,y1,z1, 0,0,1],
-      [x1,y0,z0,x0,y0,z0,x0,y1,z0,x1,y1,z0, 0,0,-1],
-      [x0,y1,z1,x1,y1,z1,x1,y1,z0,x0,y1,z0, 0,1,0],
-      [x0,y0,z0,x1,y0,z0,x1,y0,z1,x0,y0,z1, 0,-1,0],
-      [x1,y0,z1,x1,y0,z0,x1,y1,z0,x1,y1,z1, 1,0,0],
-      [x0,y0,z0,x0,y0,z1,x0,y1,z1,x0,y1,z0, -1,0,0]
-    ];
-    for(const q of f){
-      const n=[q[12],q[13],q[14]];
-      const v=[[q[0],q[1],q[2]],[q[3],q[4],q[5]],[q[6],q[7],q[8]],[q[9],q[10],q[11]]];
-      for(const idx of [0,1,2,0,2,3]){
-        pos.push(...v[idx]); nrm.push(...n);
-      }
-    }
-  },
-  _mesh(fn){
-    const pos=[], nrm=[];
-    fn(pos,nrm);
-    const gl=this.gl;
-    const ab=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,ab);
-    const arr=new Float32Array(pos.length/3*6);
-    for(let i=0,j=0;i<pos.length;i+=3,j+=6){
-      arr[j]=pos[i];arr[j+1]=pos[i+1];arr[j+2]=pos[i+2];
-      arr[j+3]=nrm[i];arr[j+4]=nrm[i+1];arr[j+5]=nrm[i+2];
-    }
-    gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);
-    return {buf:ab, n:pos.length/3, stride:24};
-  },
   _makeMeshes(){
-    const box=this._box.bind(this);
-    const inf=(p,n)=>{ box(-0.18,0.0,-0.1,0.18,0.55,0.1,p,n); box(-0.12,0.55,-0.12,0.12,0.82,0.12,p,n); box(-0.35,0.28,-0.07,0.35,0.48,0.07,p,n); };
-    const rifle=(p,n)=>{ inf(p,n); box(0.12,0.32,-0.35,0.2,0.4,0.25,p,n); };
-    const sniper=(p,n)=>{ inf(p,n); box(0.12,0.34,-0.5,0.18,0.4,0.3,p,n); };
-    const medic=(p,n)=>{ inf(p,n); box(-0.08,0.3,0.1,0.08,0.5,0.22,p,n); };
-    const eng=(p,n)=>{ inf(p,n); box(-0.2,0.0,-0.2,0.05,0.2,0.2,p,n); };
-    const mg=(p,n)=>{ inf(p,n); box(-0.15,0.15,-0.4,0.25,0.35,0.3,p,n); };
-    const at=(p,n)=>{ inf(p,n); box(-0.1,0.2,-0.5,0.15,0.35,0.35,p,n); };
-    const aa=(p,n)=>{ inf(p,n); box(-0.05,0.4,-0.05,0.05,0.95,0.05,p,n); };
-    const sf=(p,n)=>{ inf(p,n); box(-0.2,0.6,-0.1,0.2,0.7,0.1,p,n); };
-    const para=(p,n)=>{ inf(p,n); box(-0.45,0.85,-0.45,0.45,0.95,0.45,p,n); };
-    const marine=(p,n)=>{ inf(p,n); box(-0.15,0.7,-0.15,0.15,0.85,0.15,p,n); };
-    const arm=(p,n)=>{ box(-0.7,0.05,-0.45,0.7,0.4,0.45,p,n); box(-0.25,0.4,-0.25,0.3,0.65,0.25,p,n); box(0.3,0.45,-0.08,0.85,0.55,0.08,p,n); };
-    const art=(p,n)=>{ box(-0.45,0.0,-0.3,0.35,0.28,0.3,p,n); box(0.0,0.22,-0.07,0.95,0.32,0.07,p,n); };
-    const air=(p,n)=>{ box(-0.7,0.25,-0.12,0.7,0.4,0.12,p,n); box(-0.15,0.25,-0.7,0.15,0.32,0.7,p,n); box(-0.05,0.4,-0.05,0.05,0.7,0.05,p,n); };
-    const bomb=(p,n)=>{ box(-0.8,0.2,-0.16,0.8,0.4,0.16,p,n); box(-0.2,0.2,-0.6,0.2,0.35,0.6,p,n); };
-    const ship=(p,n)=>{ box(-1.1,0.0,-0.28,1.1,0.28,0.28,p,n); box(-0.3,0.28,-0.18,0.5,0.55,0.18,p,n); };
-    this.meshes={
-      rifle:this._mesh(rifle), sniper:this._mesh(sniper), medic:this._mesh(medic),
-      eng:this._mesh(eng), mg:this._mesh(mg), at:this._mesh(at), aa:this._mesh(aa),
-      sf:this._mesh(sf), para:this._mesh(para), marine:this._mesh(marine),
-      arm:this._mesh(arm), art:this._mesh(art), air:this._mesh(air), bomb:this._mesh(bomb),
-      inf:this._mesh(rifle),
-      dd:this._mesh(ship), cl:this._mesh(ship), bb:this._mesh(ship), cv:this._mesh(ship), ss:this._mesh(ship)
-    };
+    UnitMesh.init();
     const gl=this.gl;
+    this.meshes={};
+    for(const k of Object.keys(UnitMesh.meshes)){
+      const src=UnitMesh.meshes[k];
+      const ab=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,ab);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(src), gl.STATIC_DRAW);
+      this.meshes[k]={buf:ab, n:src.length/6, stride:24};
+    }
     this.ibuf=gl.createBuffer();
     this.data=new Float32Array(this.maxInst*9);
   },
@@ -6289,7 +6436,6 @@ void main(){
   draw(now){
     if(!this.ok||!this.gl) return;
     if(typeof unitStyle==="function" && unitStyle()==="nato"){ this._clear(); return; }
-    if(typeof combatShowUnits==="function" && !combatShowUnits()){ this._clear(); return; }
     const gl=this.gl;
     if(this.w!==view.cssW||this.h!==view.cssH) this.resize();
     gl.viewport(0,0,this.canv.width,this.canv.height);
@@ -6297,7 +6443,6 @@ void main(){
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
     gl.disable(gl.CULL_FACE);
-    const t=(now||performance.now())/1000;
     const groups={};
     const add=(typ,x,y,z,col,scl,rot,bob)=>{
       typ=typ||"rifle";
@@ -6305,74 +6450,31 @@ void main(){
       if(!groups[typ]) groups[typ]=[];
       groups[typ].push(x,y,z,col[0],col[1],col[2],scl,rot,bob);
     };
-    const figS=typeof figureScale==="function"?figureScale():1;
-    const close=typeof combatZoomedIn==="function"?combatZoomedIn():view.scale>=0.4;
-    // units
-    const byKey=new Map();
-    for(const u of (state.units||[])){
-      if(!u||u.str<=0)continue;
-      const p=scrOf(u.ax!=null?u.ax:0, u.ay!=null?u.ay:0);
-      if(!p.vis)continue;
-      if(p.x<-40||p.y<-40||p.x>view.cssW+40||p.y>view.cssH+40)continue;
-      const typ=typeof normType==="function"?normType(u.type):u.type;
-      const k=u.pid+":"+u.owner+":"+typ;
-      if(!byKey.has(k)) byKey.set(k,[]);
-      byKey.get(k).push(u);
-    }
-    for(const list of byKey.values()){
-      const u=list[0], nat=nations[u.owner]; if(!nat)continue;
-      const col=this._hex(typeof displayColor==="function"?displayColor(nat):nat.color);
-      const typ=typeof normType==="function"?normType(u.type):u.type;
-      const p=scrOf(u.ax,u.ay);
-      const nFigs=close?Math.min(4, Math.max(1, Math.round(Math.sqrt(list.reduce((s,x)=>s+x.str,0)/800)))):1;
-      const moving=list.some(x=>x.dest>=0&&x.dest!==x.pid);
-      const scl=6.5*figS*(typ==="arm"||typ==="art"?1.15:typ==="air"||typ==="bomb"?1.2:1);
-      for(let i=0;i<nFigs;i++){
-        const ox=(i-(nFigs-1)/2)*9*figS;
-        const walk=moving?Math.abs(Math.sin(t*8+i))*1.4:Math.sin(t*1.5+i)*0.3;
-        const rot=moving?Math.sin(t*6+i)*0.15:0;
-        const fly=(typ==="air"||typ==="bomb")?(6+Math.sin(t*3+i)*2):0;
-        add(typ, p.x+ox, p.y-8-fly, 0, col, scl, rot, walk);
-      }
-    }
-    // bases as simple compounds (grow with modules)
-    if(state.bases){
-      for(const b of state.bases){
-        const pr=provinces[b.pid]; if(!pr)continue;
-        const c=scrOf(pr.cx,pr.cy); if(!c.vis)continue;
-        const nat=nations[b.owner]; if(!nat)continue;
-        const col=this._hex(displayColor(nat));
-        const tier=typeof baseVisualTier==="function"?baseVisualTier(b):1;
-        const x=c.x+(b.kind==="nav"?10:-12), y=c.y+(b.kind==="nav"?8:-18);
-        const typ=b.kind==="nav"?"dd":"arm";
-        add(typ,x,y,0,col, 5*figS*(1+tier*0.12), 0, 0);
-      }
-    }
+    const figs=typeof collectUnitFigures==="function"?collectUnitFigures(now):[];
+    for(const f of figs) add(f.typ,f.x,f.y,0,this._hex(f.col),f.scl,f.rot,f.bob);
     gl.useProgram(this.prog);
     gl.uniform2f(this.loc.uRes, view.cssW, view.cssH);
-    const ia=this.is2?gl:this.ext;
-    const va=this.is2?(fn,loc,sz,st,off,div)=>{ gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,st,off); gl.vertexAttribDivisor(loc,div); }
-      :(fn,loc,sz,st,off,div)=>{ gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,st,off); this.ext.vertexAttribDivisorANGLE(loc,div); };
+    const va=this.is2
+      ?(loc,sz,st,off,div)=>{ gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,st,off); gl.vertexAttribDivisor(loc,div); }
+      :(loc,sz,st,off,div)=>{ gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,st,off); this.ext.vertexAttribDivisorANGLE(loc,div); };
     for(const typ of Object.keys(groups)){
       const arr=groups[typ];
-      const n=arr.length/9;
-      if(!n)continue;
+      const n=arr.length/9; if(!n)continue;
       const mesh=this.meshes[typ]; if(!mesh)continue;
       gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
-      va("p", this.loc.aPos, 3, 24, 0, 0);
-      va("n", this.loc.aNrm, 3, 24, 12, 0);
-      if(n>this.maxInst) arr.length=this.maxInst*9;
+      va(this.loc.aPos, 3, 24, 0, 0);
+      va(this.loc.aNrm, 3, 24, 12, 0);
       const instN=Math.min(n,this.maxInst);
       const f=this.data;
       for(let i=0;i<instN*9;i++) f[i]=arr[i];
       gl.bindBuffer(gl.ARRAY_BUFFER, this.ibuf);
       gl.bufferData(gl.ARRAY_BUFFER, f.subarray(0, instN*9), gl.DYNAMIC_DRAW);
       const S=36;
-      va("ip", this.loc.iPos, 3, S, 0, 1);
-      va("ic", this.loc.iCol, 3, S, 12, 1);
-      va("is", this.loc.iScl, 1, S, 24, 1);
-      va("ir", this.loc.iRot, 1, S, 28, 1);
-      va("ib", this.loc.iBob, 1, S, 32, 1);
+      va(this.loc.iPos, 3, S, 0, 1);
+      va(this.loc.iCol, 3, S, 12, 1);
+      va(this.loc.iScl, 1, S, 24, 1);
+      va(this.loc.iRot, 1, S, 28, 1);
+      va(this.loc.iBob, 1, S, 32, 1);
       if(this.is2) gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.n, instN);
       else this.ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, mesh.n, instN);
     }
@@ -6384,6 +6486,230 @@ void main(){
     gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
   }
 };
+
+function collectUnitFigures(now){
+  const out=[];
+  const t=(now||performance.now())/1000;
+  const figS=(typeof figureScale==="function"?figureScale():1)*1.3;
+  const close=typeof combatZoomedIn==="function"?combatZoomedIn(): (view&&view.scale>=0.4);
+  const colOf=nat=>(typeof displayColor==="function"?displayColor(nat):nat&&nat.color)||"#888";
+  // every unit is drawn on its own — never a single shared token for a stack
+  for(const u of (state.units||[])){
+    if(!u||u.str<=0)continue;
+    const nat=nations[u.owner]; if(!nat)continue;
+    const p=scrOf(u.ax,u.ay); if(!p||!p.vis)continue;
+    if(p.x<-60||p.y<-60||p.x>view.cssW+60||p.y>view.cssH+60)continue;
+    if(u._down>0.85 && (u.str||0)<=0) continue;
+    const typ=typeof normType==="function"?normType(u.type):(u.type||"rifle");
+    const col=colOf(nat);
+    const loco=u.loco|| (typeof unitLocomotion==="function"?unitLocomotion(typ):"walk");
+    const moving=u.dest>=0&&u.dest!==u.pid && !(u._hold) && !u._firing;
+    const face=u.facing!=null?u.facing:0;
+    // map facing (world) to model yaw: screen is already projected, use a stable yaw
+    const rot=loco==="fly"?(moving?face*0.15:Math.sin(t*2+u.id)*0.08)
+      : loco==="sail"?(moving?0.05:Math.sin(t*1.2+u.id)*0.08)
+      : loco==="drive"?(moving?Math.sin(t*10+u.id)*0.04:0)
+      : (moving?Math.sin(t*8+u.id)*0.22:0);
+    const showStr=u.visStr!=null?Math.min(u.str,u.visStr):u.str;
+    const nFigs=close?Math.min(5, Math.max(u.str>0?1:0, Math.round(Math.sqrt((showStr||800)/900)))):Math.min(3, Math.max(u.str>0?1:0, Math.round((showStr||800)/2500)));
+    const baseScl=10.2*figS*(typ==="arm"||typ==="art"?1.25: typ==="aa"?1.15: typ==="air"||typ==="bomb"||typ==="transport"?1.35: typ==="bb"||typ==="cv"?1.4: typ==="sniper"?1.05:1);
+    const recoil=(u.recoil||0), flinch=(u.flinch||0);
+    const kickX= -Math.cos(face)*recoil*5 + ((u.id||0)%3-1)*flinch*1.4;
+    const kickY= -Math.sin(face)*recoil*3;
+    for(let i=0;i<nFigs;i++){
+      const ox=(i-(nFigs-1)/2)*12*figS + kickX;
+      const oy=(i%2)*4*figS + kickY + flinch*2;
+      let bob=0, fly=0, yaw=rot;
+      if(u._firing||u.aimId!=null) yaw=face*0.25 + (recoil?-0.2:0);
+      if(loco==="walk"){
+        bob=moving?Math.abs(Math.sin(t*9+i+u.id))*2.1:Math.sin(t*1.4+i)*0.3;
+        yaw=moving?Math.sin(t*8+i)*0.22:0;
+      } else if(loco==="drive"){
+        bob=moving?Math.sin(t*14+i)*0.35:0;
+      } else if(loco==="fly"){
+        fly=12+Math.sin(t*3+i+u.id)*3;
+        bob=Math.sin(t*2.2+i)*0.8;
+        yaw=moving?Math.sin(t*2+i)*0.12:Math.sin(t*1.4+i)*0.1;
+      } else if(loco==="sail"){
+        bob=Math.sin(t*1.6+i+u.id)*0.7;
+        yaw=Math.sin(t*1.3+i)*0.1;
+      }
+      const typDraw=(typ==="sniper"&&!moving)?"sniper":typ;
+      out.push({typ:typDraw,x:p.x+ox,y:p.y-10-fly+oy,col,scl:baseScl,rot:yaw,bob,uid:u.id,owner:u.owner,loco});
+      if(typ==="medic"){
+        out.push({typ:"cross",x:p.x+ox,y:p.y-10-fly+oy-baseScl*0.95,col:"#f4f4f4",scl:baseScl*0.55,rot:0,bob:0,uid:u.id,mark:true});
+      }
+    }
+  }
+  if(state.bases){
+    for(const b of state.bases){
+      const pr=provinces[b.pid]; if(!pr)continue;
+      const c=scrOf(pr.cx,pr.cy); if(!c||!c.vis)continue;
+      const nat=nations[b.owner]; if(!nat)continue;
+      const tier=typeof baseVisualTier==="function"?baseVisualTier(b):1;
+      const x=c.x+(b.kind==="nav"?12:-14), y=c.y+(b.kind==="nav"?8:-20);
+      out.push({typ:b.kind==="nav"?"dd":"tent",x,y,col:colOf(nat),scl:7.2*figS*(1+tier*0.12),rot:0,bob:0,base:true,bid:b.id});
+    }
+  }
+  for(const n of (nations||[])){
+    if(!n||!n.trainQ)continue;
+    for(const q of n.trainQ){
+      if(q.ship)continue;
+      const pr=provinces[q.pid]; if(!pr)continue;
+      const c=scrOf(pr.cx,pr.cy); if(!c||!c.vis)continue;
+      const typ=typeof normType==="function"?normType(q.type):q.type;
+      out.push({typ:typ||"rifle",x:c.x+8,y:c.y-16,col:colOf(n),scl:8.8*figS,rot:0,bob:Math.sin(t*3)*0.4,ghost:true,train:true,owner:n.id});
+      if((typ||"")==="medic") out.push({typ:"cross",x:c.x+8,y:c.y-16-8,col:"#f4f4f4",scl:5*figS,rot:0,bob:0,ghost:true});
+    }
+  }
+  return out;
+}
+
+var Unit3D={
+  light:[0.35,0.85,0.45],
+  _hex(c){
+    const s=String(c||"#888").replace("#","");
+    const n=s.length===3?s[0]+s[0]+s[1]+s[1]+s[2]+s[2]:s;
+    return [parseInt(n.slice(0,2),16)/255, parseInt(n.slice(2,4),16)/255, parseInt(n.slice(4,6),16)/255];
+  },
+  _shade(rgb, k){
+    const c=r=>Math.max(0,Math.min(255,Math.round(r*255*k)));
+    return "rgb("+c(rgb[0])+","+c(rgb[1])+","+c(rgb[2])+")";
+  },
+  drawMesh(ctx, typ, px, py, scl, rot, bob, col, alpha){
+    UnitMesh.init();
+    const mesh=UnitMesh.meshes[typ]||UnitMesh.meshes.rifle;
+    if(!mesh)return;
+    const rgb=this._hex(col);
+    const cr=Math.cos(rot||0), sr=Math.sin(rot||0);
+    const L=this.light, llen=Math.hypot(L[0],L[1],L[2])||1;
+    const lx=L[0]/llen, ly=L[1]/llen, lz=L[2]/llen;
+    const faces=[];
+    for(let i=0;i<mesh.length;i+=18){
+      const pts=[];
+      let depth=0;
+      for(let k=0;k<3;k++){
+        let x=mesh[i+k*6], y=mesh[i+k*6+1]+(bob||0), z=mesh[i+k*6+2];
+        const rx=cr*x+sr*z, rz=-sr*x+cr*z;
+        const sx=px+rx*scl, sy=py+(-y - rz*0.35)*scl;
+        depth+=sy+rz*scl;
+        pts.push(sx,sy);
+      }
+      let nx=mesh[i+3], ny=mesh[i+4], nz=mesh[i+5];
+      const rnx=cr*nx+sr*nz, rnz=-sr*nx+cr*nz;
+      const nd=Math.hypot(rnx,ny,rnz)||1;
+      const lit=0.38+0.62*Math.max(0, (rnx*lx+ny*ly+rnz*lz)/nd);
+      faces.push({pts, depth:depth/3, col:this._shade(rgb, lit), back: (rnx*0 + ny*0.35 + rnz*1)< -0.05});
+    }
+    faces.sort((a,b)=>a.depth-b.depth);
+    ctx.save();
+    ctx.globalAlpha=alpha==null?1:alpha;
+    ctx.lineJoin="round";
+    ctx.lineWidth=Math.max(0.4, scl*0.03);
+    for(const f of faces){
+      if(f.back) continue;
+      ctx.beginPath();
+      ctx.moveTo(f.pts[0],f.pts[1]);
+      ctx.lineTo(f.pts[2],f.pts[3]);
+      ctx.lineTo(f.pts[4],f.pts[5]);
+      ctx.closePath();
+      ctx.fillStyle=f.col;
+      ctx.strokeStyle="rgba(10,12,16,0.35)";
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  },
+  drawShadow(ctx,x,y,s){
+    ctx.save();
+    ctx.fillStyle="rgba(0,0,0,0.32)";
+    ctx.beginPath(); ctx.ellipse(x, y+2, 7*s, 2.2*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  },
+  drawRing(ctx,x,y,r,col,pulse){
+    ctx.save();
+    ctx.strokeStyle=col||"#f3e2a8";
+    ctx.lineWidth=2.6;
+    ctx.globalAlpha=0.95;
+    ctx.beginPath(); ctx.ellipse(x, y+3, r, r*0.38, 0, 0, Math.PI*2); ctx.stroke();
+    if(pulse){
+      const k=0.7+0.3*Math.sin((performance.now()/180));
+      ctx.globalAlpha=0.55*k;
+      ctx.lineWidth=3.4;
+      ctx.beginPath(); ctx.ellipse(x, y+3, r*1.25*k, r*0.48*k, 0, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.restore();
+  },
+  drawAndHit(ctx, now){
+    const nato=typeof unitStyle==="function" && unitStyle()==="nato";
+    const useGL=UnitGL.ok && !nato;
+    const figs=collectUnitFigures(now);
+    const hits=[];
+    // always paint rings, shadows, ghosts, and (if no WebGL) the 3D models in Canvas2D
+    for(const f of figs){
+      const s=Math.max(0.8,(f.scl||8)/9);
+      if(!useGL || f.ghost){
+        this.drawShadow(ctx,f.x,f.y,s);
+        this.drawMesh(ctx, f.typ||"rifle", f.x, f.y, f.scl||9, f.rot||0, f.bob||0, f.col, f.ghost?0.55:1);
+      }
+    }
+    // selection / spawn rings + hit boxes from live units (not ghosts)
+    const byU=new Map();
+    for(const u of (state.units||[])){
+      if(!u||u.str<=0)continue;
+      const p=scrOf(u.ax,u.ay); if(!p||!p.vis)continue;
+      if(p.x<-60||p.y<-50||p.x>view.cssW+60||p.y>view.cssH+50)continue;
+      const selected=(state.selectedUnits||[]).includes(u.id);
+      const born=u.bornAt && (now-(u.bornAt))<5000;
+      const typ=typeof normType==="function"?normType(u.type):u.type;
+      const figS=(typeof figureScale==="function"?figureScale():1)*1.25;
+      const rad=16*figS*(typ==="arm"||typ==="art"||typ==="air"?1.2:1);
+      if(selected) this.drawRing(ctx, p.x, p.y-6, rad+4, "#f3e2a8", true);
+      else if(born) this.drawRing(ctx, p.x, p.y-6, rad+6, "#7dce7a", true);
+      if(selected || born){
+        const maxHp=u.maxStr||u.str;
+        const hp=Math.max(0,Math.min(1,u.str/(maxHp||u.str||1)));
+        ctx.save();
+        ctx.fillStyle="rgba(12,16,20,0.75)";
+        ctx.fillRect(p.x-12, p.y-28, 24, 4);
+        ctx.fillStyle=hp<0.35?"#e25b4a":hp<0.7?"#e2b14a":"#7dce7a";
+        ctx.fillRect(p.x-12, p.y-28, 24*hp, 4);
+        ctx.restore();
+      }
+      hits.push({uid:u.id,x:p.x-rad-4,y:p.y-rad*1.6-8,w:rad*2+8,h:rad*2.2+14});
+      byU.set(u.id,p);
+    }
+    state._unitHits=hits;
+  }
+};
+
+function toggleGlDebug(force){
+  state.glDebug=force==null?!state.glDebug:!!force;
+  const el=ensureGlDebug();
+  el.style.display=state.glDebug?"block":"none";
+  if(state.glDebug) refreshGlDebug();
+}
+function ensureGlDebug(){
+  let el=$("dbgGL");
+  if(!el){
+    el=document.createElement("div");
+    el.id="dbgGL";
+    el.style.display="none";
+    const wrap=$("mapwrap"); if(wrap) wrap.appendChild(el);
+  }
+  return el;
+}
+function refreshGlDebug(){
+  if(!state.glDebug)return;
+  const el=ensureGlDebug();
+  const why=UnitGL.ok?("WebGL OK — "+(UnitGL.info||"context ready")):(UnitGL.fail||"WebGL not started");
+  const rend=UnitGL.ok&&unitStyle()!=="nato"?"WebGL 3D models":(unitStyle()==="nato"?"NATO 2D icons":"Canvas 3D fallback (shaded low-poly)");
+  const n=(state.units||[]).filter(u=>u&&u.str>0).length;
+  const mine=(state.units||[]).filter(u=>u&&u.owner===state.player&&u.str>0).length;
+  const sel=(state.selectedUnits||[]).length;
+  const scale=state.globeOn?("globe r="+Math.round(globe&&globe.r||0)):"flat scale="+(view&&view.scale?view.scale.toFixed(3):"?");
+  el.innerHTML=`<b>F3 debug</b><br>${why}<br>Drawing with: ${rend}<br>Units: ${n} (yours: ${mine}) · selected: ${sel}<br>${scale}<br>Hits: ${(state._unitHits||[]).length}`;
+}
+
 
 /* ===== Build-up start, RTS orders, drag-to-place bases, modules, shooting ===== */
 var PEACE_MONTHS=12;
@@ -7365,7 +7691,7 @@ function installPlayOps(){
       <button class="btn shopdrag" data-dragbuild="nav">⚓ Naval (${fmt(baseFoundCost("nav"))})</button>`;
     if(!bar.innerHTML || bar.style.display==="none"){
       bar.style.display="flex";
-      bar.innerHTML=`<span class="who">Build</span>${tray}<span class="who" style="font-weight:500;color:var(--muted)">Drag a base onto your land. Drag a box over troops to select them, then click their destination.</span>`;
+      bar.innerHTML=`<span class="who">Build</span>${tray}<span class="who" style="font-weight:500;color:var(--muted)">Drag a base onto your land. Click a unit, then right-click to make them walk there.</span>`;
     } else if(!bar.querySelector("[data-dragbuild]")){
       bar.insertAdjacentHTML("afterbegin", tray);
     }
@@ -7447,7 +7773,24 @@ function refreshCExports(){
   C.TECHS=typeof TECHS!=="undefined"?TECHS:C.TECHS;
   C.view=view;
   C.applyTx=typeof applyTx==="function"?applyTx:C.applyTx;
+  if(typeof tickUnitTravel==="function"){ C.tickUnitTravel=tickUnitTravel; C.unitSpeed=unitSpeed; C.buildTravel=buildTravel; }
+  if(typeof toggleGlDebug==="function") C.toggleGlDebug=toggleGlDebug;
+  if(typeof Unit3D!=="undefined") C.Unit3D=Unit3D;
+  if(typeof UnitMesh!=="undefined") C.UnitMesh=UnitMesh;
+  if(typeof scrOf==="function") C.scrOf=scrOf;
+  if(typeof draw==="function") C.draw=draw;
+  C.getUnitHits=()=>state._unitHits||[];
+  C.getSelected=()=>(state.selectedUnits||[]).slice();
+  C.setPaused=v=>{state.paused=!!v;};
+  C.selectUnits=ids=>{state.selectedUnits=ids||[];};
+  if(typeof spawnUnit==="function") C.spawnUnit=spawnUnit;
+  if(typeof declareWar==="function") C.declareWar=declareWar;
+
+
+  if(typeof UnitGL!=="undefined") C.UnitGL=UnitGL;
+  if(typeof collectUnitFigures==="function") C.collectUnitFigures=collectUnitFigures;
 }
+
 
 /* ===== Weightier, slower, paid tech tree with labs and doctrines ===== */
 var TECHS3=[
@@ -7677,14 +8020,1161 @@ function installTechRework(){
 }
 installTechRework();
 
-/* ===== Multiplayer: PeerJS P2P, manual SDP fallback, local hot-seat ===== */
+/* ===== Dead-simple army control: click to select, right-click to move ===== */
+function installArmyControls(){
+  const cv=typeof canvas!=="undefined"?canvas:$("c");
+  if(!cv || cv._armyCtrl) return;
+  cv._armyCtrl=true;
+  state.moveMode=false;
+  state.keysDown=state.keysDown||{};
+  state._edge=null;
+
+  const _spawn=typeof spawnUnit==="function"?spawnUnit:null;
+  if(_spawn){
+    spawnUnit=function(nid,pid,str,type,opts){
+      const u=_spawn(nid,pid,str,type,opts);
+      if(u){
+        u.maxStr=u.maxStr||u.str;
+        u.bornAt=performance.now();
+        if(nid===state.player && state.phase==="play"){
+          state.selectedUnits=[u.id];
+          state.selected=nid;
+          if(typeof feedback==="function") feedback((typeof unitKind==="function"&&unitKind(type)?unitKind(type).name:(type||"Unit"))+" is ready at your base. Click them, then right-click where they should go.","good",false);
+          renderArmyUI();
+        }
+      }
+      return u;
+    };
+  }
+
+  const _bar=typeof renderUnitBar==="function"?renderUnitBar:null;
+  if(_bar){
+    renderUnitBar=function(){
+      const ok=_bar();
+      const bar=$("actionBar");
+      if(!bar||state.phase!=="play"||!(state.selectedUnits||[]).length){ renderArmyUI(); return ok; }
+      if(!$("uMove")){
+        const b=document.createElement("button");
+        b.className="btn gold"; b.id="uMove"; b.textContent=state.moveMode?"Click the map…":"Move";
+        b.title="Then click where they should go (handy if you have no right-click)";
+        b.onclick=()=>{ state.moveMode=!state.moveMode; b.textContent=state.moveMode?"Click the map…":"Move"; renderArmyUI(); };
+        bar.appendChild(b);
+      } else {
+        $("uMove").textContent=state.moveMode?"Click the map…":"Move";
+        $("uMove").classList.toggle("on", !!state.moveMode);
+      }
+      renderArmyUI();
+      return true;
+    };
+  }
+
+  function pt(e){
+    const r=cv.getBoundingClientRect();
+    return {sx:e.clientX-r.left, sy:e.clientY-r.top, r};
+  }
+  function ownUnitAt(sx,sy){
+    const id=typeof hitUnit==="function"?hitUnit(sx,sy):-1;
+    if(id<0)return null;
+    const u=unitById(id);
+    return (u&&u.owner===state.player&&u.str>0)?u:null;
+  }
+  function enemyAt(sx,sy){
+    const uid=typeof hitUnit==="function"?hitUnit(sx,sy):-1;
+    if(uid>=0){
+      const u=unitById(uid);
+      if(u&&u.owner!==state.player&&u.str>0) return {kind:"unit",uid,nid:u.owner,pid:u.pid};
+    }
+    const bid=typeof hitBase==="function"?hitBase(sx,sy):-1;
+    if(bid>=0){
+      const b=typeof baseById==="function"?baseById(bid):null;
+      if(b&&b.owner!==state.player) return {kind:"base",bid,nid:b.owner,pid:b.pid};
+    }
+    return null;
+  }
+  function selectUnit(uid, add){
+    if(!state.selectedUnits) state.selectedUnits=[];
+    if(add){
+      if(state.selectedUnits.includes(uid)) state.selectedUnits=state.selectedUnits.filter(id=>id!==uid);
+      else state.selectedUnits.push(uid);
+    } else state.selectedUnits=[uid];
+    if(typeof renderActionBar==="function") renderActionBar();
+    renderArmyUI();
+  }
+  function orderTo(sx,sy){
+    if(!playerCanOrder || !playerCanOrder()) return false;
+    const ids=(state.selectedUnits||[]).filter(id=>{const u=unitById(id);return u&&u.owner===state.player&&u.str>0;});
+    if(!ids.length) return false;
+    const en=enemyAt(sx,sy);
+    if(en){
+      if(en.kind==="base" && typeof issueWalk==="function"){ issueWalk(ids, en.pid, en.bid); renderArmyUI(); return true; }
+      if(typeof issueWalk==="function"){ issueWalk(ids, en.pid, -1); renderArmyUI(); return true; }
+    }
+    const dest=typeof hitProv==="function"?hitProv(sx,sy):-1;
+    if(dest<0) return false;
+    if(typeof issueWalk==="function") issueWalk(ids, dest, -1);
+    else if(typeof orderMove==="function") orderMove(ids, dest, true);
+    state.moveMode=false;
+    if(typeof renderActionBar==="function") renderActionBar();
+    renderArmyUI();
+    return true;
+  }
+
+  cv.addEventListener("mousedown", e=>{
+    if(state.phase!=="play"||state.player<0) return;
+    if(e.target!==cv) return;
+    if(state.buildDrag) return;
+    const {sx,sy}=pt(e);
+    state._armyMoved=0;
+    state._armyLast={x:e.clientX,y:e.clientY};
+    if(e.button===1 || e.altKey){
+      state._apan={sx,sy}; dragging=true; moved=0; lastX=e.clientX; lastY=e.clientY;
+      cv.classList.add("drag");
+      e.preventDefault();
+      return;
+    }
+    if(e.button===2){
+      // right click is MOVE, never pan
+      state._rmb={sx,sy};
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if(e.button===0){
+      state.boxSel={x:sx,y:sy,sx,sy,shifted:!!e.shiftKey};
+      dragging=false; moved=0;
+      e.stopPropagation();
+    }
+  }, true);
+
+  window.addEventListener("mousemove", e=>{
+    if(state._apan && (e.buttons&4 || e.altKey || e.buttons)){
+      const dx=e.clientX-(state._armyLast?state._armyLast.x:e.clientX);
+      const dy=e.clientY-(state._armyLast?state._armyLast.y:e.clientY);
+      state._armyLast={x:e.clientX,y:e.clientY};
+      panBy(dx,dy);
+      return;
+    }
+    if(state.boxSel && state.phase==="play"){
+      const {sx,sy}=pt(e);
+      const dx=Math.abs(e.clientX-(state._armyLast?state._armyLast.x:e.clientX));
+      const dy=Math.abs(e.clientY-(state._armyLast?state._armyLast.y:e.clientY));
+      state._armyMoved=(state._armyMoved||0)+dx+dy;
+      moved=state._armyMoved;
+      state._armyLast={x:e.clientX,y:e.clientY};
+      state.boxSel.sx=sx; state.boxSel.sy=sy;
+      if(state._armyMoved>4 && typeof showBoxSel==="function") showBoxSel(true,state.boxSel.x,state.boxSel.y,sx,sy);
+      const dest=hitProv(sx,sy); state._hoverDest=dest; state._hoverBase=typeof hitBase==="function"?hitBase(sx,sy):-1;
+    }
+  }, true);
+
+  window.addEventListener("mouseup", e=>{
+    if(state._apan){ state._apan=null; cv.classList.remove("drag"); }
+    if(state._rmb){
+      const start=state._rmb; state._rmb=null;
+      if(state.phase==="play" && (state._armyMoved||0)<10){
+        orderTo(start.sx, start.sy);
+      }
+    }
+    if(state.boxSel && e.button===0 && state.phase==="play"){
+      const box=state.boxSel; state.boxSel=null;
+      if(typeof showBoxSel==="function") showBoxSel(false);
+      const {sx,sy}=pt(e);
+      if((state._armyMoved||moved)>6){
+        const ids=typeof unitsInBox==="function"?unitsInBox(box.x,box.y,sx,sy):[];
+        if(box.shifted){
+          const set=new Set(state.selectedUnits||[]);
+          ids.forEach(id=>set.add(id));
+          state.selectedUnits=[...set];
+        } else state.selectedUnits=ids;
+        if(typeof renderActionBar==="function") renderActionBar();
+        renderArmyUI();
+        state._handledClick=true;
+      } else {
+        state._pendingArmyClick={sx:box.x,sy:box.y,shifted:box.shifted};
+      }
+    }
+  }, true);
+
+  cv.addEventListener("click", e=>{
+    if(state.phase!=="play"||state.player<0) return;
+    if(e.target!==cv && e.target!==$("c3d")) return;
+    if(state._handledClick){ state._handledClick=false; e.stopImmediatePropagation(); return; }
+    if((moved||0)>6 && !(state._pendingArmyClick)) return;
+    const p=state._pendingArmyClick||pt(e);
+    state._pendingArmyClick=null;
+    const sx=p.sx, sy=p.sy, shifted=!!(e.shiftKey||p.shifted);
+    if(state.moveMode){
+      if(orderTo(sx,sy)){ e.stopImmediatePropagation(); return; }
+    }
+    const mine=ownUnitAt(sx,sy);
+    if(mine){
+      selectUnit(mine.id, shifted);
+      e.stopImmediatePropagation();
+      return;
+    }
+    const ids=(state.selectedUnits||[]).filter(id=>{const u=unitById(id);return u&&u.owner===state.player;});
+    if(ids.length){
+      const en=enemyAt(sx,sy);
+      if(en){ orderTo(sx,sy); e.stopImmediatePropagation(); return; }
+      // left click on empty ground or own land: deselect, do NOT move
+      state.selectedUnits=[];
+      state.moveMode=false;
+      if(typeof renderActionBar==="function") renderActionBar();
+      renderArmyUI();
+      // let the click also select the province (don't stop)
+      return;
+    }
+  }, true);
+
+  cv.addEventListener("contextmenu", e=>{
+    e.preventDefault();
+    if(state.phase!=="play"||state.player<0) return;
+    const {sx,sy}=pt(e);
+    if((state.selectedUnits||[]).length){
+      orderTo(sx,sy);
+      e.stopImmediatePropagation();
+    }
+  }, true);
+
+  window.addEventListener("keydown", e=>{
+    if(e.target&&(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT"))return;
+    if(e.key==="F3"){ e.preventDefault(); toggleGlDebug(); return; }
+    const k=e.key;
+    if(k==="ArrowLeft"||k==="ArrowRight"||k==="ArrowUp"||k==="ArrowDown"||k==="w"||k==="a"||k==="s"||k==="d"||k==="W"||k==="A"||k==="S"||k==="D"){
+      if(k==="s"||k==="S"){
+        if(e.ctrlKey||e.metaKey){ e.preventDefault(); if(state.phase==="play") saveManual(); return; }
+      }
+      state.keysDown[k.toLowerCase()]=true;
+      if(k.startsWith("Arrow")) e.preventDefault();
+    }
+    if((k==="m"||k==="M") && state.phase==="play" && (state.selectedUnits||[]).length && !e.ctrlKey){
+      // M was mute — keep mute on the button; if units selected, M means Move
+      // Don't steal mute: only Shift+M or the on-screen Move button? Steer says Move button for touchpad.
+      // Leave M as mute.
+    }
+    if(k==="Escape"){ state.moveMode=false; renderArmyUI(); }
+  }, true);
+  window.addEventListener("keyup", e=>{
+    state.keysDown[e.key.toLowerCase()]=false;
+  });
+
+  const _frame=typeof frame==="function"?null:null;
+  // hook the existing rAF loop via tickCam wrap
+  const _tickCam=typeof tickCam==="function"?tickCam:null;
+  if(_tickCam){
+    tickCam=function(dt){
+      _tickCam(dt);
+      armyPanTick(dt);
+      if(state.glDebug) refreshGlDebug();
+    };
+  }
+}
+
+function panBy(dx,dy){
+  if(state.globeOn){
+    globe.tlon=globe.lon=globe.lon-dx*0.35;
+    globe.tlat=globe.lat=clamp(globe.lat+dy*0.25,-80,80);
+    if(globe.lon>180)globe.lon-=360; if(globe.lon<-180)globe.lon+=360;
+    globe.tlon=globe.lon; globe.dirty=true;
+  } else {
+    view.ox+=dx; view.oy+=dy; view.tox=view.ox; view.toy=view.oy;
+    if(typeof applyTx==="function") applyTx();
+  }
+}
+
+function armyPanTick(dt){
+  if(state._camLock) return;
+  if(state.phase==="title") return;
+  const kd=state.keysDown||{};
+  let dx=0, dy=0;
+  const sp=0.55*(dt||16);
+  if(kd.arrowleft||kd.a) dx+=sp;
+  if(kd.arrowright||kd.d) dx-=sp;
+  if(kd.arrowup||kd.w) dy+=sp;
+  if(kd.arrowdown||kd.s) dy-=sp;
+  // edge scroll
+  if(state.phase==="play" && !state.boxSel && !state.buildDrag){
+    const wrap=$("mapwrap");
+    if(wrap && state._mouseCss){
+      const r=wrap.getBoundingClientRect();
+      const m=18, x=state._mouseCss.x, y=state._mouseCss.y;
+      const es=0.45*(dt||16);
+      if(x<m) dx+=es*(1-x/m);
+      if(x>r.width-m) dx-=es*(1-(r.width-x)/m);
+      if(y<m) dy+=es*(1-y/m);
+      if(y>r.height-m) dy-=es*(1-(r.height-y)/m);
+    }
+  }
+  if(dx||dy) panBy(dx,dy);
+}
+
+function trackMouseCss(e){
+  const wrap=$("mapwrap"); if(!wrap)return;
+  const r=wrap.getBoundingClientRect();
+  state._mouseCss={x:e.clientX-r.left,y:e.clientY-r.top};
+}
+window.addEventListener("mousemove", trackMouseCss, {passive:true});
+
+function renderArmyUI(){
+  renderMoveHint();
+  renderSelPanel();
+  if(typeof renderPickHint==="function") renderPickHint();
+  if(state.glDebug) refreshGlDebug();
+}
+
+function renderMoveHint(){
+  let el=$("moveHint");
+  if(!el){
+    el=document.createElement("div");
+    el.id="moveHint";
+    const wrap=$("mapwrap"); if(!wrap)return;
+    wrap.appendChild(el);
+  }
+  const n=(state.selectedUnits||[]).filter(id=>{const u=unitById(id);return u&&u.owner===state.player&&u.str>0;}).length;
+  if(state.phase==="play" && n>0){
+    el.style.display="block";
+    el.textContent=state.moveMode?"Click the map to move":"Right-click to move";
+  } else if(state.phase==="play" && (state.units||[]).some(u=>u.owner===state.player&&u.str>0)){
+    el.style.display="block";
+    el.textContent="Click a unit to select it, then right-click to move";
+  } else {
+    el.style.display="none";
+  }
+}
+
+function renderSelPanel(){
+  let el=$("selPanel");
+  if(!el){
+    el=document.createElement("div");
+    el.id="selPanel";
+    const wrap=$("mapwrap"); if(!wrap)return;
+    wrap.appendChild(el);
+  }
+  const ids=(state.selectedUnits||[]).map(unitById).filter(u=>u&&u.owner===state.player&&u.str>0);
+  if(state.phase!=="play" || !ids.length){ el.style.display="none"; return; }
+  el.style.display="block";
+  const rows=ids.slice(0,12).map(u=>{
+    const typ=typeof unitKind==="function"?unitKind(u.type):null;
+    const name=typ&&typ.name?typ.name:(u.type||"Unit");
+    const max=u.maxStr||u.str;
+    const hp=Math.max(0,Math.min(1,u.str/(max||1)));
+    const hpTxt=Math.round(hp*100)+"%";
+    return `<div class="selrow"><b>${escArmy(name)}</b>
+      <div class="selhp"><i style="width:${hp*100}%"></i></div>
+      <span class="selhpt">${hpTxt}</span></div>`;
+  }).join("");
+  el.innerHTML=`<div class="st">${ids.length} selected</div>${rows}
+    <button class="btn gold" id="selMove">${state.moveMode?"Click the map…":"Move"}</button>
+    <div class="small">Right-click the map to move. Click an enemy to attack.</div>`;
+  const b=$("selMove"); if(b) b.onclick=()=>{ state.moveMode=!state.moveMode; if(typeof renderActionBar==="function") renderActionBar(); renderArmyUI(); };
+}
+
+function escArmy(s){ return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+function alwaysShowPlayerUnits(){
+  const _csu=typeof combatShowUnits==="function"?combatShowUnits:null;
+  combatShowUnits=function(){
+    if(state.player>=0 && (state.units||[]).some(u=>u.owner===state.player&&u.str>0)) return true;
+    if((state.trainQWait)|| (nations[state.player]&&(nations[state.player].trainQ||[]).length)) return true;
+    return _csu?_csu():true;
+  };
+}
+
+function hookArmyDraw(){
+  const _drawCL=typeof drawCombatLayer==="function"?drawCombatLayer:null;
+  if(_drawCL && !drawCombatLayer._army){
+    const prev=drawCombatLayer;
+    drawCombatLayer=function(now){
+      if(typeof drawUnitFormations!=="undefined") drawUnitFormations._drew=false;
+      prev(now);
+      if(typeof unitStyle==="function" && unitStyle()==="nato") return;
+      if(typeof Unit3D!=="undefined" && !(drawUnitFormations&&drawUnitFormations._drew)){
+        Unit3D.drawAndHit(ctx, now||performance.now());
+      }
+    };
+    drawCombatLayer._army=true;
+  }
+  const _dUF=typeof drawUnitFormations==="function"?drawUnitFormations:null;
+  if(_dUF && !drawUnitFormations._army){
+    drawUnitFormations=function(now){
+      if(typeof unitStyle==="function" && unitStyle()!=="nato"){
+        if(typeof Unit3D!=="undefined") Unit3D.drawAndHit(ctx, now||performance.now());
+        else _dUF(now);
+        drawUnitFormations._drew=true;
+        return;
+      }
+      _dUF(now);
+    };
+    drawUnitFormations._army=true;
+  }
+}
+
+alwaysShowPlayerUnits();
+hookArmyDraw();
+if(typeof document!=="undefined"){
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", installArmyControls);
+  else installArmyControls();
+}
+
+/* ===== Continuous map travel: walk/drive/fly/sail along the path, never teleport ===== */
+function unitLocomotion(type){
+  const t=typeof normType==="function"?normType(type):type;
+  if(t==="air"||t==="bomb"||t==="transport") return "fly";
+  if(t==="dd"||t==="cl"||t==="bb"||t==="cv"||t==="ss") return "sail";
+  if(t==="arm"||t==="art"||t==="aa") return "drive";
+  return "walk";
+}
+function unitSpeed(u, terrain){
+  const typ=typeof normType==="function"?normType(u&&u.type): (u&&u.type)||"rifle";
+  const monthSec=(typeof TICK==="number"?TICK:700)/1000;
+  const mul={
+    rifle:1, inf:1, sniper:0.88, medic:0.9, eng:0.85, mg:0.8, at:0.86, aa:0.72,
+    sf:1.22, para:1.05, marine:1.0, arm:1.45, art:0.7,
+    air:3.3, bomb:2.6, transport:2.4,
+    dd:1.65, cl:1.45, bb:1.15, cv:1.3, ss:1.4
+  };
+  let dist=120*(mul[typ]||1); // world units per month at 1x
+  const loco=unitLocomotion(typ);
+  const terr=String(terrain||"");
+  if(loco!=="fly"){
+    if(/mountain|mount/.test(terr)) dist*=(typ==="arm"||typ==="art"?0.45:0.58);
+    else if(/forest|wood/.test(terr)) dist*=(typ==="arm"?0.62:0.8);
+    else if(/desert/.test(terr)) dist*=0.88;
+    else if(/swamp|marsh/.test(terr)) dist*=(typ==="arm"||typ==="art"?0.4:0.62);
+    else if(/urban|city/.test(terr)) dist*=0.9;
+    else if(/sea|ocean|water/.test(terr)) dist*=(loco==="sail"?1:0.35);
+  }
+  const spd=(state&&state.speed)||1;
+  return (dist/Math.max(0.2,monthSec))*spd;
+}
+function borderMid(a,b){
+  if(!a||!b)return null;
+  let x=(a.cx+b.cx)/2, y=(a.cy+b.cy)/2;
+  if(Math.abs(b.cx-a.cx)>3600){ // wrap
+    const bw=b.cx>a.cx?b.cx-7200:b.cx+7200;
+    x=(a.cx+bw)/2;
+  }
+  return {x,y};
+}
+function buildTravel(u, dest){
+  if(!u||dest==null||dest<0)return false;
+  if(dest===u.pid && (!u.route||u.route.length<=1)){
+    u.dest=-1; u.route=null; u.wps=null; u.wpI=0;
+    const p=provinces[u.pid]; if(p){u.tx=p.cx;u.ty=p.cy;}
+    return true;
+  }
+  const path=typeof fullUnitPath==="function"?fullUnitPath(u,dest):null;
+  if(!path||path.length<1){
+    if(dest===u.pid){ u.dest=-1; return true; }
+    return false;
+  }
+  u.dest=dest;
+  u.route=path.slice();
+  const wps=[];
+  const sx=u.ax!=null?u.ax:(provinces[u.pid]?provinces[u.pid].cx:0);
+  const sy=u.ay!=null?u.ay:(provinces[u.pid]?provinces[u.pid].cy:0);
+  wps.push({x:sx,y:sy,pid:u.pid});
+  for(let i=1;i<path.length;i++){
+    const A=provinces[path[i-1]], B=provinces[path[i]]; if(!B)continue;
+    const mid=borderMid(A,B)||{x:B.cx,y:B.cy};
+    wps.push({x:mid.x,y:mid.y,pid:path[i],border:true});
+    wps.push({x:B.cx,y:B.cy,pid:path[i]});
+  }
+  if(wps.length<2){ u.dest=-1; u.wps=null; return dest===u.pid; }
+  u.wps=wps; u.wpI=1;
+  u.tx=wps[1].x; u.ty=wps[1].y;
+  u._hold=false;
+  return true;
+}
+function stopTravel(u, snap){
+  if(!u)return;
+  u.dest=-1; u.route=null; u.wps=null; u.wpI=0; u._hold=false;
+  if(snap){
+    const p=provinces[u.pid];
+    if(p){ u.ax=p.cx; u.ay=p.cy; u.tx=p.cx; u.ty=p.cy; }
+  } else {
+    u.tx=u.ax; u.ty=u.ay;
+  }
+}
+function enemiesAt(pid, nid, skipId){
+  const out=[];
+  for(const o of (state.units||[])){
+    if(!o||o.str<=0||o.id===skipId||o.pid!==pid)continue;
+    if(typeof atWar==="function" ? atWar(nid,o.owner) : false) out.push(o);
+  }
+  return out;
+}
+function tryEnterProvince(u, pid){
+  if(!u||pid==null||pid<0)return false;
+  if(u.pid===pid)return true;
+  if(typeof canEnterProv==="function" && !canEnterProv(u.owner,pid) && pid!==u.dest){
+    if(u.owner===state.player && typeof feedback==="function") feedback("The way is blocked.","war",true);
+    stopTravel(u,false);
+    return false;
+  }
+  u.pid=pid;
+  const p=provinces[pid];
+  if(p && p.owner!==u.owner && typeof atWar==="function" && atWar(u.owner,p.owner)) u.assault=pid;
+  if(enemiesAt(pid,u.owner,u.id).length){
+    u._hold=true; // intercepted — fight here
+    if(u.owner===state.player && typeof feedback==="function") feedback("Your "+((typeof unitKind==="function"&&unitKind(u.type))?unitKind(u.type).name:"unit")+" was intercepted!","war",false);
+  }
+  return true;
+}
+function tickUnitTravel(dt){
+  if(!state||!state.units)return;
+  const paused=!!state.paused && !state._forceTravel;
+  if(state.phase!=="play" && !state._forceTravel) return;
+  if(paused) return;
+  const sec=Math.max(0, Math.min(0.1, (dt||16)/1000));
+  if(sec<=0)return;
+  for(const u of state.units){
+    if(!u||u.str<=0)continue;
+    if(u.ax==null||u.ay==null){
+      const p=provinces[u.pid]; if(p){u.ax=p.cx;u.ay=p.cy;u.tx=p.cx;u.ty=p.cy;}
+    }
+    if(u.dest==null||u.dest<0||u.dest===u.pid && (!u.wps||u.wpI>=(u.wps.length||0))){
+      if(u.dest===u.pid) u.dest=-1;
+      const p=provinces[u.pid];
+      if(p && u.ax==null){ u.ax=p.cx; u.ay=p.cy; u.tx=p.cx; u.ty=p.cy; }
+      continue;
+    }
+    if(typeof unitInShotRange==="function" && unitInShotRange(u)){
+      u._firing=true;
+      const tgt=unitInShotRange(u);
+      if(tgt&&tgt.u){
+        u.aimId=tgt.u.id; u.aimX=tgt.u.ax; u.aimY=tgt.u.ay;
+        u.facing=Math.atan2(tgt.u.ay-u.ay, tgt.u.ax-u.ax);
+      }
+      continue; // stop moving to shoot when in range
+    }
+    if(u._hold){
+      if(!enemiesAt(u.pid,u.owner,u.id).length) u._hold=false;
+      else continue;
+    }
+    if(!u.wps||!u.wps.length||u.wpI==null){
+      if(!buildTravel(u,u.dest)) { u.dest=-1; continue; }
+    }
+    const wp=u.wps[u.wpI];
+    if(!wp){ stopTravel(u,true); continue; }
+    const pNow=provinces[u.pid];
+    const spd=unitSpeed(u, pNow&&pNow.terrain);
+    let dx=wp.x-u.ax, dy=wp.y-u.ay;
+    if(dx>3600)dx-=7200; if(dx<-3600)dx+=7200;
+    const dist=Math.hypot(dx,dy);
+    const step=spd*sec;
+    if(dist>0.001){
+      const ang=Math.atan2(dy,dx);
+      u.facing=ang;
+      u.loco=unitLocomotion(u.type);
+    }
+    if(dist<=step || dist<0.8){
+      u.ax=wp.x; u.ay=wp.y;
+      if(wp.pid!=null) tryEnterProvince(u, wp.pid);
+      u.wpI++;
+      if(!u.wps||u.wpI>=u.wps.length){
+        if(u.pid===u.dest || u.dest<0) stopTravel(u,true);
+        else if(!buildTravel(u,u.dest)) stopTravel(u,false);
+      } else {
+        const nwp=u.wps[u.wpI];
+        u.tx=nwp.x; u.ty=nwp.y;
+      }
+    } else {
+      u.ax+=dx/dist*step;
+      u.ay+=dy/dist*step;
+      u.tx=wp.x; u.ty=wp.y;
+    }
+  }
+}
+
+function installUnitMotion(){
+  if(installUnitMotion._ok)return;
+  installUnitMotion._ok=true;
+  const _om=typeof orderMove==="function"?orderMove:null;
+  if(_om){
+    orderMove=function(ids,dest,manual){
+      const ok=_om(ids,dest,manual);
+      if(ok){
+        for(const id of ids){
+          const u=unitById(id);
+          if(u&&u.dest>=0) buildTravel(u,u.dest);
+        }
+      }
+      return ok;
+    };
+  }
+  // Replace teleporting tick with path refresh only
+  tickUnitMoves=function(){
+    for(const u of (state.units||[])){
+      if(!u||u.str<=0)continue;
+      if(u.dest>=0 && u.dest!==u.pid){
+        if(!u.wps||!u.wps.length) buildTravel(u,u.dest);
+        if(u._hold && !enemiesAt(u.pid,u.owner,u.id).length) u._hold=false;
+      }
+    }
+  };
+  const _tc=typeof tickCam==="function"?tickCam:null;
+  if(_tc){
+    tickCam=function(dt){
+      _tc(dt);
+      tickUnitTravel(dt);
+    };
+  }
+  // keep getUnits useful for tests
+  if(window.CROWNFALL && window.CROWNFALL.getUnits){
+    const prev=window.CROWNFALL.getUnits;
+    window.CROWNFALL.getUnits=function(){
+      return (state.units||[]).map(u=>({
+        id:u.id,owner:u.owner,pid:u.pid,name:provinces[u.pid]&&provinces[u.pid].name,
+        str:u.str,type:u.type,dest:u.dest,supplied:u.supplied!==false,
+        ax:u.ax,ay:u.ay,tx:u.tx,ty:u.ty,facing:u.facing,loco:u.loco,hold:!!u._hold
+      }));
+    };
+  }
+}
+
+installUnitMotion();
+
+/* ===== Individual 3D firefights: aim, recoil, traveling shots, hits, falls ===== */
+var WEAPON={
+  rifle:{range:52, cd:420, acc:0.64, typ:"tracer", speed:380, dmg:7, vol:0.05, freq:380},
+  inf:{range:52, cd:420, acc:0.64, typ:"tracer", speed:380, dmg:7, vol:0.05, freq:380},
+  sniper:{range:160, cd:1500, acc:0.88, typ:"streak", speed:720, dmg:20, vol:0.06, freq:220},
+  medic:{range:28, cd:900, acc:0.4, typ:"tracer", speed:360, dmg:3, vol:0.03, freq:420},
+  eng:{range:44, cd:520, acc:0.58, typ:"tracer", speed:360, dmg:6, vol:0.05, freq:360},
+  mg:{range:78, cd:90, acc:0.5, typ:"burst", speed:420, dmg:5, vol:0.045, freq:500},
+  at:{range:100, cd:1100, acc:0.72, typ:"rocket", speed:240, dmg:22, vol:0.07, freq:140},
+  aa:{range:180, cd:700, acc:0.55, typ:"flak", speed:320, dmg:14, vol:0.06, freq:260},
+  sf:{range:58, cd:280, acc:0.7, typ:"tracer", speed:400, dmg:9, vol:0.05, freq:440},
+  para:{range:48, cd:400, acc:0.62, typ:"tracer", speed:380, dmg:7, vol:0.05, freq:400},
+  marine:{range:50, cd:380, acc:0.66, typ:"tracer", speed:400, dmg:8, vol:0.05, freq:390},
+  arm:{range:120, cd:900, acc:0.74, typ:"shell", speed:260, dmg:28, vol:0.08, freq:80},
+  art:{range:300, cd:1800, acc:0.6, typ:"arc", speed:160, dmg:32, vol:0.09, freq:70},
+  air:{range:110, cd:220, acc:0.58, typ:"tracer", speed:500, dmg:8, vol:0.05, freq:600},
+  bomb:{range:80, cd:1600, acc:0.55, typ:"bomb", speed:140, dmg:36, vol:0.09, freq:90},
+  transport:{range:40, cd:800, acc:0.4, typ:"tracer", speed:360, dmg:4, vol:0.03, freq:400},
+  dd:{range:160, cd:600, acc:0.65, typ:"shell", speed:250, dmg:18, vol:0.07, freq:100},
+  cl:{range:200, cd:700, acc:0.66, typ:"shell", speed:240, dmg:22, vol:0.075, freq:90},
+  bb:{range:280, cd:1100, acc:0.68, typ:"arc", speed:170, dmg:40, vol:0.1, freq:60},
+  cv:{range:140, cd:500, acc:0.55, typ:"tracer", speed:420, dmg:10, vol:0.05, freq:500},
+  ss:{range:150, cd:1200, acc:0.7, typ:"rocket", speed:220, dmg:24, vol:0.07, freq:110}
+};
+function weaponOf(u){
+  const t=typeof normType==="function"?normType(u&&u.type):(u&&u.type)||"rifle";
+  return WEAPON[t]||WEAPON.rifle;
+}
+function ensureFireFX(){
+  const fx=typeof ensureCombatFX==="function"?ensureCombatFX():(state.combatFX||(state.combatFX={}));
+  if(!fx.shots)fx.shots=[];
+  if(!fx.muzzles)fx.muzzles=[];
+  if(!fx.impacts)fx.impacts=[];
+  if(!fx.bodies)fx.bodies=[];
+  if(!fx.flashes)fx.flashes=[];
+  if(!fx.smokes)fx.smokes=[];
+  if(!fx.sparks)fx.sparks=[];
+  if(!fx.booms)fx.booms=[];
+  if(!fx.floats)fx.floats=[];
+  if(!fx.tracers)fx.tracers=[];
+  return fx;
+}
+function hostileUnits(u){
+  const out=[];
+  if(!u||u.str<=0)return out;
+  for(const o of (state.units||[])){
+    if(!o||o.str<=0||o.id===u.id||o.owner===u.owner)continue;
+    if(typeof atWar==="function" ? atWar(u.owner,o.owner) : false) out.push(o);
+  }
+  return out;
+}
+function pickAimTarget(u){
+  const w=weaponOf(u);
+  const typ=typeof normType==="function"?normType(u.type):u.type;
+  let best=null, bestD=1e12;
+  for(const o of hostileUnits(u)){
+    const dx=(o.ax||0)-(u.ax||0), dy=(o.ay||0)-(u.ay||0);
+    const d=Math.hypot(dx,dy);
+    const range=w.range * ((typ==="aa" && (o.type==="air"||o.type==="bomb"))?1.4:1);
+    // allow a little slack so nearby battles still engage
+    if(d>range*1.35) continue;
+    if(d<bestD){ bestD=d; best=o; }
+  }
+  return best?{u:best, d:bestD}:null;
+}
+function unitInShotRange(u){
+  const t=pickAimTarget(u);
+  if(!t)return null;
+  const w=weaponOf(u);
+  if(t.d<=w.range) return t;
+  return null;
+}
+
+function fireSfx(typ, dist){
+  if(typeof muted!=="undefined"&&muted)return;
+  if(typeof actx==="undefined"||!actx)return;
+  const w=WEAPON[typ]||WEAPON.rifle;
+  const now=performance.now();
+  if(!state._sfxAt)state._sfxAt=0;
+  // allow slightly overlapping shots, cap rate
+  if(now-state._sfxAt<40)return;
+  state._sfxAt=now;
+  const fall=clamp(1-Math.max(0,(dist||0)-40)/260, 0.12, 1);
+  const jitter=0.85+Math.random()*0.3;
+  const vol=(w.vol||0.05)*fall*jitter;
+  const f=(w.freq||400)*(0.92+Math.random()*0.16);
+  if(typ==="sniper"){
+    if(typeof tone==="function"){ tone(f,.09,"sawtooth",vol,f*0.55); tone(f*3.2,.04,"triangle",vol*0.5); }
+    if(typeof noise==="function") noise(.05,vol*0.6,2200);
+  } else if(typ==="mg"){
+    if(typeof tone==="function") tone(f+Math.random()*40,.03,"square",vol*0.9);
+    if(typeof noise==="function") noise(.025,vol*0.5,1800);
+  } else if(typ==="arm"||typ==="art"||typ==="bb"||typ==="cl"||typ==="dd"){
+    if(typeof tone==="function"){ tone(f,.16,"sawtooth",vol*1.1,f*0.45); tone(f*0.5,.12,"square",vol*0.6); }
+    if(typeof noise==="function") noise(.14,vol*0.8,400);
+  } else if(typ==="at"||typ==="ss"){
+    if(typeof tone==="function") tone(f,.12,"sawtooth",vol,f*0.4);
+    if(typeof noise==="function") noise(.1,vol*0.7,600);
+  } else if(typ==="aa"){
+    if(typeof tone==="function") tone(f,.07,"square",vol,f*1.4);
+    if(typeof noise==="function") noise(.06,vol*0.6,1200);
+  } else if(typ==="bomb"){
+    if(typeof tone==="function") tone(90,.2,"sine",vol*0.7,50);
+    if(typeof noise==="function") noise(.18,vol*0.9,300);
+  } else {
+    if(typeof tone==="function") tone(f+Math.random()*80,.045,"square",vol);
+    if(typeof noise==="function") noise(.035,vol*0.45,2000);
+  }
+}
+
+function spawnProjectile(from, to, kind, opts){
+  const fx=ensureFireFX();
+  const w=weaponOf(from);
+  const typ=kind||w.typ;
+  const ax=from.ax, ay=from.ay, bx=to.ax, by=to.ay;
+  const dx=bx-ax, dy=by-ay, dist=Math.hypot(dx,dy)||1;
+  const miss=opts&&opts.miss;
+  const j=(miss?18:4)+Math.random()*6;
+  const ang=Math.atan2(dy,dx)+(miss?(Math.random()-.5)*0.25: (Math.random()-.5)*0.03);
+  const len=dist+(miss?20+Math.random()*24:0);
+  const tx=ax+Math.cos(ang)*len, ty=ay+Math.sin(ang)*len;
+  const speed=w.speed*(0.9+Math.random()*0.2);
+  const shot={
+    typ, fromId:from.id, toId:to.id,
+    x:ax, y:ay, x0:ax, y0:ay, x1:tx, y1:ty,
+    vx:Math.cos(ang)*speed, vy:Math.sin(ang)*speed,
+    life:1, t:0, dur:Math.max(0.05, len/speed),
+    miss:!!miss, hit:false, col: shotColor(typ, from),
+    scale: typ==="arc"||typ==="shell"||typ==="bomb"?1.6: typ==="rocket"?1.3: typ==="streak"?1.4:1,
+    trail: typ==="rocket"||typ==="arc"||typ==="bomb"
+  };
+  const cap=combatZoomedIn()|| (view&&view.scale>=0.5)? 90: 28;
+  fxPush(fx.shots, shot, cap);
+  fxPush(fx.muzzles, {x:ax, y:ay, ang, life:1, typ, col:shot.col}, 40);
+  from.recoil=1;
+  from.facing=ang;
+  from.aimId=to.id;
+  from.aimX=bx; from.aimY=by;
+  from._lastShot=performance.now();
+  return shot;
+}
+function shotColor(typ, from){
+  if(typ==="streak") return "#f6f0c4";
+  if(typ==="burst") return "#ffe08a";
+  if(typ==="shell"||typ==="arc") return "#ffbf6a";
+  if(typ==="rocket") return "#ff8a4a";
+  if(typ==="flak") return "#e8e0a8";
+  if(typ==="bomb") return "#ff7a3a";
+  const nat=from&&nations[from.owner];
+  return "#ffe9a8";
+}
+
+function tryShoot(u, now, zoomed, budget){
+  if(budget.left<=0)return;
+  if(u.str<=0||(u._down>0.8))return;
+  const typ=typeof normType==="function"?normType(u.type):u.type;
+  if(typ==="medic") return; // medics don't fire
+  const w=weaponOf(u);
+  const tgt=unitInShotRange(u);
+  if(!tgt){
+    const far=pickAimTarget(u);
+    if(far){ u.aimId=far.u.id; u.aimX=far.u.ax; u.aimY=far.u.ay; u.facing=Math.atan2(far.u.ay-u.ay, far.u.ax-u.ax); }
+    return;
+  }
+  const o=tgt.u;
+  u.aimId=o.id; u.aimX=o.ax; u.aimY=o.ay;
+  u.facing=Math.atan2(o.ay-u.ay, o.ax-u.ax);
+  u._firing=true;
+  if(now-(u._lastShot||0)<w.cd*(zoomed?1:1.6)) return;
+  const acc=clamp(w.acc - Math.max(0, tgt.d/w.range-0.4)*0.35, 0.18, 0.95);
+  const miss=Math.random()>acc;
+  const n = w.typ==="burst" ? (zoomed?3:2) : 1;
+  for(let i=0;i<n && budget.left>0;i++){
+    setTimeout(()=>{},0); // keep sync for headless determinism
+    spawnProjectile(u, {ax:o.ax+(Math.random()-0.5)*6, ay:o.ay+(Math.random()-0.5)*6, id:o.id}, w.typ, {miss});
+    budget.left--;
+  }
+  const dist=camDist(u.ax,u.ay);
+  fireSfx(typ, dist);
+}
+
+function camDist(x,y){
+  if(typeof scrOf!=="function"||!view) return 80;
+  const p=scrOf(x,y);
+  if(!p||!p.vis) return 240;
+  const cx=(view.cssW||800)/2, cy=(view.cssH||500)/2;
+  return Math.hypot(p.x-cx,p.y-cy);
+}
+
+function applyShotHit(shot){
+  const fx=ensureFireFX();
+  const typ=shot.typ||"tracer";
+  const x=shot.x, y=shot.y;
+  if(shot.miss){
+    fxPush(fx.impacts,{x,y,life:1,kind:"dust",r:3+Math.random()*3}, 50);
+    fxPush(fx.smokes,{x,y,r:3+Math.random()*3,life:0.8,vx:(Math.random()-0.5)*0.2,vy:-0.15,g:0.3}, 40);
+    return;
+  }
+  const tgt=shot.toId!=null?unitById(shot.toId):null;
+  if(tgt&&tgt.str>0){
+    tgt.flinch=1;
+    tgt.facing=(tgt.facing||0)+(Math.random()-0.5)*0.4;
+    const w=WEAPON[typ==="streak"?"sniper":typ==="shell"||typ==="arc"?"arm":typ==="rocket"?"at":"rifle"]||WEAPON.rifle;
+    // visual wound only — sim casualties still come from tickFieldBattles; drop visStr for falling figures
+    if(tgt.visStr==null) tgt.visStr=tgt.str;
+    tgt.visStr=Math.max(0, tgt.visStr - (w.dmg||6)* (0.6+Math.random()*0.8) * 8);
+    maybeFall(tgt, x, y);
+  }
+  if(typ==="shell"||typ==="arc"||typ==="bomb"||typ==="rocket"){
+    fxPush(fx.booms,{x,y,life:1,r: typ==="bomb"||typ==="arc"?16:10}, 24);
+    fxPush(fx.impacts,{x,y,life:1,kind:"boom",r: typ==="arc"?14:9}, 40);
+    fxPush(fx.smokes,{x,y,r:8,life:1,vx:0.1,vy:-0.2,g:0.45}, 36);
+    for(let i=0;i<5;i++) fxPush(fx.sparks,{x:x+(Math.random()-0.5)*8,y:y+(Math.random()-0.5)*8,life:1,vx:(Math.random()-0.5)*40,vy:(Math.random()-0.5)*40}, 40);
+  } else if(typ==="flak"){
+    fxPush(fx.impacts,{x,y,life:1,kind:"flak",r:12}, 30);
+    fxPush(fx.smokes,{x,y,r:6,life:0.9,vx:0,vy:-0.1,g:0.4}, 30);
+  } else {
+    fxPush(fx.impacts,{x,y,life:1,kind:"spark",r:3}, 50);
+    fxPush(fx.sparks,{x,y,life:1,n:4}, 40);
+    fxPush(fx.impacts,{x,y,life:0.7,kind:"dust",r:2.5}, 50);
+  }
+}
+
+function maybeFall(u, x, y){
+  const fx=ensureFireFX();
+  const figs=figsForStr(u.visStr!=null?u.visStr:u.str);
+  const alive=figsForStr(u.str);
+  const prev=u._figCount!=null?u._figCount:alive;
+  const now=Math.max(figs, 0);
+  if(now<prev){
+    const n=Math.min(3, prev-now);
+    const nat=nations[u.owner];
+    const col=nat&&typeof displayColor==="function"?displayColor(nat):(nat&&nat.color)||"#888";
+    for(let i=0;i<n;i++){
+      fxPush(fx.bodies,{
+        x:(x!=null?x:u.ax)+(Math.random()-0.5)*8,
+        y:(y!=null?y:u.ay)+(Math.random()-0.5)*6,
+        ang:u.facing||0, typ:normType(u.type), col,
+        life:1, pose:0
+      }, 40);
+    }
+  }
+  u._figCount=now;
+  if((u.visStr!=null && u.visStr<=40) || u.str<=0){
+    u._down=1;
+  }
+}
+function figsForStr(str){
+  return Math.max(0, Math.min(5, Math.round(Math.sqrt(Math.max(0,str||0)/900))));
+}
+
+function tickFirefight(dt){
+  if(!state||state.phase!=="play") return;
+  const fx=ensureFireFX();
+  const sec=Math.max(0.008, Math.min(0.08,(dt||16)/1000));
+  const now=performance.now();
+  const zoomed=typeof combatZoomedIn==="function"?combatZoomedIn():(view&&view.scale>=0.45);
+  const agg=!zoomed && !(view&&view.scale>=0.32);
+  // decay pose
+  for(const u of (state.units||[])){
+    if(!u)continue;
+    if(u.recoil) u.recoil=Math.max(0, u.recoil-sec*6);
+    if(u.flinch) u.flinch=Math.max(0, u.flinch-sec*5);
+    if(u._down) u._down=Math.max(0, u._down-sec*0.25);
+    if(u.visStr!=null && u.str>u.visStr) u.visStr=Math.min(u.str, u.visStr+sec*40);
+    if(u.visStr!=null && u.str<u.visStr-80) maybeFall(u, u.ax, u.ay);
+    u._firing=false;
+  }
+  // shooting
+  const budget={left: agg?6: (zoomed?18:10)};
+  const shooters=(state.units||[]).filter(u=>u&&u.str>0);
+  // prioritize on-screen / player
+  shooters.sort((a,b)=>{
+    const pa=a.owner===state.player?-1:0, pb=b.owner===state.player?-1:0;
+    return pa-pb;
+  });
+  for(const u of shooters){
+    if(budget.left<=0)break;
+    tryShoot(u, now, zoomed, budget);
+  }
+  // fly shots
+  const keep=[];
+  for(const s of fx.shots){
+    s.t += sec/s.dur;
+    if(s.typ==="arc"||s.typ==="bomb"){
+      const t=clamp(s.t,0,1);
+      s.x=s.x0+(s.x1-s.x0)*t;
+      s.y=s.y0+(s.y1-s.y0)*t;
+    } else {
+      s.x+=s.vx*sec; s.y+=s.vy*sec;
+      s.t = Math.hypot(s.x-s.x0,s.y-s.y0)/Math.max(1,Math.hypot(s.x1-s.x0,s.y1-s.y0));
+    }
+    if(s.trail && Math.random()<0.6){
+      fxPush(fx.smokes,{x:s.x,y:s.y,r:2+Math.random()*2,life:0.6,vx:0,vy:-0.12,g:0.3}, 50);
+    }
+    if(s.t>=1){
+      s.x=s.x1; s.y=s.y1;
+      applyShotHit(s);
+    } else keep.push(s);
+  }
+  fx.shots=keep;
+  const decay=(arr,k)=>{
+    if(!arr)return;
+    for(const it of arr){ it.life-=sec*k; if(it.pose!=null) it.pose=Math.min(1, (it.pose||0)+sec*3); }
+    for(let i=arr.length-1;i>=0;i--) if(arr[i].life<=0) arr.splice(i,1);
+  };
+  decay(fx.muzzles, 8);
+  decay(fx.impacts, 3.2);
+  decay(fx.bodies, 0.35);
+  decay(fx.flashes, 5);
+  decay(fx.sparks, 4);
+  decay(fx.booms, 2.4);
+}
+
+function drawFirefight(ctx, now){
+  const fx=state.combatFX; if(!fx||!ctx)return;
+  const zoomed=typeof combatZoomedIn==="function"?combatZoomedIn():true;
+  ctx.save();
+  // falling / dead figures
+  if(fx.bodies){
+    for(const b of fx.bodies){
+      const p=scrOf(b.x,b.y); if(!p||!p.vis)continue;
+      const fall=clamp(b.pose||0,0,1);
+      ctx.save();
+      ctx.translate(p.x,p.y);
+      ctx.rotate((b.ang||0)+fall*1.35);
+      ctx.globalAlpha=Math.max(0,b.life)*0.9;
+      const scl=(typeof figureScale==="function"?figureScale():1)*8;
+      if(typeof Unit3D!=="undefined" && Unit3D.drawMesh){
+        Unit3D.drawShadow(ctx,0,0,scl/9);
+        Unit3D.drawMesh(ctx, b.typ||"rifle", 0, fall*6, scl*(1-fall*0.15), fall*1.2, 0, b.col, Math.max(0,b.life));
+      } else {
+        ctx.fillStyle=b.col||"#888";
+        ctx.fillRect(-4, -2-fall*2, 8, 4);
+      }
+      ctx.restore();
+    }
+  }
+  // in-flight projectiles (world → screen)
+  if(fx.shots){
+    for(const s of fx.shots){
+      const a=scrOf(s.x0,s.y0), b=scrOf(s.x,s.y), c=scrOf(s.x1,s.y1);
+      if((!a||!a.vis)&&(!b||!b.vis))continue;
+      const px=b?b.x:(a&&a.x), py=b?b.y:(a&&a.y);
+      ctx.globalAlpha=0.95;
+      ctx.strokeStyle=s.col||"#ffe9a8";
+      ctx.lineCap="round";
+      if(s.typ==="arc"||s.typ==="bomb"){
+        const t=clamp(s.t,0,1);
+        const midX=((a&&a.x)||px)+(((c&&c.x)||px)-((a&&a.x)||px))*0.5;
+        const midY=Math.min((a&&a.y)||py,(c&&c.y)||py)-Math.hypot(((c&&c.x)||px)-((a&&a.x)||px),((c&&c.y)||py)-((a&&a.y)||py))*0.28;
+        ctx.lineWidth=1.6;
+        ctx.beginPath();
+        if(a&&c){ ctx.moveTo(a.x,a.y); ctx.quadraticCurveTo(midX,midY,px,py); ctx.stroke(); }
+        ctx.fillStyle="#2a241c"; ctx.beginPath(); ctx.arc(px,py,2.4,0,Math.PI*2); ctx.fill();
+      } else if(s.typ==="streak"){
+        ctx.lineWidth=2.2;
+        ctx.shadowColor="#fff6c8"; ctx.shadowBlur=6;
+        const tail=scrOf(s.x-s.vx*0.05, s.y-s.vy*0.05);
+        ctx.beginPath();
+        if(tail&&tail.vis) ctx.moveTo(tail.x,tail.y); else if(a) ctx.moveTo(a.x,a.y);
+        ctx.lineTo(px,py); ctx.stroke();
+        ctx.shadowBlur=0;
+      } else if(s.typ==="shell"||s.typ==="rocket"){
+        ctx.lineWidth=2;
+        const tail=scrOf(s.x-s.vx*0.06, s.y-s.vy*0.06);
+        ctx.beginPath(); if(tail) ctx.moveTo(tail.x,tail.y); ctx.lineTo(px,py); ctx.stroke();
+        ctx.fillStyle=s.col; ctx.beginPath(); ctx.arc(px,py,2.2,0,Math.PI*2); ctx.fill();
+      } else {
+        ctx.lineWidth=s.typ==="burst"?1.5:1.35;
+        const tail=scrOf(s.x-s.vx*0.04, s.y-s.vy*0.04);
+        ctx.beginPath(); if(tail) ctx.moveTo(tail.x,tail.y); ctx.lineTo(px,py); ctx.stroke();
+      }
+    }
+  }
+  // muzzles
+  if(fx.muzzles){
+    for(const m of fx.muzzles){
+      const p=scrOf(m.x,m.y); if(!p||!p.vis)continue;
+      ctx.globalAlpha=Math.max(0,m.life);
+      const L=8+m.life*6;
+      ctx.strokeStyle="#fff4c0"; ctx.lineWidth=2;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x+Math.cos(m.ang||0)*L, p.y+Math.sin(m.ang||0)*L*0.7);
+      ctx.stroke();
+      ctx.fillStyle="#ffe9a0";
+      ctx.beginPath(); ctx.arc(p.x,p.y,2.2+m.life*2,0,Math.PI*2); ctx.fill();
+    }
+  }
+  // impacts
+  if(fx.impacts){
+    for(const im of fx.impacts){
+      const p=scrOf(im.x,im.y); if(!p||!p.vis)continue;
+      ctx.globalAlpha=Math.max(0,im.life);
+      if(im.kind==="boom"||im.kind==="flak"){
+        ctx.strokeStyle=im.kind==="flak"?"#e8e0a8":"#ffb45a";
+        ctx.lineWidth=2;
+        const r=(im.r||8)*(1.2-im.life*0.4);
+        ctx.beginPath(); ctx.arc(p.x,p.y,r,0,Math.PI*2); ctx.stroke();
+        if(im.kind==="boom"){
+          ctx.fillStyle="rgba(255,180,60,0.35)";
+          ctx.beginPath(); ctx.arc(p.x,p.y,r*0.55,0,Math.PI*2); ctx.fill();
+        }
+      } else if(im.kind==="spark"){
+        ctx.strokeStyle="#ffe9a0"; ctx.lineWidth=1.2;
+        for(let i=0;i<4;i++){
+          const a=i*1.6; ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x+Math.cos(a)*6*im.life,p.y+Math.sin(a)*4*im.life); ctx.stroke();
+        }
+      } else {
+        ctx.fillStyle="rgba(160,140,100,0.45)";
+        ctx.beginPath(); ctx.ellipse(p.x,p.y,(im.r||3)*1.4,(im.r||3)*0.6,0,0,Math.PI*2); ctx.fill();
+      }
+    }
+  }
+  ctx.globalAlpha=1;
+  ctx.restore();
+}
+
+function installFirefight(){
+  if(installFirefight._ok)return;
+  installFirefight._ok=true;
+  const _tc=typeof tickCam==="function"?tickCam:null;
+  if(_tc){
+    tickCam=function(dt){
+      if(state._camLock){
+        const L=state._camLock;
+        view.scale=view.ts=L.s;
+        view.ox=view.tox=L.ox;
+        view.oy=view.toy=L.oy;
+        if(typeof applyTx==="function") applyTx();
+      }
+      _tc(dt);
+      if(state._camLock){
+        const L=state._camLock;
+        view.scale=view.ts=L.s;
+        view.ox=view.tox=L.ox;
+        view.oy=view.toy=L.oy;
+        if(typeof applyTx==="function") applyTx();
+      }
+      tickFirefight(dt);
+    };
+  }
+  const _dcl=typeof drawCombatLayer==="function"?drawCombatLayer:null;
+  if(_dcl){
+    drawCombatLayer=function(now){
+      _dcl(now);
+      drawFirefight(ctx, now||performance.now());
+    };
+  }
+  // when zoomed in, skip the old random province-center tracers — individual shots carry the scene
+  const _tbf=typeof tickBattleFX==="function"?tickBattleFX:null;
+  if(_tbf){
+    tickBattleFX=function(dt){
+      const close=typeof combatZoomedIn==="function"?combatZoomedIn():false;
+      if(close && (state.units||[]).some(u=>u&&u._firing)){
+        // still tick existing fx lifetimes via a light pass: call original only if no live firefight
+        const fx=ensureCombatFX();
+        const k=Math.min(3,(dt||16)/16);
+        for(const arr of [fx.flashes,fx.tracers,fx.shells,fx.smokes,fx.craters,fx.floats,fx.sparks,fx.booms]){
+          if(!arr)continue;
+          for(const it of arr){
+            if(it.life!=null) it.life-=0.045*k;
+            if(it.t!=null){ it.t+=0.05*k; if(it.t>=1) it.hit=true; }
+            if(it.x!=null&&it.vx) it.x+=it.vx; if(it.y!=null&&it.vy) it.y+=it.vy;
+          }
+        }
+        return;
+      }
+      _tbf(dt);
+    };
+  }
+  const _draw=typeof draw==="function"?draw:null;
+  if(_draw && !draw._ffLock){
+    draw=function(){
+      if(state._camLock){
+        const L=state._camLock;
+        view.scale=view.ts=L.s; view.ox=view.tox=L.ox; view.oy=view.toy=L.oy;
+        if(typeof applyTx==="function") applyTx();
+      }
+      _draw();
+    };
+    draw._ffLock=true;
+  }
+  if(window.CROWNFALL){
+
+    const C=window.CROWNFALL;
+    C.tickFirefight=tickFirefight;
+    C.weaponOf=weaponOf;
+    C.drawFirefight=drawFirefight;
+    C.pickAimTarget=pickAimTarget;
+    if(typeof spawnUnit==="function") C.spawnUnit=spawnUnit;
+    if(typeof declareWar==="function") C.declareWar=declareWar;
+    C.getFireFX=()=>{const fx=state.combatFX||{}; return {shots:(fx.shots||[]).length,muzzles:(fx.muzzles||[]).length,impacts:(fx.impacts||[]).length,bodies:(fx.bodies||[]).length};};
+    if(typeof draw==="function") C.draw=draw;
+    C.lockCam=(s,x,y)=>{
+      const wrap=$("mapwrap"); const r=wrap.getBoundingClientRect();
+      view.cssW=r.width; view.cssH=r.height;
+      const ox=r.width/2-x*s, oy=r.height/2-y*s;
+      state._camLock={s,ox,oy};
+      view.scale=view.ts=s; view.ox=view.tox=ox; view.oy=view.toy=oy;
+      if(typeof applyTx==="function") applyTx();
+      if(typeof _landCache!=="undefined") _landCache.ok=false;
+    };
+    C.forceVolley=()=>{
+      const list=(state.units||[]).filter(u=>u&&u.str>0);
+      let n=0;
+      for(const u of list){
+        const t=pickAimTarget(u);
+        if(!t) continue;
+        spawnProjectile(u,t.u,weaponOf(u).typ,{miss:false});
+        n++;
+      }
+      return {n, shots:(state.combatFX&&state.combatFX.shots||[]).length, aims:list.map(u=>({id:u.id,aim:pickAimTarget(u)&&pickAimTarget(u).d, owner:u.owner, typ:u.type}))};
+    };
+
+  }
+}
+installFirefight();
+
+/* ===== Multiplayer: simple host/join UX, reliable brokers, no duplicate players ===== */
 var MP={
   mode:null, peer:null, conns:[], room:null, chat:[], players:{},
   name:"Player", myNid:-1, ready:false, hostNid:-1,
   pc:null, channel:null, lastSnapAt:0, seenTick:-1,
   hotseat:[], hotI:0, status:"",
-  broker:"0.peerjs.com"
+  broker:"0.peerjs.com", connState:"idle", retries:0
 };
+var MP_ICE={iceServers:[
+  {urls:"stun:stun.l.google.com:19302"},
+  {urls:"stun:stun1.l.google.com:19302"},
+  {urls:"stun:stun2.l.google.com:19302"},
+  {urls:"stun:stun.cloudflare.com:3478"},
+  {urls:["turn:openrelay.metered.ca:80","turn:openrelay.metered.ca:443","turn:openrelay.metered.ca:443?transport=tcp","turns:openrelay.metered.ca:443"],
+    username:"openrelayproject", credential:"openrelayproject"}
+]};
+var MP_BROKERS=[
+  {host:"0.peerjs.com", port:443, path:"/", secure:true, key:"peerjs"},
+  {host:"peerjs.com", port:443, path:"/peerjs", secure:true, key:"peerjs"}
+];
 function mpIsClient(){ return MP.mode==="client"; }
 function mpIsHost(){ return MP.mode==="host"; }
 function mpActive(){ return !!MP.mode; }
@@ -7720,120 +9210,208 @@ function mpChat(text, from){
   MP.chat.push(line); if(MP.chat.length>80) MP.chat.shift();
   renderMpChat();
 }
-function mpStatus(s){ MP.status=s; const el=$("mpStatus"); if(el)el.textContent=s; }
+function mpFriendlyError(err){
+  const t=String((err&&err.type)||err||"");
+  if(/peer-unavailable|peerunavailable/i.test(t)) return "Couldn't find that room. Check the code and try again.";
+  if(/unavailable-id/i.test(t)) return "That code is busy. Trying a new one…";
+  if(/network|socket|server-error|disconnected|ssl/i.test(t)) return "Couldn't reach the game service. Trying again…";
+  if(/webrtc|browser/i.test(t)) return "This browser couldn't start a live game. Try Chrome or Edge, or play on the same computer.";
+  return "Something went wrong. Trying again…";
+}
+function mpStatus(s, kind){
+  MP.status=s;
+  if(kind) MP.connState=kind;
+  const el=$("mpStatus"); if(el) el.textContent=s;
+  const pill=$("mpConnPill");
+  if(pill){
+    const st=MP.connState||"idle";
+    pill.className="mppill "+st;
+    pill.textContent=st==="connected"?"Connected":st==="connecting"||st==="retrying"?"Connecting…":st==="error"?"Having trouble":"Ready";
+  }
+  renderMpRoster();
+}
+function escMp(s){ return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 
 function ensureMpUi(){
   if($("mpModal")) return;
   const d=document.createElement("div");
   d.id="mpModal";
+  d.className="menu";
   d.innerHTML=`<div class="mpcard">
-    <button class="mpx" id="mpClose">×</button>
-    <h2 id="mpTitle">Multiplayer</h2>
-    <div class="small" id="mpStatus"></div>
+    <button class="mpx" id="mpClose" aria-label="Close">×</button>
+    <div class="mphead">
+      <h2 id="mpTitle">Multiplayer</h2>
+      <div id="mpConnPill" class="mppill idle">Ready</div>
+    </div>
+    <div class="mpstatus" id="mpStatus"></div>
     <div id="mpBody"></div>
     <div id="mpChatWrap" style="display:none">
       <div id="mpChatLog"></div>
-      <form id="mpChatForm"><input id="mpChatIn" maxlength="240" placeholder="Chat…"><button class="btn" type="submit">Send</button></form>
+      <form id="mpChatForm"><input id="mpChatIn" maxlength="240" placeholder="Type a message…"><button class="btn" type="submit">Send</button></form>
     </div>
   </div>`;
   document.body.appendChild(d);
-  $("mpClose").onclick=()=>{ if(state.phase==="title"||state.phase==="pick") closeMpModal(); };
+  $("mpClose").onclick=()=>{
+    if(state.phase==="play"){ closeMpModal(); return; }
+    if(MP.mode&&(MP.mode==="host"||MP.mode==="client")&&state.phase==="pick"){
+      // keep the lobby docked; just don't leave
+      return;
+    }
+    mpLeaveMenu();
+  };
   $("mpChatForm").onsubmit=(e)=>{ e.preventDefault(); const v=$("mpChatIn").value.trim(); if(!v)return; $("mpChatIn").value=""; mpBroadcastChat(v); };
 }
-function openMpModal(){ ensureMpUi(); $("mpModal").style.display="flex"; }
+function mpLeaveMenu(){
+  if(state.phase!=="play"){
+    if(MP.peer){ try{MP.peer.destroy();}catch(e){} }
+    MP.mode=null; MP.conns=[]; MP.players={}; MP.peer=null; MP.room=null;
+  }
+  closeMpModal();
+  if(state.phase==="pick"&&!MP.mode){ /* stay on map */ }
+  renderPickHint();
+}
+function openMpModal(mode){
+  ensureMpUi();
+  const m=$("mpModal");
+  m.style.display="flex";
+  m.className=mode==="docked"?"docked":"menu";
+}
 function closeMpModal(){ const m=$("mpModal"); if(m)m.style.display="none"; }
 function renderMpChat(){
   const log=$("mpChatLog"); if(!log)return;
-  $("mpChatWrap").style.display=MP.mode?"block":"none";
+  const wrap=$("mpChatWrap");
+  if(wrap) wrap.style.display=(MP.mode&&MP.mode!=="hotseat"&&($("mpModal")&&$("mpModal").style.display!=="none"))?"block":"none";
   log.innerHTML=MP.chat.slice(-40).map(l=>`<div><b>${escMp(l.from)}:</b> ${escMp(l.text)}</div>`).join("");
   log.scrollTop=log.scrollHeight;
 }
-function escMp(s){ return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
 function mpBroadcastChat(text){
   mpChat(text, MP.name);
   mpSend({t:"chat", from:MP.name, text});
 }
 
 function titleMpButtons(){
+  if($("tMulti"))return;
   const row=$("tNew") && $("tNew").parentElement;
-  if(!row||$("tHost"))return;
+  if(!row)return;
   const wrap=document.createElement("div");
   wrap.className="row mprow";
-  wrap.innerHTML=`<button class="btn gold" id="tHost">Host Multiplayer</button>
-    <button class="btn" id="tJoin">Join Game</button>
-    <button class="btn" id="tHot">Hot-seat</button>`;
+  wrap.innerHTML=`<button class="btn gold" id="tMulti">Multiplayer</button>
+    <button class="btn" id="tHost" hidden></button>
+    <button class="btn" id="tJoin" hidden></button>
+    <button class="btn" id="tHot" hidden></button>`;
   row.parentElement.insertBefore(wrap, row.nextSibling);
-  const note=document.createElement("div");
-  note.className="small";
-  note.style.marginTop="6px";
-  note.textContent="Online games use a short room code (peer-to-peer). Strict NATs may need the manual invite fallback. Hot-seat is pass-and-play on this computer.";
-  wrap.parentElement.insertBefore(note, wrap.nextSibling);
-  $("tHost").onclick=()=>{ ensureAudio(); SFX.click(); mpShowHost(); };
-  $("tJoin").onclick=()=>{ ensureAudio(); SFX.click(); mpShowJoin(); };
-  $("tHot").onclick=()=>{ ensureAudio(); SFX.click(); mpShowHotseat(); };
+  $("tMulti").onclick=()=>{ ensureAudio(); if(typeof SFX!=="undefined")SFX.click(); mpShowMenu(); };
+  $("tHost").onclick=()=>{ ensureAudio(); mpShowMenu(); mpDoHost(); };
+  $("tJoin").onclick=()=>{ ensureAudio(); mpShowJoin(); };
+  $("tHot").onclick=()=>{ ensureAudio(); mpShowHotseat(); };
 }
 
-function mpShowHost(){
-  openMpModal();
-  $("mpTitle").textContent="Host a game";
-  MP.name=MP.name||"Host";
-  $("mpBody").innerHTML=`<label class="small">Your name</label><input id="mpName" value="${escMp(MP.name)}">
-    <div class="row"><button class="btn gold" id="mpDoHost">Create room</button>
-    <button class="btn" id="mpManHost">Manual invite instead</button></div>
-    <div class="small">Players join with a 5-letter room code. The host simulates the world; others send orders. Remaining countries stay under AI.</div>`;
-  $("mpDoHost").onclick=()=>{ MP.name=($("mpName").value||"Host").slice(0,20); mpHost(); };
-  $("mpManHost").onclick=()=>{ MP.name=($("mpName").value||"Host").slice(0,20); mpManualHost(); };
+function mpShowMenu(){
+  openMpModal("menu");
+  $("mpTitle").textContent="Play with friends";
+  $("mpChatWrap").style.display="none";
+  $("mpStatus").textContent="";
+  MP.connState="idle"; mpStatus("", "idle");
+  $("mpBody").innerHTML=`
+    <div class="small" style="margin-bottom:10px">One of you hosts. The other joins with a short code.</div>
+    <label class="small">Your name</label>
+    <input id="mpName" maxlength="20" value="${escMp(MP.name||"Player")}">
+    <button class="btn gold mphuge" id="mpDoHost">Host Game</button>
+    <button class="btn mphuge" id="mpDoJoin">Join Game</button>
+    <button class="mplink" id="mpDoHot">Same computer (hot-seat)</button>
+    <button class="mplink" id="mpHow">How to play with friends</button>`;
+  $("mpDoHost").onclick=()=>{ MP.name=($("mpName").value||"Player").slice(0,20); mpDoHost(); };
+  $("mpDoJoin").onclick=()=>{ MP.name=($("mpName").value||"Player").slice(0,20); mpShowJoin(); };
+  $("mpDoHot").onclick=()=>mpShowHotseat();
+  $("mpHow").onclick=()=>mpShowHow();
+}
+function mpShowHow(){
+  openMpModal("menu");
+  $("mpTitle").textContent="How to play with friends";
+  $("mpBody").innerHTML=`
+    <ol class="mphow">
+      <li>One of you taps <b>Host Game</b>. A short code appears. Copy it and send it to your friend.</li>
+      <li>Your friend taps <b>Join Game</b>, types that code, and taps <b>Join</b>.</li>
+      <li>You both click your country on the map. Your name shows up next to it.</li>
+      <li>The host taps the big <b>Start Game</b> button. Countries nobody picked are run by the computer.</li>
+    </ol>
+    <div class="small">If Join says it can't find the room, check the code and try again. If it still fails, open <b>Advanced / having trouble?</b> in the lobby.</div>
+    <div class="small">Want to pass one computer back and forth? Use <b>Same computer (hot-seat)</b>.</div>
+    <button class="btn gold" id="mpHowBack">Back</button>`;
+  $("mpHowBack").onclick=()=>mpShowMenu();
 }
 function mpShowJoin(){
-  openMpModal();
-  $("mpTitle").textContent="Join a game";
-  $("mpBody").innerHTML=`<label class="small">Your name</label><input id="mpName" value="${escMp(MP.name||"Player")}">
-    <label class="small">Room code</label><input id="mpCode" maxlength="8" placeholder="e.g. 7K3PQ" style="text-transform:uppercase">
-    <div class="row"><button class="btn gold" id="mpDoJoin">Join</button>
-    <button class="btn" id="mpManJoin">Paste invite</button></div>`;
-  $("mpDoJoin").onclick=()=>{ MP.name=($("mpName").value||"Player").slice(0,20); mpJoin(($("mpCode").value||"").trim().toUpperCase()); };
-  $("mpManJoin").onclick=()=>{ MP.name=($("mpName").value||"Player").slice(0,20); mpManualJoin(); };
+  openMpModal("menu");
+  $("mpTitle").textContent="Join Game";
+  $("mpChatWrap").style.display="none";
+  $("mpBody").innerHTML=`
+    <label class="small">Your name</label>
+    <input id="mpName" maxlength="20" value="${escMp(MP.name||"Player")}">
+    <label class="small">Room code</label>
+    <input id="mpCode" maxlength="8" placeholder="Example: 7K3PQ" style="text-transform:uppercase;font-size:22px;letter-spacing:.16em;text-align:center">
+    <button class="btn gold mphuge" id="mpDoJoinGo">Join</button>
+    <button class="mplink" id="mpJoinBack">Back</button>`;
+  $("mpDoJoinGo").onclick=()=>{
+    MP.name=($("mpName").value||"Player").slice(0,20);
+    const code=($("mpCode").value||"").trim().toUpperCase();
+    if(!code||code.length<4){ mpStatus("Type the room code your friend sent you.", "error"); return; }
+    mpJoin(code);
+  };
+  $("mpJoinBack").onclick=()=>mpShowMenu();
+  setTimeout(()=>{ const el=$("mpCode"); if(el)el.focus(); }, 50);
+}
+function mpDoHost(){
+  mpHost();
 }
 function mpShowHotseat(){
-  openMpModal();
-  $("mpTitle").textContent="Hot-seat";
-  $("mpBody").innerHTML=`<div class="small">Local pass-and-play. After New Game, each human claims a country in the lobby below, then start. Use <b>Pass control</b> to hand the machine to the next player. AI runs everyone else.</div>
-    <label class="small">Human players (2–8)</label>
+  openMpModal("menu");
+  $("mpTitle").textContent="Same computer";
+  $("mpBody").innerHTML=`
+    <div class="small">You'll take turns on this computer. Each person picks a country, then you pass the keyboard when it's their turn.</div>
+    <label class="small">How many people? (2–8)</label>
     <input id="mpHotN" type="number" min="2" max="8" value="2">
-    <div class="row"><button class="btn gold" id="mpDoHot">Set up hot-seat</button></div>`;
+    <button class="btn gold mphuge" id="mpDoHot">Let's go</button>
+    <button class="mplink" id="mpHotBack">Back</button>`;
   $("mpDoHot").onclick=()=>{
     const n=clamp(parseInt($("mpHotN").value,10)||2,2,8);
     MP.mode="hotseat"; MP.hotseat=[]; MP.hotN=n; MP.hotI=0;
-    closeMpModal();
     newCampaign();
-    state.phase="pick";
-    feedback("Hot-seat: Player 1, click a country to claim it. "+n+" human slots.","good",false);
+    state.phase="pick"; state.paused=true;
     state._hotNeed=n;
-    openMpModal();
     renderHotLobby();
+    renderPickHint();
   };
+  $("mpHotBack").onclick=()=>mpShowMenu();
 }
 function renderHotLobby(){
   if(!$("mpTitle")||!$("mpBody"))return;
-  $("mpTitle").textContent="Hot-seat lobby";
-  const claimed=MP.hotseat.map((id,i)=>{
-    const n=nations[id]; return `Player ${i+1}: ${n?n.name:"?"}`;
-  });
-  $("mpBody").innerHTML=`<div class="small">${claimed.join("<br>")||"No countries claimed yet."}</div>
-    <div class="small">Click a country on the map to claim it for the next player (${MP.hotseat.length}/${MP.hotN}).</div>
-    <div class="row"><button class="btn gold" id="mpHotGo" ${MP.hotseat.length<2?"disabled":""}>Start with ${MP.hotseat.length} players</button></div>`;
+  openMpModal("docked");
+  $("mpTitle").textContent="Hot-seat";
   $("mpChatWrap").style.display="none";
+  const claimed=MP.hotseat.map((id,i)=>{
+    const n=nations[id];
+    const col=n&&typeof displayColor==="function"?displayColor(n):"#888";
+    return `<div class="mpline"><span class="mpdot" style="background:${col}"></span><b>Player ${i+1}</b> — ${n?escMp(n.name):"?"}</div>`;
+  }).join("")||`<div class="small">No one has picked a country yet.</div>`;
+  $("mpBody").innerHTML=`
+    <div class="mphint">Click the map to pick your country</div>
+    <div class="st">Players</div>
+    ${claimed}
+    <div class="small">Player ${Math.min(MP.hotseat.length+1,MP.hotN)} of ${MP.hotN}, click your country.</div>
+    <button class="btn gold mphuge" id="mpHotGo" ${MP.hotseat.length<2?"disabled":""}>Start Game</button>`;
   const b=$("mpHotGo"); if(b) b.onclick=()=>mpStartHotseat();
+  renderPickHint();
 }
 function mpStartHotseat(){
-  if(MP.hotseat.length<2)return;
+  if(MP.hotseat.length<2){ mpStatus("Each person needs to pick a country first.", "error"); return; }
   closeMpModal();
   MP.hotI=0;
   const id=MP.hotseat[0];
   state.phase="pick";
   startAs(id);
-  feedback("Hot-seat: you are "+nations[id].name+". When you are done issuing orders, click Pass control.","good",false);
+  feedback("You're playing as "+nations[id].name+". When you're done giving orders, tap Pass control.","good",false);
   addPassButton();
+  renderPickHint();
 }
 function addPassButton(){
   if($("bPassSeat"))return;
@@ -7851,74 +9429,238 @@ function mpPassControl(){
   zoomToNation(id);
   updateSpeed(); refreshHUD(); renderPanel(true); renderActionBar();
   const n=nations[id];
-  feedback("Pass the computer to Player "+(MP.hotI+1)+" — "+(n?n.name:"")+". Game is paused.","good",false);
+  feedback("Pass the computer to Player "+(MP.hotI+1)+" — "+(n?n.name:"")+". The game is paused.","good",false);
 }
 
+function mpDedupePlayers(){
+  if(!MP.players) MP.players={};
+  const list=Object.values(MP.players);
+  // Host must appear once: merge placeholder "host" with the real peer id
+  const hosts=list.filter(p=>p&&p.host);
+  if(hosts.length>1){
+    const prefer=hosts.find(p=>p.id&&p.id===MP.selfId)
+      || hosts.find(p=>MP.peer&&p.id===MP.peer.id)
+      || hosts.find(p=>p.nid>=0)
+      || hosts[hosts.length-1];
+    for(const p of hosts){
+      if(p===prefer)continue;
+      if((prefer.nid==null||prefer.nid<0)&&p.nid>=0) prefer.nid=p.nid;
+      if(!prefer.name&&p.name) prefer.name=p.name;
+      delete MP.players[p.id];
+    }
+  }
+  // Drop leftover placeholder if we now have a peer id
+  if(MP.selfId && MP.selfId!=="host" && MP.players.host && MP.players[MP.selfId]){
+    const ph=MP.players.host;
+    const real=MP.players[MP.selfId];
+    if((real.nid==null||real.nid<0)&&ph.nid>=0) real.nid=ph.nid;
+    delete MP.players.host;
+  }
+  // Same name + same country (or both still picking) and not both live peers
+  const seen=new Map();
+  for(const p of Object.values(MP.players)){
+    const k=String(p.name||"").toLowerCase()+"|"+(p.nid??-1)+"|"+(p.host?"H":"");
+    if(seen.has(k)){
+      const a=seen.get(k);
+      if(p.id===MP.selfId){ delete MP.players[a.id]; seen.set(k,p); }
+      else if(a.id!==MP.selfId) delete MP.players[p.id];
+    } else seen.set(k,p);
+  }
+}
+function mpRememberMe(){
+  const id=(MP.peer&&MP.peer.id)||MP.selfId||"host";
+  if(MP.selfId && MP.selfId!==id && MP.players[MP.selfId]){
+    const old=MP.players[MP.selfId];
+    delete MP.players[MP.selfId];
+    MP.players[id]=Object.assign({},old,{id,name:MP.name,live:true,host:mpIsHost()});
+    if(MP.myNid>=0) MP.players[id].nid=MP.myNid;
+  }
+  MP.selfId=id;
+  if(!MP.players[id]) MP.players[id]={id,name:MP.name,nid:MP.myNid,ready:false,live:true,host:mpIsHost()};
+  else {
+    MP.players[id].name=MP.name;
+    MP.players[id].live=true;
+    MP.players[id].host=mpIsHost();
+    if(MP.myNid>=0) MP.players[id].nid=MP.myNid;
+  }
+  mpDedupePlayers();
+}
+function mpPlayerRows(){
+  mpDedupePlayers();
+  const rows=Object.values(MP.players);
+  if(!rows.length) return `<div class="small">Waiting for friends to join…</div>`;
+  return rows.map(p=>{
+    const n=p.nid>=0&&nations[p.nid]?nations[p.nid]:null;
+    const col=n&&typeof displayColor==="function"?displayColor(n):"#6a7380";
+    const country=n?n.name:"click the map to pick";
+    const you=p.id===MP.selfId?" (you)":"";
+    const left=p.live===false?" · left — the computer is playing":"";
+    const host=p.host?" · host":"";
+    return `<div class="mpline"><span class="mpdot" style="background:${col}"></span><b>${escMp(p.name)}${you}</b> — ${escMp(country)}${host}${left}</div>`;
+  }).join("");
+}
 function lobbyHtml(){
-  const rows=Object.values(MP.players).map(p=>{
-    const n=p.nid>=0&&nations[p.nid]?nations[p.nid].name:"(picking)";
-    return `<div class="mpline">${escMp(p.name)} — ${escMp(n)} ${p.ready?"✓ ready":""} ${p.live===false?"(disconnected, AI)":""}</div>`;
-  }).join("")||"<div class='small'>Waiting for players…</div>";
-  return `<div class="small">Room code</div><div class="mpcode" id="mpCodeShow">${escMp(MP.room||"")}</div>
-    <div class="row"><button class="btn" id="mpCopy">Copy code</button></div>
-    <div class="st">Players</div>${rows}
-    <div class="small">Click a country on the map to claim it. Host chooses scenario and difficulty on the title card (already applied). Unclaimed nations stay AI.</div>
-    ${mpIsHost()?`<div class="row"><button class="btn gold" id="mpStart">Start campaign</button></div>`:`<div class="row"><button class="btn" id="mpReady">${MP.ready?"Ready ✓":"Ready up"}</button></div>`}
-    <div class="small">If a player drops, the AI takes over their country. Strict firewalls or symmetric NATs may block peer-to-peer; use Manual invite if the broker fails.</div>`;
+  const canStart=mpIsHost() && Object.values(MP.players).some(p=>p.id===MP.selfId && p.nid>=0);
+  return `
+    <div class="small">Tell your friend this code</div>
+    <div class="mpcode" id="mpCodeShow">${escMp(MP.room||"…")}</div>
+    <button class="btn gold" id="mpCopy">Copy</button>
+    <div class="mphint">Click the map to pick your country</div>
+    <div class="st">Players</div>
+    <div id="mpPlayerList">${mpPlayerRows()}</div>
+    <div class="small">Countries nobody picks are run by the computer.</div>
+    ${mpIsHost()
+      ? `<button class="btn gold mphuge" id="mpStart" ${canStart?"":"disabled"}>${canStart?"Start Game":"Pick your country first"}</button>`
+      : `<div class="small">Waiting for the host to start the game…</div>`}
+    <button class="mplink" id="mpAdvanced">Advanced / having trouble?</button>
+    <button class="mplink" id="mpHow2">How to play with friends</button>`;
 }
 function renderLobby(){
-  if(typeof document==='undefined')return;
-  openMpModal();
-  $("mpTitle").textContent=mpIsHost()?"Host lobby":"Joined lobby";
+  if(typeof document==="undefined")return;
+  ensureMpUi();
+  openMpModal("docked");
+  $("mpTitle").textContent=mpIsHost()?"Your game":"You're in!";
   $("mpBody").innerHTML=lobbyHtml();
   $("mpChatWrap").style.display="block";
   renderMpChat();
-  const c=$("mpCopy"); if(c) c.onclick=()=>{ try{navigator.clipboard.writeText(MP.room);}catch(e){} feedback("Room code copied.","good",false); };
-  const s=$("mpStart"); if(s) s.onclick=mpHostStart;
-  const r=$("mpReady"); if(r) r.onclick=()=>{ MP.ready=!MP.ready; mpSend({t:"ready", ready:MP.ready, nid:MP.myNid}); renderLobby(); };
+  const c=$("mpCopy"); if(c) c.onclick=()=>{
+    const code=MP.room||"";
+    try{navigator.clipboard.writeText(code);}catch(e){}
+    c.textContent="Copied!";
+    setTimeout(()=>{ if(c)c.textContent="Copy"; }, 1500);
+    if(typeof feedback==="function") feedback("Code copied. Send it to your friend.","good",false);
+  };
+  const s=$("mpStart"); if(s) s.onclick=()=>mpHostStart();
+  const adv=$("mpAdvanced"); if(adv) adv.onclick=()=>mpShowAdvanced();
+  const how=$("mpHow2"); if(how) how.onclick=()=>mpShowHow();
+  renderPickHint();
+  renderMpRoster();
 }
 
-function mpRememberMe(){
-  const id=MP.peer&&MP.peer.id?MP.peer.id:(MP.selfId||"host");
-  MP.selfId=id;
-  if(!MP.players[id]) MP.players[id]={id,name:MP.name,nid:MP.myNid,ready:false,live:true,host:mpIsHost()};
-  else { MP.players[id].name=MP.name; MP.players[id].live=true; }
+function mpShowAdvanced(){
+  openMpModal("menu");
+  $("mpTitle").textContent="Having trouble joining?";
+  $("mpBody").innerHTML=`
+    <ol class="mphow">
+      <li>Make sure you both have the same room code. It's 5 letters and numbers, like <b>7K3PQ</b>.</li>
+      <li>The host should keep this game open. The friend taps Join, types the code, and taps Join again.</li>
+      <li>Some school or home networks block this kind of game. Try a different network (or a phone hotspot), or play on the same computer.</li>
+      <li>If a helper asked you to use a manual invite: the host copies an invite, the friend pastes it and copies an answer back. This is only needed when the usual code does not work.</li>
+    </ol>
+    <button class="btn" id="mpManHostBtn">I am the host — make a manual invite</button>
+    <button class="btn" id="mpManJoinBtn">I am joining — paste an invite</button>
+    <button class="btn gold" id="mpAdvBack">Back to the lobby</button>`;
+  $("mpManHostBtn").onclick=()=>mpManualHost();
+  $("mpManJoinBtn").onclick=()=>mpManualJoin();
+  $("mpAdvBack").onclick=()=>renderLobby();
+}
+
+function mpPeerOptions(broker){
+  const b=broker||MP_BROKERS[0];
+  return {
+    host:b.host, port:b.port, path:b.path, secure:b.secure!==false, key:b.key||"peerjs",
+    debug:0,
+    config:MP_ICE,
+    pingInterval:5000
+  };
+}
+function mpDestroyPeer(){
+  if(!MP.peer)return;
+  try{ MP.peer.destroy(); }catch(e){}
+  MP.peer=null;
+}
+function mpConnectBroker({asHost, code, attempt}){
+  attempt=attempt||0;
+  const brokers=MP_BROKERS;
+  const bi=Math.min(Math.floor(attempt/3), brokers.length-1);
+  const broker=brokers[bi];
+  MP.broker=broker.host;
+  mpStatus(attempt?"Trying again to get you connected…":"Connecting…", attempt?"retrying":"connecting");
+  if(typeof Peer==="undefined"){
+    mpStatus("This copy of the game is missing the live-play helper. Try opening it in Chrome, or play on the same computer.", "error");
+    return;
+  }
+  mpDestroyPeer();
+  let opened=false;
+  try{
+    const opts=mpPeerOptions(broker);
+    const peer=asHost? new Peer(mpPeerId(code||MP.room), opts) : new Peer(opts);
+    MP.peer=peer;
+    const timeout=setTimeout(()=>{
+      if(opened||MP.peer!==peer)return;
+      if(attempt<7){
+        mpStatus("Couldn't reach the game service. Trying again…", "retrying");
+        mpConnectBroker({asHost, code, attempt:attempt+1});
+      } else {
+        mpStatus("Couldn't reach the game service. Check your internet, or open Advanced / having trouble?", "error");
+      }
+    }, 6000+attempt*400);
+    peer.on("open", id=>{
+      opened=true; clearTimeout(timeout);
+      MP.retries=0;
+      mpRememberMe();
+      if(asHost){
+        mpStatus("Room is ready. Tell your friend the code.", "connected");
+        renderLobby();
+      } else {
+        const conn=peer.connect(mpPeerId(code||MP.room), {reliable:true});
+        conn.on("open", ()=>{ mpWire(conn, true); mpStatus("You're in! Click the map to pick your country.", "connected"); });
+        conn.on("error", ()=> mpStatus("Couldn't find that room. Check the code and try again.", "error"));
+        setTimeout(()=>{
+          if(!(MP.conns||[]).some(c=>c.open||(c.channel&&c.channel.readyState==="open"))){
+            if(attempt<7 && MP.connState!=="connected"){
+              mpConnectBroker({asHost:false, code, attempt:attempt+1});
+            } else if(MP.connState!=="connected"){
+              mpStatus("Couldn't find that room. Check the code and try again.", "error");
+            }
+          }
+        }, 5000);
+      }
+    });
+    peer.on("error", err=>{
+      const msg=mpFriendlyError(err);
+      const typ=err&&err.type;
+      if(typ==="unavailable-id" && asHost){
+        MP.room=roomCode();
+        mpStatus("That code was busy. Here's a new one. Connecting…", "retrying");
+        renderLobby();
+        mpConnectBroker({asHost:true, code:MP.room, attempt:attempt+1});
+        return;
+      }
+      if(typ==="peer-unavailable"){
+        clearTimeout(timeout);
+        mpStatus("Couldn't find that room. Check the code and try again.", "error");
+        return;
+      }
+      if(attempt<7){
+        mpStatus(msg, "retrying");
+        setTimeout(()=>mpConnectBroker({asHost, code, attempt:attempt+1}), 800+attempt*400);
+      } else {
+        clearTimeout(timeout);
+        mpStatus(msg.replace("Trying again…","You can also try Advanced / having trouble?").replace("Trying a new one…","You can also try Advanced / having trouble?"), "error");
+      }
+    });
+    if(asHost) peer.on("connection", conn=> mpAccept(conn));
+  }catch(e){
+    if(attempt<7) setTimeout(()=>mpConnectBroker({asHost, code, attempt:attempt+1}), 1000);
+    else mpStatus("Couldn't reach the game service. Try again in a moment, or play on the same computer.", "error");
+  }
 }
 
 async function mpHost(){
   MP.mode="host"; MP.room=roomCode(); MP.conns=[]; MP.players={}; MP.myNid=-1; MP.ready=false;
   mpRememberMe();
-  mpStatus("Connecting to matchmaking broker…");
-  renderLobby();
-  try{
-    if(typeof Peer==="undefined") throw new Error("PeerJS not loaded");
-    const peer=new Peer(mpPeerId(MP.room), {host:MP.broker, secure:true, port:443, path:"/", debug:0});
-    MP.peer=peer;
-    peer.on("open", id=>{ mpStatus("Room "+MP.room+" is live. Share the code."); mpRememberMe(); renderLobby(); });
-    peer.on("error", err=>{ mpStatus("Broker error: "+(err&&err.type||err)+". Try Manual invite."); });
-    peer.on("connection", conn=> mpAccept(conn));
-  }catch(e){
-    mpStatus("Could not reach the broker. Use Manual invite.");
-  }
   newCampaign();
   state.phase="pick"; state.paused=true;
+  renderLobby();
+  mpConnectBroker({asHost:true, code:MP.room, attempt:0});
 }
 function mpJoin(code){
-  if(!code||code.length<4){ mpStatus("Enter a room code."); return; }
-  MP.mode="client"; MP.room=code.toUpperCase(); MP.conns=[]; MP.players={}; MP.myNid=-1;
-  mpStatus("Looking up room "+MP.room+"…");
-  openMpModal(); renderLobby();
-  try{
-    if(typeof Peer==="undefined") throw new Error("PeerJS not loaded");
-    const peer=new Peer({host:MP.broker, secure:true, port:443, path:"/", debug:0});
-    MP.peer=peer;
-    peer.on("open", ()=>{
-      const conn=peer.connect(mpPeerId(MP.room), {reliable:true});
-      conn.on("open", ()=> mpWire(conn, true));
-      conn.on("error", e=> mpStatus("Connect failed: "+e));
-    });
-    peer.on("error", err=> mpStatus("Broker error: "+(err&&err.type||err)+". Try Paste invite."));
-  }catch(e){ mpStatus("Could not reach the broker. Try Paste invite."); }
+  if(!code||code.length<4){ mpStatus("Type the room code your friend sent you.", "error"); return; }
+  MP.mode="client"; MP.room=String(code).trim().toUpperCase(); MP.conns=[]; MP.players={}; MP.myNid=-1;
+  renderLobby();
+  mpStatus("Looking for that room…", "connecting");
+  mpConnectBroker({asHost:false, code:MP.room, attempt:0});
 }
 function mpAccept(conn){
   conn.on("open", ()=> mpWire(conn, false));
@@ -7932,25 +9674,26 @@ function mpWire(conn, asClient){
     mpSend({t:"hello-ack", room:MP.room, players:MP.players, scenario:state.scenario, diff:state.diff}, conn);
   } else {
     mpSend({t:"hello", name:MP.name});
-    mpStatus("Connected. Pick a country.");
+    mpStatus("You're in! Click the map to pick your country.", "connected");
   }
   renderLobby();
 }
 function mpOnDrop(conn){
   MP.conns=MP.conns.filter(c=>c!==conn);
-  // mark player as disconnected; AI takes over
   const pid=conn.peer||conn._pid;
   if(pid && MP.players[pid]){
     MP.players[pid].live=false;
     const nid=MP.players[pid].nid;
     const n=nid>=0?nations[nid]:null;
-    if(n) log("sys", (MP.players[pid].name||n.name)+" disconnected. The AI now runs "+n.name+".");
-    mpChat((MP.players[pid].name||"A player")+" disconnected — AI takes over.", "System");
+    if(n) log("sys", (MP.players[pid].name||n.name)+" left. The computer now plays "+n.name+".");
+    mpChat((MP.players[pid].name||"A player")+" left — the computer takes over.", "System");
   }
   if(mpIsClient() && MP.conns.length===0){
-    mpStatus("Lost connection to the host. AI may have taken over on their side; this client is now a spectator/solo.");
+    mpStatus("Lost the connection to the host. You can keep watching, or go back to the menu.", "error");
   }
-  renderLobby();
+  mpDedupePlayers();
+  if($("mpModal")&&$("mpModal").style.display!=="none") renderLobby();
+  renderMpRoster();
 }
 function mpOnMsg(raw, conn){
   let msg=raw;
@@ -7959,7 +9702,9 @@ function mpOnMsg(raw, conn){
   if(msg.t==="hello" && mpIsHost()){
     const id=conn.peer||("p"+Math.random().toString(16).slice(2,8));
     conn._pid=id;
-    MP.players[id]={id,name:msg.name||"Player",nid:-1,ready:false,live:true,host:false};
+    if(!MP.players[id]) MP.players[id]={id,name:msg.name||"Player",nid:-1,ready:false,live:true,host:false};
+    else { MP.players[id].name=msg.name||MP.players[id].name; MP.players[id].live=true; }
+    mpDedupePlayers();
     mpSend({t:"lobby", players:MP.players, scenario:state.scenario, diff:state.diff, room:MP.room});
     mpChat((msg.name||"Player")+" joined.", "System");
     renderLobby();
@@ -7968,7 +9713,9 @@ function mpOnMsg(raw, conn){
     if(msg.room) MP.room=msg.room;
     if(msg.scenario) state.scenario=msg.scenario;
     if(msg.diff) state.diff=msg.diff;
-    mpStatus("In lobby "+(MP.room||"")+".");
+    mpRememberMe();
+    mpDedupePlayers();
+    mpStatus("You're in! Click the map to pick your country.", "connected");
     renderLobby();
   } else if(msg.t==="chat"){
     mpChat(msg.text, msg.from);
@@ -7993,11 +9740,16 @@ function mpOnMsg(raw, conn){
 function mpHostAssign(conn, iso){
   const n=nations.find(x=>x.iso===iso);
   if(!n||!n.alive)return;
-  if(Object.values(MP.players).some(p=>p.nid===n.id && p.live!==false)) return; // taken
+  if(Object.values(MP.players).some(p=>p.nid===n.id && p.live!==false && p.id!==(conn?(conn.peer||conn._pid):MP.selfId))) {
+    if(!conn && mpIsHost()) mpStatus(n.name+" is already taken. Click a different country.", "error");
+    return;
+  }
   const id=conn? (conn.peer||conn._pid) : MP.selfId;
   if(!MP.players[id]) mpRememberMe();
+  if(!MP.players[id]) return;
   MP.players[id].nid=n.id;
-  if(id===MP.selfId || !conn){ MP.myNid=n.id; }
+  if(id===MP.selfId || !conn){ MP.myNid=n.id; state.selected=n.id; }
+  mpDedupePlayers();
   mpSend({t:"lobby", players:MP.players, room:MP.room, scenario:state.scenario, diff:state.diff});
   renderLobby();
 }
@@ -8005,10 +9757,12 @@ function mpPickIso(iso){
   if(MP.mode==="hotseat"){
     const n=nations.find(x=>x.iso===iso);
     if(!n)return;
-    if(MP.hotseat.includes(n.id)) return;
-    if(MP.hotseat.length>=MP.hotN) return;
+    if(MP.hotseat.includes(n.id)) return true;
+    if(MP.hotseat.length>=MP.hotN) return true;
     MP.hotseat.push(n.id);
+    state.selected=n.id;
     renderHotLobby();
+    renderPickHint();
     return true;
   }
   if(MP.mode==="host"){
@@ -8017,30 +9771,31 @@ function mpPickIso(iso){
   }
   if(MP.mode==="client"){
     mpSend({t:"pick", iso});
+    const n=nations.find(x=>x.iso===iso);
+    if(n) state.selected=n.id;
+    renderPickHint();
     return true;
   }
   return false;
 }
 function mpHostStart(){
-  const humans=Object.values(MP.players).filter(p=>p.nid>=0);
-  if(!humans.length){ mpStatus("Host must claim a country first."); return; }
+  mpDedupePlayers();
   const hostP=MP.players[MP.selfId]||Object.values(MP.players).find(p=>p.host);
-  if(!hostP||hostP.nid<0){ mpStatus("Claim a country before starting."); return; }
+  if(!hostP||hostP.nid<0){ mpStatus("Click the map to pick your country first.", "error"); renderLobby(); return; }
   MP.myNid=hostP.nid;
   closeMpModal();
-  // campaign already reset on host; just start as host nation
   if(state.phase!=="play"){ state.phase="pick"; startAs(MP.myNid); }
   state.paused=false;
-  addPassButton && (MP.mode==="hotseat") && addPassButton();
   mpSend({t:"start", snap:mpPackSnap(), youMap: Object.fromEntries(Object.values(MP.players).map(p=>[p.id,p.nid])), players:MP.players});
-  feedback("Campaign started. You command "+nations[MP.myNid].name+".","good",false);
+  feedback("The game is on! You are "+nations[MP.myNid].name+".","good",false);
   ensureMpDock();
+  renderPickHint();
+  renderMpRoster();
 }
 function mpClientStart(msg){
   if(msg.players) MP.players=msg.players;
-  const me=Object.values(MP.players).find(p=>p.name===MP.name && p.nid>=0) || Object.values(MP.players).find(p=>p.nid>=0);
-  // prefer our peer id
-  const mine=MP.players[MP.peer&&MP.peer.id] || me;
+  mpDedupePlayers();
+  const mine=MP.players[MP.selfId] || (MP.peer&&MP.players[MP.peer.id]) || Object.values(MP.players).find(p=>p.name===MP.name && p.nid>=0);
   MP.myNid=mine?mine.nid:-1;
   if(msg.snap) mpApplySnap(msg.snap, MP.myNid);
   if(MP.myNid>=0){
@@ -8049,7 +9804,9 @@ function mpClientStart(msg){
   }
   closeMpModal();
   ensureMpDock();
-  feedback("Joined the campaign as "+(nations[MP.myNid]?nations[MP.myNid].name:"a spectator")+".","good",false);
+  feedback("The game is on! You are "+(nations[MP.myNid]?nations[MP.myNid].name:"watching")+".","good",false);
+  renderPickHint();
+  renderMpRoster();
 }
 function mpPackSnap(){
   const s=snapshot();
@@ -8064,10 +9821,12 @@ function mpApplySnap(s, you){
   const keep=you!=null?you:MP.myNid;
   try{ applySnap(s); }catch(e){ console.warn(e); return; }
   if(s.buildings){ state.buildings=s.buildings; state.nextBldId=s.nextBldId||1; }
+  if(s.mpPlayers){ MP.players=s.mpPlayers; mpDedupePlayers(); }
   if(keep!=null && keep>=0){ state.player=keep; state.selected=keep; }
   state.paused=!!s.paused;
   MP.seenTick=s.tick;
   refreshHUD(); renderPanel(); renderActionBar();
+  renderMpRoster();
 }
 function mpBroadcastSnap(){
   if(!mpIsHost())return;
@@ -8078,8 +9837,6 @@ function mpBroadcastSnap(){
 }
 function mpApplyCmd(cmd, nid){
   if(!cmd||nid==null||nid<0)return;
-  const prev=state.player;
-  // temporarily act as that nation for ownership checks
   const old=state.player;
   state.player=nid;
   try{
@@ -8096,11 +9853,11 @@ function mpApplyCmd(cmd, nid){
   mpBroadcastSnap();
 }
 
-/* Manual SDP fallback */
+/* Manual SDP fallback (hidden behind Advanced) */
 function iceDone(pc){
   if(pc.iceGatheringState==="complete") return Promise.resolve();
   return new Promise(res=>{
-    const t=setTimeout(res, 4000);
+    const t=setTimeout(res, 6000);
     pc.addEventListener("icegatheringstatechange", ()=>{
       if(pc.iceGatheringState==="complete"){ clearTimeout(t); res(); }
     });
@@ -8110,7 +9867,7 @@ function bindRawChannel(ch){
   ch.onopen=()=>{
     const fake={channel:ch, peer:"manual", open:true, send:d=>ch.send(d)};
     MP.conns.push(fake);
-    mpStatus("Direct channel open.");
+    mpStatus("You're connected with a manual invite.", "connected");
     if(mpIsHost()) mpSend({t:"hello-ack", room:MP.room||"MANUAL", players:MP.players, scenario:state.scenario, diff:state.diff}, fake);
     else mpSend({t:"hello", name:MP.name});
     renderLobby();
@@ -8119,12 +9876,20 @@ function bindRawChannel(ch){
   ch.onclose=()=> mpOnDrop({channel:ch, peer:"manual"});
 }
 async function mpManualHost(){
-  MP.mode="host"; MP.room=MP.room||roomCode(); MP.conns=[]; MP.players={}; mpRememberMe();
+  MP.mode="host"; MP.room=MP.room||roomCode(); MP.conns=[]; if(!Object.keys(MP.players||{}).length){ MP.players={}; mpRememberMe(); }
   newCampaign(); state.phase="pick"; state.paused=true;
-  openMpModal(); renderLobby();
-  mpStatus("Gathering a manual invite (STUN)…");
+  openMpModal("menu");
+  $("mpTitle").textContent="Manual invite";
+  mpStatus("Making an invite…", "connecting");
+  $("mpBody").innerHTML=`<div class="small">Send the invite to your friend. When they send an answer back, paste it below.</div>
+    <textarea id="mpOffer" rows="5" readonly></textarea>
+    <div class="row"><button class="btn" id="mpCopyOff">Copy invite</button></div>
+    <textarea id="mpAnswer" rows="5" placeholder="Paste their answer here"></textarea>
+    <div class="row"><button class="btn gold" id="mpUseAns">Use this answer</button></div>
+    <button class="mplink" id="mpManBack">Back</button>`;
+  $("mpManBack").onclick=()=>renderLobby();
   try{
-    const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+    const pc=new RTCPeerConnection(MP_ICE);
     MP.pc=pc;
     const ch=pc.createDataChannel("crownfall",{ordered:true});
     bindRawChannel(ch);
@@ -8132,35 +9897,31 @@ async function mpManualHost(){
     await pc.setLocalDescription(offer);
     await iceDone(pc);
     const blob=JSON.stringify(pc.localDescription);
-    $("mpBody").insertAdjacentHTML("beforeend", `<div class="st">Manual invite</div>
-      <div class="small">Send this invite to your friend. Paste their answer below.</div>
-      <textarea id="mpOffer" rows="5" readonly></textarea>
-      <div class="row"><button class="btn" id="mpCopyOff">Copy invite</button></div>
-      <textarea id="mpAnswer" rows="5" placeholder="Paste their answer here"></textarea>
-      <div class="row"><button class="btn gold" id="mpUseAns">Accept answer</button></div>`);
     $("mpOffer").value=blob;
     $("mpCopyOff").onclick=()=>{ try{navigator.clipboard.writeText(blob);}catch(e){} };
     $("mpUseAns").onclick=async()=>{
       try{
         const desc=JSON.parse($("mpAnswer").value);
         await MP.pc.setRemoteDescription(desc);
-        mpStatus("Answer accepted. Waiting for channel…");
-      }catch(e){ mpStatus("Bad answer: "+e.message); }
+        mpStatus("Answer saved. Waiting to connect…", "connecting");
+      }catch(e){ mpStatus("That answer didn't look right. Ask your friend to copy it again.", "error"); }
     };
-  }catch(e){ mpStatus("WebRTC failed: "+e.message); }
+  }catch(e){ mpStatus("Couldn't make an invite in this browser. Try Chrome or Edge, or play on the same computer.", "error"); }
 }
 async function mpManualJoin(){
-  MP.mode="client"; MP.conns=[]; MP.players={};
-  openMpModal(); $("mpTitle").textContent="Paste invite";
+  MP.mode="client"; if(!MP.conns) MP.conns=[]; if(!MP.players) MP.players={};
+  openMpModal("menu"); $("mpTitle").textContent="Paste invite";
   $("mpBody").innerHTML=`<div class="small">Paste the host's invite, then send them the answer.</div>
     <textarea id="mpOffer" rows="5" placeholder="Paste invite"></textarea>
     <div class="row"><button class="btn gold" id="mpMakeAns">Create answer</button></div>
     <textarea id="mpAnswer" rows="5" placeholder="Your answer appears here"></textarea>
-    <div class="row"><button class="btn" id="mpCopyAns">Copy answer</button></div>`;
+    <div class="row"><button class="btn" id="mpCopyAns">Copy answer</button></div>
+    <button class="mplink" id="mpManBack">Back</button>`;
+  $("mpManBack").onclick=()=>mpShowJoin();
   $("mpMakeAns").onclick=async()=>{
     try{
       const desc=JSON.parse($("mpOffer").value);
-      const pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+      const pc=new RTCPeerConnection(MP_ICE);
       MP.pc=pc;
       pc.ondatachannel=ev=> bindRawChannel(ev.channel);
       await pc.setRemoteDescription(desc);
@@ -8168,22 +9929,70 @@ async function mpManualJoin(){
       await pc.setLocalDescription(ans);
       await iceDone(pc);
       $("mpAnswer").value=JSON.stringify(pc.localDescription);
-      mpStatus("Send this answer back to the host.");
-    }catch(e){ mpStatus("Could not build answer: "+e.message); }
+      mpStatus("Copy this answer and send it back to the host.", "connecting");
+    }catch(e){ mpStatus("That invite didn't look right. Ask the host to copy it again.", "error"); }
   };
   $("mpCopyAns").onclick=()=>{ try{navigator.clipboard.writeText($("mpAnswer").value);}catch(e){} };
 }
 
-function ensureMpDock(){
-  if($("mpDock")||!MP.mode||MP.mode==="hotseat") {
-    if(MP.mode==="hotseat") addPassButton();
+function renderMpRoster(){
+  if(!MP.mode||MP.mode==="hotseat"||state.phase!=="play"){
+    const r=$("mpRoster"); if(r) r.style.display="none";
     return;
   }
+  mpDedupePlayers();
+  let el=$("mpRoster");
+  if(!el){
+    el=document.createElement("div");
+    el.id="mpRoster";
+    const wrap=$("mapwrap"); if(!wrap)return;
+    wrap.appendChild(el);
+  }
+  el.style.display="block";
+  const rows=Object.values(MP.players).map(p=>{
+    const n=p.nid>=0&&nations[p.nid]?nations[p.nid]:null;
+    const col=n&&typeof displayColor==="function"?displayColor(n):"#6a7380";
+    const on=p.live!==false;
+    return `<div class="mprowline"><span class="mpdot" style="background:${col}"></span>${escMp(p.name)}${p.id===MP.selfId?" (you)":""}${on?"":" · offline"}</div>`;
+  }).join("");
+  el.innerHTML=`<div class="mproster"><div class="st">Players ${MP.room?("· "+escMp(MP.room)):""}</div>${rows}
+    <button class="mplink" id="mpRosterHow">How to play with friends</button></div>`;
+  const h=$("mpRosterHow"); if(h) h.onclick=()=>{ openMpModal("menu"); mpShowHow(); };
+}
+function ensureMpDock(){
+  renderMpRoster();
+  if(MP.mode==="hotseat") addPassButton();
+  if($("mpDock")||!MP.mode||MP.mode==="hotseat") return;
   const d=document.createElement("div");
   d.id="mpDock";
-  d.innerHTML=`<div class="mpdock"><b>${MP.mode==="host"?"Host":"Client"}</b> ${escMp(MP.room||"")} · <button class="btn" id="mpOpenChat">Chat</button></div>`;
+  d.innerHTML=`<div class="mpdock"><b>${mpIsHost()?"Host":"Joined"}</b> ${escMp(MP.room||"")} · <button class="btn" id="mpOpenChat">Chat</button></div>`;
   $("mapwrap").appendChild(d);
-  $("mpOpenChat").onclick=()=>{ openMpModal(); renderLobby(); };
+  $("mpOpenChat").onclick=()=>{ renderLobby(); };
+}
+
+function renderPickHint(){
+  let el=$("pickHint");
+  if(!el){
+    el=document.createElement("div");
+    el.id="pickHint";
+    const wrap=$("mapwrap"); if(!wrap)return;
+    wrap.appendChild(el);
+  }
+  if(state.phase==="pick" && MP.mode && MP.mode!=="hotseat"){
+    const mine=MP.players[MP.selfId];
+    const n=mine&&mine.nid>=0?nations[mine.nid]: (state.selected>=0?nations[state.selected]:null);
+    el.style.display="block";
+    el.innerHTML=n?`You picked <b>${escMp(n.name)}</b>. ${mpIsHost()?"Press Start Game when everyone is ready.":"Waiting for the host to start."}`:"Click the map to pick your country";
+  } else if(state.phase==="pick" && MP.mode==="hotseat"){
+    el.style.display="block";
+    el.textContent="Click the map to pick your country";
+  } else if(state.phase==="pick"){
+    const n=state.selected>=0?nations[state.selected]:null;
+    el.style.display="block";
+    el.innerHTML=n?`Click a country, then press <b>Play as ${escMp(n.name)}</b>`:"Click a country, then press Play as that country";
+  } else {
+    el.style.display="none";
+  }
 }
 
 function installMp(){
@@ -8198,7 +10007,9 @@ function installMp(){
       const n=nations[id]; if(n) mpPickIso(n.iso);
       return;
     }
-    return _startAs(id);
+    const r=_startAs(id);
+    renderPickHint();
+    return r;
   };
   const _gt=gameTick;
   gameTick=function(){
@@ -8212,12 +10023,24 @@ function installMp(){
     if(ok && mpActive() && a===state.player && typeof mpSendCmd==="function") mpSendCmd({t:"war",oid:b});
     return ok;
   };
+  const _rp=typeof renderPanel==="function"?renderPanel:null;
+  if(_rp){
+    renderPanel=function(force){
+      _rp(force);
+      renderPickHint();
+    };
+  }
+  const _nc=typeof newCampaign==="function"?newCampaign:null;
+  if(_nc){
+    newCampaign=function(){
+      _nc();
+      setTimeout(renderPickHint, 0);
+    };
+  }
 }
 
 installMp();
-
 if(typeof installPlayLate==="function") installPlayLate();
-
 
 })();
 </script>

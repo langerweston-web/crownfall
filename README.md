@@ -13,17 +13,24 @@ A real-world grand strategy game that runs in your browser. Pick any country, bu
 - A one-year peace period while nations build up
 - Drag a Military or Naval Base from the Shop or build bar onto your land
 - Base modules (Barracks, Vehicle Depot, Airfield, Hospital, Defenses, Radar, Dry Dock, and more)
-- Box-select troops, then click or right-click a destination; path and ETA preview
+- Click a unit to select it (or drag a box), then **right-click** the map to walk there — troops travel continuously, they don't teleport
+- A Move button for trackpads; click an enemy to attack
+- Every unit type has its own 3D model (riflemen, snipers, medics, tanks, artillery, planes, ships, and more)
+- Units always look 3D: WebGL when the GPU allows it, or a shaded Canvas 3D fallback if not (press F3 for a short debug note)
+- Firefights: each figure aims, recoils, and fires tracers, shells, rockets, or arcing artillery at a specific enemy
 - Target enemy bases; artillery, bombers, and missiles can damage or destroy them
-- Procedural 3D unit models when WebGL is available (2D silhouettes otherwise)
 - A leaner, slower tech tree: money and time, research labs, mutually exclusive doctrines
-- Online multiplayer (host/join with a room code, PeerJS) plus a local hot-seat mode
+- Simple multiplayer: one Multiplayer button, Host Game or Join Game with a short room code, or Same computer (hot-seat)
 - Taxes, tariffs, trade pacts, alliances, puppets, World Congress
 - Naval invasions, paratroopers, missiles, military access
 - Scenarios: 2026 Modern, 1914, 1939, Random Chaos; Easy / Normal / Hard
 - Achievements and stats, autosave
 
-Press **H** in game for all controls.
+In single player, click a country, then press **Play as** that country. In a multiplayer lobby, click the map to pick your country. Press **H** in game for all controls. Pan with middle-drag, WASD, arrow keys, or the edge of the screen.
+
+![Firefight](screenshots/firefight.png)
+
+![Multiplayer lobby](screenshots/mp.png)
 
 ![Units](screenshots/units3d.png)
 
