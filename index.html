@@ -295,7 +295,7 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
  <div class="card">
   <h1>CROWNFALL</h1>
   <div class="tag">World Edition</div>
-  <p>Take command of any of 200 real nations. Grow your economy, raise armies, research technology, forge alliances and bend the World Congress to your will — until the whole planet flies your flag.</p>
+  <p>Take command of any of 202 real nations. Grow your economy, raise armies, research technology, forge alliances and bend the World Congress to your will — until the whole planet flies your flag.</p>
   <div class="diffrow" id="tDiff">
     <button class="btn" data-d="easy">Easy</button>
     <button class="btn on" data-d="normal">Normal</button>
@@ -307,7 +307,7 @@ select{width:100%;background:var(--panel2);color:var(--text);border:1px solid va
     <button class="btn" data-sc="ww2">1939 Storm</button>
     <button class="btn" data-sc="chaos">Random Chaos</button>
   </div>
-  <p class="small" id="scBlurb">The world as it stands. All 200 nations are at peace — for now.</p>
+  <p class="small" id="scBlurb">The world as it stands. All 202 nations are at peace — for now.</p>
   <div class="notifyrow" id="tNotify">
     <div class="lab">Notifications</div>
     <button class="btn" data-n="all">All</button>
@@ -1227,7 +1227,7 @@ function startAs(id){
   state.playerDeclaredWar=false; state.runAchs=[]; state.history=[];
   state.startPop=n.pop; state.startArmy=n.army; state.startGdp=n.gdp||calcGdp(n);
   recordHistory();
-  log("sys","You take office in "+n.name+". Standing armies have been stood down. Drag a Military Base from the Shop or build bar onto your land, train troops, then click them and right-click where they should go. They will walk there. The great powers keep a one-year peace while everyone rebuilds.");
+  log("sys","You take office in "+n.name+". Standing armies have been stood down. Drag a Military Base from the Shop or build bar onto your land, train troops, then click them and right-click where they should go. They will walk there. The great powers keep a two-year peace while everyone rebuilds.");
   SFX.click(); startTutorial(state.tipsOn?1:99);
   state.tab="nation"; state.hover=-1; state.selectedProv=-1; state.selectedUnits=[];
   document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t==="nation"));
@@ -2647,7 +2647,7 @@ function diffCfg(){
   return {aiRatio:1, aiDeclare:1, playerInc:1, playerAtk:1, name:"Normal"};
 }
 const SCENARIOS={
-  modern:{id:"modern",name:"2026 Modern",year:2026,blurb:"The world as it stands. All 200 nations are at peace — for now."},
+  modern:{id:"modern",name:"2026 Modern",year:2026,blurb:"The world as it stands. All 202 nations are at peace — for now."},
   ww1:{id:"ww1",name:"1914 Powder Keg",year:1914,blurb:"Modern borders, period blocs: Entente vs Central Powers. A spark could set the world on fire."},
   ww2:{id:"ww2",name:"1939 Storm",year:1939,blurb:"Modern borders, period blocs: Allies and Axis already choosing sides. Germany is restless."},
   chaos:{id:"chaos",name:"Random Chaos",year:2026,blurb:"Shuffled rivalries, odd friendships, and a few wars already underway."}
@@ -3004,7 +3004,7 @@ if(typeof SFX!=="undefined"){
 
 /* Tutorial */
 const TUT_STEPS=[
-  {t:"Take the throne", d:"Click a country on the map, then click it again (or press Rule) to govern it."},
+  {t:"Take the throne", d:"Click a country on the map, then click it again (or press Play as) to govern it."},
   {t:"Your ledgers", d:"Economy / Manpower / Research split each month's income. Units, ships, bases, forts and missiles are bought with treasury money in the Shop. The Manpower slider only refills recruitment manpower — it does not raise a free army."},
   {t:"Look around", d:"Scroll to zoom, drag to pan. The minimap in the corner jumps the camera. Your realm glows gold."},
   {t:"Armies", d:"Divisions are the counters on the map. Auto-front (top right, or O) marches them for you. Or drag a counter to a neighboring province."},
@@ -12071,41 +12071,98 @@ function meshPlane(kind){
   function clothFlash(){ return "#3a4a6a"; }
 }
 function meshShip(kind){
+  /* v1.6 graphics: every ship class has its own silhouette, with a nation-colored waterline band and flag. */
   const m=new HQMesh();
-  const L=kind==="bb"?2.4:kind==="cv"?2.6:kind==="cl"?1.9:kind==="ss"?1.6:1.5;
-  const W=kind==="cv"?0.45:kind==="bb"?0.38:kind==="ss"?0.22:0.28;
-  const hull=kind==="ss"?"#1a2420":"#6a7076";
-  // hull tapered
-  m.box(-W,0.00,-L*0.45, W,0.28,L*0.35, hull,0.1,0);
-  m.box(-W*0.6,0.00,L*0.35, W*0.6,0.26,L*0.52, hull,0.1,0);
-  m.box(-W*0.5,0.00,-L*0.58, W*0.5,0.24,-L*0.45, hull,0.1,0);
+  const NAT="#888888";               // replaced by nation color through the accent channel (acc=1)
+  const grey="#6f767c", greyD="#555b60", deck="#5d6366", light="#9aa0a4";
+  function hull(L,W,H,col){
+    m.box(-W,0.00,-L*0.42, W,H,L*0.30, col,0.08,0);           // midship
+    m.box(-W*0.72,0.00,L*0.30, W*0.72,H*1.04,L*0.42, col,0.08,0); // fore taper
+    m.box(-W*0.40,0.02,L*0.42, W*0.40,H*1.08,L*0.52, col,0.08,0); // bow
+    m.box(-W*0.70,0.00,-L*0.52, W*0.70,H*0.96,-L*0.42, col,0.08,0); // stern
+    m.box(-W*1.02,0.02,-L*0.40, W*1.02,0.10,L*0.30, NAT,1.0,0);    // nation band at waterline
+  }
+  function turret(z,r,len,twin,y){
+    y=y||0.40;
+    m.box(-r,y-0.06,z-r, r,y+0.08,z+r, greyD,0.1,0);
+    const dir=z>=0?1:-1;
+    if(twin){ m.cylZ(-r*0.35,y+0.02,z,z+dir*len, 0.03, 5, PAL.metalD,0,0); m.cylZ(r*0.35,y+0.02,z,z+dir*len, 0.03, 5, PAL.metalD,0,0); }
+    else m.cylZ(0,y+0.02,z,z+dir*len, 0.035, 5, PAL.metalD,0,0);
+  }
+  function flag(x,y,z){
+    m.cyl(x,y,y+0.32,z, 0.012, 4, PAL.metal,0,0);
+    m.box(x,y+0.20,z-0.12, x+0.012,y+0.32,z, NAT,1.0,0);
+  }
   if(kind==="ss"){
-    m.box(-0.10,0.28,-0.15, 0.10,0.55,0.25, PAL.metalD,0.3,0);
-    m.cyl(0,0.55,0.85,0.05, 0.03, 6, PAL.metal,0,0);
+    // low cigar hull riding at the waterline, tall sail with dive planes
+    const L=1.7;
+    m.cylZ(0,0.10,-L*0.45,L*0.40, 0.17, 10, "#1d2622",0.05,0);
+    m.box(-0.10,0.02,L*0.40, 0.10,0.18,L*0.50, "#1d2622",0.05,0);
+    m.box(-0.07,0.02,-L*0.52, 0.07,0.16,-L*0.45, "#1d2622",0.05,0);
+    m.box(-0.07,0.22,-0.05, 0.07,0.58,0.30, "#202a26",0.1,0);    // sail
+    m.box(-0.22,0.46,0.10, 0.22,0.50,0.20, "#202a26",0.1,0);     // sail planes
+    m.box(-0.075,0.50,-0.05, 0.075,0.56,0.30, NAT,1.0,0);         // nation band on sail
+    m.cyl(0.03,0.58,0.80,0.15, 0.015, 4, PAL.metal,0,0);           // periscope
+    m.box(-0.28,0.05,-L*0.50, 0.28,0.09,-L*0.44, "#1d2622",0.05,0); // stern planes
     return m.data();
   }
-  // deck
-  m.box(-W*0.9,0.28,-L*0.42, W*0.9,0.34,L*0.32, "#5a6064",0.05,0);
   if(kind==="cv"){
-    m.box(-W*0.95,0.34,-L*0.40, W*0.95,0.38,L*0.40, "#4a4e48",0.1,0);
-    m.box(W*0.45,0.38,-0.20, W*0.85,0.85,0.40, "#4a5458",0.35,0); // island
-    m.box(W*0.50,0.85,-0.05, W*0.80,1.05,0.20, clothFlash(),0.85,0);
-  } else {
-    m.box(-0.16,0.34,-0.10, 0.16,0.72,0.35, "#8a8e92",0.2,0);
-    m.box(-0.12,0.72,-0.04, 0.12,0.95,0.22, "#7a7e82",0.25,0);
-    m.box(-0.08,0.85,0.00, 0.08,0.95,0.16, clothFlash(),0.9,0);
-    if(kind==="bb"){
-      m.cylZ(0,0.55,0.40,1.15, 0.06, 6, PAL.metalD,0,0);
-      m.cylZ(0,0.55,-0.85,-0.20, 0.06, 6, PAL.metalD,0,0);
-      m.box(-0.22,0.34,-0.70, 0.22,0.52,-0.35, PAL.metal,0.15,0);
-    } else if(kind==="cl"){
-      m.cylZ(0,0.50,0.35,0.95, 0.05, 6, PAL.metalD,0,0);
-    } else {
-      m.cylZ(0,0.48,0.30,0.80, 0.045, 6, PAL.metalD,0,0);
-    }
+    // carrier: flat, full-length overhanging flight deck, island on the starboard side
+    const L=2.7, W=0.36;
+    hull(L,W,0.30,grey);
+    m.box(-W*1.35,0.30,-L*0.50, W*1.20,0.37,L*0.54, "#3f4440",0.05,0);           // flight deck
+    m.box(-0.015,0.371,-L*0.46, 0.015,0.375,L*0.50, "#d8dccf",0,0);              // centerline
+    m.box(-W*1.25,0.371,L*0.10, -W*0.95,0.375,L*0.48, "#d8dccf",0,0);            // angled stripe
+    m.box(W*0.82,0.37,-0.35, W*1.15,0.92,0.20, "#59626a",0.2,0);                 // island
+    m.box(W*0.84,0.92,-0.25, W*1.13,1.04,0.12, NAT,1.0,0);                        // island band
+    m.cyl(W*0.98,1.04,1.30,-0.05, 0.02, 4, PAL.metal,0,0);                        // mast
+    // parked jets
+    for(const pz of [-0.85,-0.45,0.55]){ m.box(-0.20,0.37,pz-0.12, -0.12,0.41,pz+0.12, light,0,0); m.box(-0.30,0.37,pz-0.02, -0.02,0.39,pz+0.05, light,0,0); }
+    return m.data();
   }
+  if(kind==="bb"){
+    // battleship: long and wide, big twin turrets (2 fore, 1 aft), tall pagoda tower, two stacks
+    const L=2.5, W=0.40;
+    hull(L,W,0.32,greyD);
+    m.box(-W*0.92,0.32,-L*0.42, W*0.92,0.36,L*0.36, deck,0.05,0);
+    turret(L*0.30,0.15,0.42,true,0.42);
+    turret(L*0.14,0.14,0.38,true,0.56);   // superfiring
+    turret(-L*0.30,0.15,0.42,true,0.42);
+    m.box(-0.18,0.36,-0.25, 0.18,0.70,0.20, "#7c8286",0.15,0);
+    m.box(-0.13,0.70,-0.15, 0.13,1.00,0.12, "#868b8f",0.15,0);
+    m.box(-0.09,1.00,-0.10, 0.09,1.22,0.06, "#8e9397",0.2,0);
+    m.box(-0.095,1.15,-0.105, 0.095,1.22,0.065, NAT,1.0,0);
+    m.cyl(0,0.70,0.98,-0.38, 0.07, 7, "#4a4f52",0,0);
+    m.cyl(0,0.70,0.92,-0.58, 0.065, 7, "#4a4f52",0,0);
+    flag(0,1.22,-0.02);
+    return m.data();
+  }
+  if(kind==="cl"){
+    // cruiser: medium hull, single turrets fore and aft, two raked stacks, boxy bridge
+    const L=2.0, W=0.30;
+    hull(L,W,0.28,grey);
+    m.box(-W*0.9,0.28,-L*0.40, W*0.9,0.32,L*0.32, deck,0.05,0);
+    turret(L*0.27,0.11,0.32,true,0.38);
+    turret(-L*0.28,0.11,0.32,true,0.38);
+    m.box(-0.14,0.32,0.00, 0.14,0.66,0.30, "#858a8e",0.15,0);
+    m.box(-0.10,0.66,0.05, 0.10,0.84,0.24, "#8e9397",0.2,0);
+    m.box(-0.105,0.78,0.045, 0.105,0.84,0.245, NAT,1.0,0);
+    m.cyl(0,0.32,0.70,-0.12, 0.055, 6, "#4a4f52",0,0);
+    m.cyl(0,0.32,0.66,-0.34, 0.055, 6, "#4a4f52",0,0);
+    flag(0,0.84,0.12);
+    return m.data();
+  }
+  // destroyer: small, slim and fast-looking, one forward gun, low bridge, single stack, sharp bow
+  const L=1.45, W=0.22;
+  hull(L,W,0.24,light);
+  m.box(-W*0.9,0.24,-L*0.40, W*0.9,0.27,L*0.30, deck,0.05,0);
+  turret(L*0.26,0.08,0.24,false,0.32);
+  m.box(-0.10,0.27,0.02, 0.10,0.52,0.22, "#8e9397",0.15,0);
+  m.box(-0.105,0.46,0.015, 0.105,0.52,0.225, NAT,1.0,0);
+  m.cyl(0,0.27,0.55,-0.14, 0.05, 6, "#4a4f52",0,0);
+  m.box(-0.06,0.27,-L*0.36, 0.06,0.34,-L*0.24, greyD,0.1,0);   // depth-charge rack
+  flag(0,0.52,0.10);
   return m.data();
-  function clothFlash(){ return "#3a4a6a"; }
 }
 
 function buildAllUnitMeshes(){
@@ -13739,6 +13796,153 @@ function installCompat(){
   }
 }
 installCompat();
+
+/* ===== v1.6 UI: top bar layout, hint placement, war/loss alerts ===== */
+(function installV16UI(){
+  const st=document.createElement("style");
+  st.textContent=`
+#tr{max-width:calc(50% - 170px);flex-wrap:wrap;justify-content:flex-end}
+#tr .seg{flex-wrap:wrap;justify-content:flex-end}
+.camHint{top:auto !important;bottom:150px !important}
+@media (max-width:1180px){#tr .seg button{padding:4px 6px;font-size:11px}#tr{max-width:calc(50% - 150px)}}
+#warAlert{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);z-index:30;display:none;min-width:320px;max-width:min(480px,90vw);
+ background:rgba(30,8,10,.97);border:2px solid #e2504a;border-radius:12px;padding:18px 20px;text-align:center;color:#fbe9e7;
+ box-shadow:0 0 0 9999px rgba(0,0,0,.35),0 12px 40px rgba(0,0,0,.6);font:14px/1.45 system-ui;animation:waPulse 1s ease-in-out 3}
+#warAlert h3{margin:0 0 6px;font-size:20px;color:#ff7a70;letter-spacing:.5px}
+#warAlert .wa-list{margin:8px 0 12px;text-align:left;max-height:160px;overflow:auto}
+#warAlert button{background:#e2504a;color:#fff;border:0;border-radius:8px;padding:8px 18px;font-weight:700;cursor:pointer}
+@keyframes waPulse{50%{border-color:#ffd0c8}}`;
+  document.head.appendChild(st);
+
+  const el=document.createElement("div"); el.id="warAlert";
+  (document.getElementById("mapwrap")||document.body).appendChild(el);
+
+  let prevWars=null, prevProvs=null, prevPlayer=-1, queue=[], selfDeclared=new Set();
+  if(typeof declareWar==="function"){
+    const _dw=declareWar;
+    declareWar=function(a,b,silent){ if(a===state.player) selfDeclared.add(b); return _dw(a,b,silent); };
+  }
+  const online=()=>typeof MP!=="undefined" && MP.mode && MP.mode!=="hotseat";
+  function show(){
+    if(!queue.length) return;
+    const title=queue.some(q=>q.w)?"WAR!":"PROVINCE LOST";
+    el.innerHTML=`<h3>⚠ ${title}</h3><div class="wa-list">${queue.map(q=>"• "+q.t).join("<br>")}</div>`+
+      `<div class="small" style="opacity:.8;margin-bottom:10px">${online()?"":"Game paused. "}Build a military base and recruit troops to defend.</div><button id="waOk">Got it</button>`;
+    el.style.display="block";
+    document.getElementById("waOk").onclick=()=>{ el.style.display="none"; queue=[]; };
+    if(!online() && state.phase==="play"){ state.paused=true; if(typeof updateSpeed==="function") updateSpeed(); }
+    try{ tone(440,.25,"square",.06); setTimeout(()=>tone(330,.35,"square",.06),260); }catch(e){}
+  }
+  setInterval(()=>{
+    if(state.phase!=="play" || state.player<0 || !nations[state.player]){ prevWars=null; return; }
+    const me=nations[state.player];
+    const wars=new Set(me.wars||[]);
+    const provs=new Set(); for(const p of provinces) if(p.owner===state.player) provs.add(p.id);
+    if(prevWars && prevPlayer===state.player){
+      let added=false;
+      for(const w of wars) if(!prevWars.has(w)){
+        if(selfDeclared.has(w)){ selfDeclared.delete(w); continue; }
+        queue.push({w:1,t:`<b>${nations[w].name}</b> declared war on you.`}); added=true;
+      }
+      for(const id of prevProvs) if(!provs.has(id)){
+        const p=provinces[id], o=nations[p.owner];
+        queue.push({t:`<b>${p.name}</b> was taken${o?" by "+o.name:""}.`}); added=true;
+      }
+      if(added) show();
+    }
+    prevWars=wars; prevProvs=provs; prevPlayer=state.player;
+  },250);
+})();
+
+/* ===== v1.6: training queue when every base slot is busy ===== */
+(function installTrainQueue(){
+  if(typeof buyUnit!=="function"||typeof pickBaseFor!=="function") return;
+  const Q=[];
+  const _buy=buyUnit;
+  let draining=false;
+  buyUnit=function(n,type,pid,silent){
+    const t=typeof normType==="function"?normType(type):type;
+    const isShip=typeof SHIP_TYPES!=="undefined"&&SHIP_TYPES[t];
+    if(!draining && n && n.id===state.player && !isShip && !pickBaseFor(n,t,pid)){
+      const kind=(typeof isNavalRecruit==="function"&&isNavalRecruit(t))?"nav":"mil";
+      const capable=basesOf(n.id,kind,true).some(b=>baseCanTrain(b,t));
+      if(capable){
+        if(Q.length>=10){ feedback("Training queue is full (10). Upgrade a base for more slots.","war",true); return false; }
+        Q.push({type:t,pid});
+        feedback(`Base full, so this unit is queued (${Q.length} waiting). It starts when a slot frees up.`,"good",false);
+        return true;
+      }
+    }
+    return _buy(n,type,pid,silent);
+  };
+  setInterval(()=>{
+    if(state.phase!=="play"||state.paused||!Q.length) return;
+    const n=nations[state.player]; if(!n){Q.length=0;return;}
+    const job=Q[0];
+    if(!pickBaseFor(n,job.type,job.pid)) return;
+    draining=true;
+    let ok=false; try{ ok=buyUnit(n,job.type,job.pid,true); }finally{ draining=false; }
+    Q.shift();
+    if(!ok) feedback("A queued unit couldn't start (not enough money?) and was dropped.","war",false);
+  },600);
+  window.__cfTrainQueue=Q;
+})();
+
+/* ===== v1.6 graphics: title fit, distinct neighbor colors, live hover card ===== */
+(function installV16Graphics(){
+  // 1) Title and other overlays: never clip the top. Cards scroll on short screens and stay centered when they fit.
+  const st=document.createElement("style");
+  st.textContent=`
+.overlay{overflow-y:auto;align-items:flex-start;padding:14px 0}
+.overlay>.card{margin:auto}
+@media (max-height:760px){#title .card{padding:18px 26px}#title .card h1{font-size:36px}#title .card p{margin:6px 0}}
+@media (max-height:620px){#title .card h1{font-size:30px;letter-spacing:.16em}}`;
+  document.head.appendChild(st);
+
+  // 2) Recolor nations so countries that touch never share the same or a near-identical color.
+  const PALETTE=["#c9a227","#d97706","#c44536","#4d7c0f","#0f766e","#3b5ba5","#6b4fa3","#94408f",
+    "#be185d","#2f6f99","#15803d","#92400e","#64748b","#0e7490","#9f1239","#65a30d","#7a5cb8","#b45309"];
+  const rgb=h=>{h=h.replace("#","");return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];};
+  const dist=(a,b)=>{const x=rgb(a),y=rgb(b);const rm=(x[0]+y[0])/2;const dr=x[0]-y[0],dg=x[1]-y[1],db=x[2]-y[2];
+    return Math.sqrt((2+rm/256)*dr*dr+4*dg*dg+(2+(255-rm)/256)*db*db);};
+  const NEAR=150;
+  try{
+    const adj=nations.map(()=>new Set());
+    for(const p of provinces){
+      const a=p.owner; if(a==null||!adj[a]) continue;
+      for(const j of (p.neighbors||[]).concat(p.sea||[])){
+        const b=provinces[j]&&provinces[j].owner;
+        if(b!=null&&b!==a&&adj[b]){adj[a].add(b);adj[b].add(a);}
+      }
+    }
+    const order=nations.map(n=>n.id).sort((a,b)=>adj[b].size-adj[a].size||a-b);
+    const done=new Set();
+    for(const id of order){
+      const n=nations[id]; const orig=n.color;
+      const nb=[...adj[id]].filter(j=>done.has(j)).map(j=>nations[j].color);
+      const minTo=c=>nb.length?Math.min(...nb.map(x=>dist(c,x))):1e9;
+      if(minTo(orig)<NEAR){
+        let best=orig,score=-1;
+        for(const c of PALETTE){const m=Math.min(minTo(c),400)*1000-dist(c,orig); if(m>score){score=m;best=c;}}
+        n.color=best;
+      }
+      done.add(id);
+    }
+    if(typeof bumpMap==="function") bumpMap();
+  }catch(e){ console.warn("recolor failed",e); }
+
+  // 3) Hover card: refresh while it is showing, so it follows conquests without the mouse moving.
+  if(typeof showTooltip==="function"){
+    const _show=showTooltip; let last=null;
+    showTooltip=function(sx,sy,pid){ last=[sx,sy,pid]; return _show(sx,sy,pid); };
+    setInterval(()=>{
+      try{
+        if(!last||!tipEl||tipEl.style.display==="none"||state.hover!==last[2]) return;
+        _show(last[0],last[1],last[2]);
+      }catch(e){}
+    },400);
+  }
+})();
 
 })();
 </script>
