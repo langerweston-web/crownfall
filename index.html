@@ -8119,39 +8119,102 @@ function installArmyControls(){
     return true;
   }
 
+  // Click target may be the map canvas or the 3D overlay sitting on top of it
+  const isMapEvt=e=>!e.target||e.target===cv||e.target===document.getElementById("c3d")||e.target===document.getElementById("mapwrap")||e.target.id==="c"||e.target.id==="c3d";
+  const isTyping=e=>{
+    const t=e.target;
+    if(!t)return false;
+    const tag=(t.tagName||"").toUpperCase();
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT")return true;
+    if(t.isContentEditable)return true;
+    return false;
+  };
+  const nearOwnUnit=(sx,sy)=>{
+    if(typeof ownUnitAt==="function" && ownUnitAt(sx,sy)) return true;
+    const hits=state._unitHits||[];
+    const pad=36;
+    for(const h of hits){
+      const u=typeof unitById==="function"?unitById(h.uid):null;
+      if(!u||u.owner!==state.player||u.str<=0)continue;
+      if(sx>=h.x-pad&&sx<=h.x+h.w+pad&&sy>=h.y-pad&&sy<=h.y+h.h+pad) return true;
+    }
+    return false;
+  };
+  const beginPan=(e,sx,sy)=>{
+    state._apan={sx,sy,from:e.button};
+    state._armyMoved=0;
+    state._armyLast={x:e.clientX,y:e.clientY};
+    dragging=true; moved=0; lastX=e.clientX; lastY=e.clientY;
+    cv.classList.add("drag");
+    try{cv.focus();}catch(err){}
+  };
+  const applyDragPan=(e)=>{
+    const lx=state._armyLast?state._armyLast.x:e.clientX;
+    const ly=state._armyLast?state._armyLast.y:e.clientY;
+    const dx=e.clientX-lx, dy=e.clientY-ly;
+    state._armyLast={x:e.clientX,y:e.clientY};
+    state._armyMoved=(state._armyMoved||0)+Math.abs(dx)+Math.abs(dy);
+    moved=state._armyMoved;
+    if(typeof panBy==="function") panBy(dx,dy);
+  };
+
+  if(!cv.hasAttribute("tabindex")) cv.setAttribute("tabindex","0");
+  cv.style.outline="none";
+
   cv.addEventListener("mousedown", e=>{
     if(state.phase!=="play"||state.player<0) return;
-    if(e.target!==cv) return;
+    if(!isMapEvt(e) && e.target!==cv) return;
     if(state.buildDrag) return;
     const {sx,sy}=pt(e);
     state._armyMoved=0;
     state._armyLast={x:e.clientX,y:e.clientY};
+    // Middle or Alt: always pan
     if(e.button===1 || e.altKey){
-      state._apan={sx,sy}; dragging=true; moved=0; lastX=e.clientX; lastY=e.clientY;
-      cv.classList.add("drag");
+      beginPan(e,sx,sy);
       e.preventDefault();
+      e.stopPropagation();
       return;
     }
     if(e.button===2){
-      // right click is MOVE, never pan
-      state._rmb={sx,sy};
+      // Right: click = move order; drag more than 6px = pan
+      state._rmb={sx,sy,x:e.clientX,y:e.clientY};
+      state._armyMoved=0;
       e.preventDefault();
       e.stopPropagation();
       return;
     }
     if(e.button===0){
-      state.boxSel={x:sx,y:sy,sx,sy,shifted:!!e.shiftKey};
-      dragging=false; moved=0;
+      const wantBox=!!(e.shiftKey||state.boxSelMode||nearOwnUnit(sx,sy));
+      if(wantBox){
+        state.boxSel={x:sx,y:sy,sx,sy,shifted:!!e.shiftKey};
+        dragging=false; moved=0;
+      } else {
+        beginPan(e,sx,sy);
+      }
+      e.preventDefault();
       e.stopPropagation();
     }
   }, true);
 
   window.addEventListener("mousemove", e=>{
-    if(state._apan && (e.buttons&4 || e.altKey || e.buttons)){
+    if(state._rmb && !state._apan){
       const dx=e.clientX-(state._armyLast?state._armyLast.x:e.clientX);
       const dy=e.clientY-(state._armyLast?state._armyLast.y:e.clientY);
       state._armyLast={x:e.clientX,y:e.clientY};
-      panBy(dx,dy);
+      state._armyMoved=(state._armyMoved||0)+Math.abs(dx)+Math.abs(dy);
+      moved=state._armyMoved;
+      if(state._armyMoved>6){
+        // convert the right-drag into a pan
+        if(!state._rmb.panning){
+          state._rmb.panning=true;
+          cv.classList.add("drag");
+        }
+        if(typeof panBy==="function") panBy(dx,dy);
+      }
+      return;
+    }
+    if(state._apan && (e.buttons || e.altKey)){
+      applyDragPan(e);
       return;
     }
     if(state.boxSel && state.phase==="play"){
@@ -8163,7 +8226,7 @@ function installArmyControls(){
       state._armyLast={x:e.clientX,y:e.clientY};
       state.boxSel.sx=sx; state.boxSel.sy=sy;
       if(state._armyMoved>4 && typeof showBoxSel==="function") showBoxSel(true,state.boxSel.x,state.boxSel.y,sx,sy);
-      const dest=hitProv(sx,sy); state._hoverDest=dest; state._hoverBase=typeof hitBase==="function"?hitBase(sx,sy):-1;
+      const dest=typeof hitProv==="function"?hitProv(sx,sy):-1; state._hoverDest=dest; state._hoverBase=typeof hitBase==="function"?hitBase(sx,sy):-1;
     }
   }, true);
 
@@ -8171,7 +8234,8 @@ function installArmyControls(){
     if(state._apan){ state._apan=null; cv.classList.remove("drag"); }
     if(state._rmb){
       const start=state._rmb; state._rmb=null;
-      if(state.phase==="play" && (state._armyMoved||0)<10){
+      cv.classList.remove("drag");
+      if(state.phase==="play" && (state._armyMoved||0)<=6 && !start.panning){
         orderTo(start.sx, start.sy);
       }
     }
@@ -8229,36 +8293,80 @@ function installArmyControls(){
   cv.addEventListener("contextmenu", e=>{
     e.preventDefault();
     if(state.phase!=="play"||state.player<0) return;
-    const {sx,sy}=pt(e);
-    if((state.selectedUnits||[]).length){
-      orderTo(sx,sy);
-      e.stopImmediatePropagation();
-    }
+    // A real right-CLICK (no drag) already issued a move on mouseup.
+    // Don't issue a second order from contextmenu.
+    if((state._armyMoved||0)>6) e.stopImmediatePropagation();
   }, true);
 
+  cv.addEventListener("wheel", e=>{
+    if(state.phase==="title") return;
+    if(state._camLock) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const {sx,sy}=pt(e);
+    if(typeof cameraWheel==="function") cameraWheel(e,sx,sy);
+    else if(typeof zoomAt==="function" && !state.globeOn) zoomAt(sx,sy,e.deltaY<0?1.12:1/1.12);
+  }, {passive:false, capture:true});
+  const wrap=$("mapwrap");
+  if(wrap && !wrap._camWheel){
+    wrap._camWheel=true;
+    wrap.addEventListener("wheel", e=>{
+      if(state.phase==="title") return;
+      if(state._camLock) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const r=cv.getBoundingClientRect();
+      const sx=e.clientX-r.left, sy=e.clientY-r.top;
+      if(typeof cameraWheel==="function") cameraWheel(e,sx,sy);
+    }, {passive:false, capture:true});
+  }
+
   window.addEventListener("keydown", e=>{
-    if(e.target&&(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"||e.target.tagName==="SELECT"))return;
-    if(e.key==="F3"){ e.preventDefault(); toggleGlDebug(); return; }
-    const k=e.key;
-    if(k==="ArrowLeft"||k==="ArrowRight"||k==="ArrowUp"||k==="ArrowDown"||k==="w"||k==="a"||k==="s"||k==="d"||k==="W"||k==="A"||k==="S"||k==="D"){
-      if(k==="s"||k==="S"){
-        if(e.ctrlKey||e.metaKey){ e.preventDefault(); if(state.phase==="play") saveManual(); return; }
+    if(isTyping(e)) return;
+    if(e.key==="F3"){ e.preventDefault(); if(typeof toggleGlDebug==="function") toggleGlDebug(); return; }
+    const code=e.code||"";
+    const k=e.key||"";
+    const isWASD=code==="KeyW"||code==="KeyA"||code==="KeyS"||code==="KeyD"||k==="w"||k==="a"||k==="s"||k==="d"||k==="W"||k==="A"||k==="S"||k==="D";
+    const isArrow=code.startsWith("Arrow")||k.startsWith("Arrow");
+    if(isWASD||isArrow){
+      if((k==="s"||k==="S"||code==="KeyS") && (e.ctrlKey||e.metaKey)){
+        e.preventDefault();
+        if(state.phase==="play" && typeof saveManual==="function") saveManual();
+        return;
       }
-      state.keysDown[k.toLowerCase()]=true;
-      if(k.startsWith("Arrow")) e.preventDefault();
+      if(!state.keysDown) state.keysDown={};
+      if(isArrow) state.keysDown[k.toLowerCase()]=true;
+      if(code==="KeyW"||k==="w"||k==="W") state.keysDown.w=true;
+      if(code==="KeyA"||k==="a"||k==="A") state.keysDown.a=true;
+      if(code==="KeyS"||k==="s"||k==="S") state.keysDown.s=true;
+      if(code==="KeyD"||k==="d"||k==="D") state.keysDown.d=true;
+      if(k.toLowerCase()==="arrowleft") state.keysDown.arrowleft=true;
+      if(k.toLowerCase()==="arrowright") state.keysDown.arrowright=true;
+      if(k.toLowerCase()==="arrowup") state.keysDown.arrowup=true;
+      if(k.toLowerCase()==="arrowdown") state.keysDown.arrowdown=true;
+      e.preventDefault();
+      return;
     }
-    if((k==="m"||k==="M") && state.phase==="play" && (state.selectedUnits||[]).length && !e.ctrlKey){
-      // M was mute — keep mute on the button; if units selected, M means Move
-      // Don't steal mute: only Shift+M or the on-screen Move button? Steer says Move button for touchpad.
-      // Leave M as mute.
+    if((k==="Home"||code==="Home") && state.phase==="play"){
+      e.preventDefault();
+      if(typeof centerOnCountry==="function") centerOnCountry();
+      return;
     }
     if(k==="Escape"){ state.moveMode=false; renderArmyUI(); }
   }, true);
   window.addEventListener("keyup", e=>{
-    state.keysDown[e.key.toLowerCase()]=false;
-  });
+    if(!state.keysDown) state.keysDown={};
+    const code=e.code||"";
+    const k=(e.key||"").toLowerCase();
+    state.keysDown[k]=false;
+    if(code==="KeyW") state.keysDown.w=false;
+    if(code==="KeyA") state.keysDown.a=false;
+    if(code==="KeyS") state.keysDown.s=false;
+    if(code==="KeyD") state.keysDown.d=false;
+    if(k.startsWith("arrow")) state.keysDown[k]=false;
+  }, true);
 
-  const _frame=typeof frame==="function"?null:null;
+    const _frame=typeof frame==="function"?null:null;
   // hook the existing rAF loop via tickCam wrap
   const _tickCam=typeof tickCam==="function"?tickCam:null;
   if(_tickCam){
@@ -10041,6 +10149,2893 @@ function installMp(){
 
 installMp();
 if(typeof installPlayLate==="function") installPlayLate();
+
+/* ===== Crownfall v1.3 — expanded buildings, resources, 3D models ===== */
+var BUILDINGS={
+  factory:{name:"Factory",cost:420,time:4,upkeep:8,hp:110,emoji:"🏭",desc:"Income and faster training. Power plants boost output.",prod:"income",cap:6},
+  mine:{name:"Mine",cost:300,time:3,upkeep:5,hp:90,emoji:"⛏",desc:"Produces steel each month. Richer in mountains.",prod:"steel",cap:6},
+  oilwell:{name:"Oil Well",cost:340,time:3,upkeep:6,hp:90,emoji:"🛢",desc:"Produces oil each month. Richer in deserts and on the coast.",prod:"oil",cap:6},
+  power:{name:"Power Plant",cost:400,time:4,upkeep:8,hp:100,emoji:"⚡",desc:"Boosts factories, mines, and oil wells nationwide.",cap:4},
+  farm:{name:"Farm",cost:220,time:3,upkeep:3,hp:70,emoji:"🌾",desc:"Feeds population and refills manpower faster. Best on plains.",cap:8},
+  bank:{name:"Bank",cost:380,time:4,upkeep:6,hp:80,emoji:"🏦",desc:"Raises income and makes taxes more efficient.",cap:3},
+  market:{name:"Market",cost:260,time:3,upkeep:4,hp:70,emoji:"🏪",desc:"Trade income; works with your tariff policy.",cap:4},
+  lab:{name:"Research Lab",cost:420,time:4,upkeep:6,hp:80,emoji:"🔬",desc:"+40% research speed and +1 research slot.",cap:3},
+  uni:{name:"University",cost:780,time:6,upkeep:8,hp:90,emoji:"🎓",desc:"+60% research speed and +1 slot. Build a lab first.",need:"lab",cap:3},
+  hospitalb:{name:"Hospital",cost:320,time:4,upkeep:6,hp:90,emoji:"🏥",desc:"Heals nearby units and supports population.",cap:4},
+  bunker:{name:"Bunker",cost:260,time:3,upkeep:4,hp:160,emoji:"🪖",desc:"Fortifies the province against assaults.",cap:6},
+  aa_bat:{name:"Anti-Air Battery",cost:280,time:3,upkeep:5,hp:90,emoji:" ⎇",desc:"Cuts bombing and missile damage in this province.",cap:5},
+  coastal:{name:"Coastal Gun",cost:360,time:4,upkeep:6,hp:130,emoji:"大炮",desc:"Defends the coast against invasions. Coastal provinces only.",coastal:true,cap:4},
+  radar_stn:{name:"Radar Station",cost:300,time:3,upkeep:5,hp:70,emoji:"📡",desc:"Extends bomber and missile reach, and spots incoming raids.",cap:3},
+  silo:{name:"Missile Silo",cost:700,time:6,upkeep:12,hp:100,emoji:"🚀",desc:"Cheaper, faster strategic missiles.",cap:2},
+  airfieldb:{name:"Airfield",cost:450,time:5,upkeep:8,hp:100,emoji:"🛩",desc:"Speeds fighter and bomber training.",cap:3},
+  spyhq:{name:"Spy HQ",cost:320,time:4,upkeep:6,hp:70,emoji:"🕵",desc:"Run spy missions: siphon treasury or shake a rival's stability.",cap:2},
+  propaganda:{name:"Propaganda Office",cost:200,time:3,upkeep:4,hp:70,emoji:"📢",desc:"Raises national stability each month.",cap:3},
+  wonder:{name:"Monument",cost:2400,time:10,upkeep:18,hp:200,emoji:"🏛",desc:"A unique wonder: prestige, income, and stability. One per nation.",unique:true,cap:1}
+};
+// Coastal gun emoji fallback if the CJK glyph is missing in some fonts — use a cannon-like mark
+BUILDINGS.coastal.emoji="🎯";
+
+const UNIT_RES={
+  rifle:{steel:0,oil:0}, sniper:{steel:0,oil:0}, medic:{steel:0,oil:0},
+  eng:{steel:1,oil:0}, mg:{steel:1,oil:0}, art:{steel:2,oil:0},
+  arm:{steel:8,oil:3}, at:{steel:2,oil:0}, aa:{steel:2,oil:1},
+  air:{steel:4,oil:6}, bomb:{steel:5,oil:8}, transport:{steel:3,oil:5},
+  sf:{steel:0,oil:0}, para:{steel:0,oil:0}, marine:{steel:0,oil:1},
+  dd:{steel:6,oil:4}, cl:{steel:8,oil:6}, bb:{steel:14,oil:8},
+  cv:{steel:12,oil:10}, ss:{steel:6,oil:5}
+};
+
+function unitResCost(type){
+  type=typeof normType==="function"?normType(type):type;
+  return UNIT_RES[type]||{steel:0,oil:0};
+}
+function ensureRes(n){
+  if(!n)return;
+  if(n.steel==null||!Number.isFinite(n.steel)) n.steel=16;
+  if(n.oil==null||!Number.isFinite(n.oil)) n.oil=12;
+  if(n.prestige==null||!Number.isFinite(n.prestige)) n.prestige=0;
+  if(n._spyCD==null) n._spyCD=0;
+}
+function ensureBldg(b){
+  if(!b)return b;
+  const d=BUILDINGS[b.kind]||{};
+  if(!b.level) b.level=1;
+  if(b.on==null) b.on=true;
+  if(!b.maxHp) b.maxHp=Math.round((d.hp||80)*(1+0.2*((b.level||1)-1)));
+  if(b.hp==null) b.hp=b.maxHp;
+  if(b.pendingLevel==null) b.pendingLevel=0;
+  if(b.buildLeft==null) b.buildLeft=0;
+  return b;
+}
+function buildingCost(kind,level){
+  const d=BUILDINGS[kind];
+  if(!d)return 400;
+  if(!level||level<=1)return d.cost;
+  return Math.round(d.cost*0.7*level);
+}
+function buildingById(id){
+  ensureBuildings();
+  return state.buildings.find(b=>b.id===id)||null;
+}
+function bldgReady(b){
+  if(!b)return false;
+  ensureBldg(b);
+  return (b.buildLeft||0)<=0 && b.on!==false && (b.hp||0)>0;
+}
+function bldgMul(b){
+  if(!bldgReady(b))return 0;
+  const lv=b.level||1;
+  const hp=Math.max(0.35,(b.hp||1)/(b.maxHp||1));
+  return (1+0.4*(lv-1))*hp;
+}
+function readyKind(n,kind){
+  if(!n)return 0;
+  ensureBuildings();
+  let s=0;
+  for(const b of state.buildings){
+    if(b.owner!==n.id||b.kind!==kind)continue;
+    s+=bldgMul(b);
+  }
+  return s;
+}
+function buildingsAt(pid,kind){
+  ensureBuildings();
+  return state.buildings.filter(b=>b.pid===pid && (!kind||b.kind===kind));
+}
+function bldgEffectText(kind,level){
+  const lv=level||1;
+  const m=(1+0.4*(lv-1));
+  const fmtN=x=>((x*m).toFixed(x*m%1?1:0));
+  switch(kind){
+    case "factory": return "+"+Math.round(8*m)+"% income, faster training";
+    case "mine": return "+"+fmtN(4)+" steel / month";
+    case "oilwell": return "+"+fmtN(3.5)+" oil / month";
+    case "power": return "+"+Math.round(15*m)+"% mine, well, and factory output";
+    case "farm": return "+"+Math.round(12*m)+"% manpower refill";
+    case "bank": return "+"+Math.round(4*m)+"% income, better taxes";
+    case "market": return "+"+Math.round(5*m)+"% trade and tariff income";
+    case "lab": return "+"+Math.round(40*m)+"% research, +1 slot";
+    case "uni": return "+"+Math.round(60*m)+"% research, +1 slot";
+    case "hospitalb": return "Heals units here, supports population";
+    case "bunker": return "+"+Math.round(18*m)+"% province defense";
+    case "aa_bat": return "-"+Math.round(28*m)+"% bomb and missile damage here";
+    case "coastal": return "Harder enemy naval invasions";
+    case "radar_stn": return "Longer bomber and missile reach";
+    case "silo": return "Missiles cost less and reload faster";
+    case "airfieldb": return "Fighter and bomber training is faster";
+    case "spyhq": return "Enables spy missions from this panel";
+    case "propaganda": return "+"+((0.4*m).toFixed(1))+" stability / month";
+    case "wonder": return "Prestige, +"+Math.round(6*m)+"% income, +stability";
+    default: return (BUILDINGS[kind]&&BUILDINGS[kind].desc)||"";
+  }
+}
+
+function canPlaceBuilding(nid,pid,kind){
+  const p=provinces[pid], n=nations[nid], d=BUILDINGS[kind];
+  if(!d) return "Unknown building.";
+  if(!p||!n||p.owner!==nid) return "You can only build on land you own.";
+  if(d.needTech && typeof hasTech==="function" && !hasTech(n,d.needTech))
+    return "Requires "+((typeof techById==="function"&&techById(d.needTech)||{name:d.needTech}).name)+".";
+  if(d.need && !buildingsOf(nid,d.need).length && kind!==d.need){
+    if(kind!=="lab") return "Build a "+(BUILDINGS[d.need]||{name:d.need}).name+" first.";
+  }
+  if(d.coastal && !p.coastal) return "Coastal guns must be built on the coast.";
+  if(d.unique && (state.buildings||[]).some(b=>b.owner===nid&&b.kind===kind))
+    return "Each nation may raise only one Monument.";
+  if((state.buildings||[]).some(b=>b.pid===pid&&b.kind===kind&&b.owner===nid))
+    return "Already present here.";
+  const cap=d.cap||8;
+  const have=(state.buildings||[]).filter(b=>b.owner===nid&&b.kind===kind).length;
+  if(have>=cap) return "You already have the maximum number of "+d.name+"s.";
+  const cost=buildingCost(kind,1);
+  if((n.money||0)<cost) return "Need "+fmt(cost)+" cr.";
+  return null;
+}
+function placeBuilding(nid,pid,kind,silent){
+  const err=canPlaceBuilding(nid,pid,kind);
+  if(err){ if(!silent&&nid===state.player) feedback(err,"war",true); return null; }
+  const n=nations[nid], d=BUILDINGS[kind];
+  const cost=buildingCost(kind,1);
+  n.money-=cost;
+  ensureBuildings();
+  const b={id:state.nextBldId++, owner:nid, pid, kind, level:1, buildLeft:d.time, on:true, hp:d.hp, maxHp:d.hp, pendingLevel:0};
+  state.buildings.push(b);
+  if(!silent){
+    log("sys",n.name+" began a "+d.name+" in "+provinces[pid].name+".");
+    if(nid===state.player) feedback(d.name+" — "+fmt(cost)+" cr, "+d.time+" months to finish.","good",false);
+  }
+  if(typeof bumpMap==="function") bumpMap();
+  return b;
+}
+function upgradeBuilding(id,silent){
+  const b=buildingById(id); if(!b)return false;
+  ensureBldg(b);
+  const n=nations[b.owner], d=BUILDINGS[b.kind];
+  if(!n||!d)return false;
+  if((b.buildLeft||0)>0){ if(!silent&&n.id===state.player) feedback("Finish the current work first.","war",true); return false; }
+  if((b.level||1)>=3){ if(!silent&&n.id===state.player) feedback("Already at the highest level.","war",true); return false; }
+  if((b.hp||0)<=0){ if(!silent&&n.id===state.player) feedback("Repair it before upgrading.","war",true); return false; }
+  const next=(b.level||1)+1;
+  const cost=buildingCost(b.kind,next);
+  if((n.money||0)<cost){ if(!silent&&n.id===state.player) feedback("Need "+fmt(cost)+" cr to upgrade.","war",true); return false; }
+  n.money-=cost;
+  b.pendingLevel=next;
+  b.buildLeft=2+next;
+  if(!silent&&n.id===state.player) feedback("Upgrading "+d.name+" to level "+next+" ("+b.buildLeft+" mo, "+fmt(cost)+" cr).","good",false);
+  renderBldPanel();
+  return true;
+}
+function repairBuilding(id,silent){
+  const b=buildingById(id); if(!b)return false;
+  ensureBldg(b);
+  const n=nations[b.owner], d=BUILDINGS[b.kind];
+  if(!n||!d)return false;
+  const miss=Math.max(0,(b.maxHp||1)-(b.hp||0));
+  if(miss<=0){ if(!silent&&n.id===state.player) feedback("No damage to repair.","war",true); return false; }
+  const cost=Math.max(8,Math.round(d.cost*0.4*(miss/(b.maxHp||1))));
+  if((n.money||0)<cost){ if(!silent&&n.id===state.player) feedback("Need "+fmt(cost)+" cr to repair.","war",true); return false; }
+  n.money-=cost;
+  b.hp=b.maxHp;
+  if(!silent&&n.id===state.player) feedback(d.name+" repaired for "+fmt(cost)+" cr.","good",false);
+  renderBldPanel();
+  return true;
+}
+function demolishBuilding(id,silent){
+  const b=buildingById(id); if(!b)return false;
+  ensureBldg(b);
+  const n=nations[b.owner], d=BUILDINGS[b.kind];
+  if(!n||!d)return false;
+  const hpFrac=Math.max(0,(b.hp||0)/(b.maxHp||1));
+  const refund=Math.round(d.cost*0.4*(b.level||1)*hpFrac);
+  n.money+=refund;
+  state.buildings=state.buildings.filter(x=>x.id!==b.id);
+  if(state.selectedBld===id) state.selectedBld=null;
+  if(!silent){
+    log("sys",n.name+" demolished a "+d.name+(refund?(" (refund "+fmt(refund)+" cr)"):"")+".");
+    if(n.id===state.player) feedback("Demolished "+d.name+". Refund "+fmt(refund)+" cr.","war",false);
+  }
+  renderBldPanel();
+  if(typeof bumpMap==="function") bumpMap();
+  return true;
+}
+function toggleBuilding(id,silent){
+  const b=buildingById(id); if(!b)return false;
+  ensureBldg(b);
+  b.on=!b.on;
+  if(!silent&&b.owner===state.player){
+    feedback((BUILDINGS[b.kind]||{}).name+" is now "+(b.on?"running":"offline")+".","sys",false);
+  }
+  renderBldPanel();
+  return true;
+}
+
+function bldgUpkeepOf(b){
+  ensureBldg(b);
+  const d=BUILDINGS[b.kind]; if(!d)return 0;
+  let u=(d.upkeep||4)*(0.7+0.3*(b.level||1));
+  if((b.buildLeft||0)>0) u*=0.5;
+  if(b.on===false) u*=0.3;
+  if((b.hp||0)<=0) u=0;
+  return u;
+}
+function nationBldgUpkeep(nid){
+  ensureBuildings();
+  let s=0;
+  for(const b of state.buildings) if(b.owner===nid) s+=bldgUpkeepOf(b);
+  return s;
+}
+function terrainResBonus(kind,p){
+  if(!p)return 1;
+  const t=p.terrain||"plains";
+  if(kind==="mine") return t==="mountain"?1.35:t==="urban"?0.85:1;
+  if(kind==="oilwell") return (t==="desert"||p.coastal)?1.3:0.95;
+  if(kind==="farm") return t==="plains"?1.25:t==="forest"?1.1:t==="desert"||t==="mountain"?0.7:1;
+  if(kind==="factory") return t==="urban"?1.15:1;
+  return 1;
+}
+function tickResources(){
+  ensureBuildings();
+  for(const n of nations){
+    if(!n||!n.alive)continue;
+    ensureRes(n);
+    let steel=0, oil=0;
+    const pwr=readyKind(n,"power");
+    const pMul=1+0.15*pwr;
+    for(const b of state.buildings){
+      if(b.owner!==n.id)continue;
+      const m=bldgMul(b);
+      if(!m)continue;
+      const p=provinces[b.pid];
+      const tb=terrainResBonus(b.kind,p);
+      if(b.kind==="mine") steel+=4*m*tb*pMul;
+      else if(b.kind==="oilwell") oil+=3.5*m*tb*pMul;
+    }
+    n.steel=Math.min(9999,(n.steel||0)+steel);
+    n.oil=Math.min(9999,(n.oil||0)+oil);
+    if((n._spyCD||0)>0) n._spyCD--;
+    const prop=readyKind(n,"propaganda");
+    const wonder=readyKind(n,"wonder");
+    if(prop||wonder){
+      n.stability=Math.max(15,Math.min(100,(n.stability||70)+0.35*prop+0.25*wonder));
+    }
+    if(wonder) n.prestige=(n.prestige||0)+0.4*wonder;
+  }
+}
+function tickBuildingCare(){
+  ensureBuildings();
+  for(const b of state.buildings){
+    ensureBldg(b);
+    if((b.buildLeft||0)<=0 && b.pendingLevel){
+      b.level=b.pendingLevel;
+      b.pendingLevel=0;
+      b.maxHp=Math.round(((BUILDINGS[b.kind]||{}).hp||80)*(1+0.2*(b.level-1)));
+      b.hp=Math.min(b.maxHp,(b.hp||0)+Math.round(b.maxHp*0.2));
+      if(b.owner===state.player){
+        const d=BUILDINGS[b.kind];
+        if(typeof notify==="function") notify((d&&d.name||"Building")+" is now level "+b.level+".","sys","info");
+      }
+    }
+    if((b.buildLeft||0)>0)continue;
+    if(b.hp>0 && b.hp<b.maxHp){
+      const atPeace=!nations[b.owner]||!(nations[b.owner].wars||[]).length;
+      b.hp=Math.min(b.maxHp,b.hp+(atPeace?2:0.6));
+    }
+  }
+  // hospitals heal units in the same province
+  if(state.units){
+    const hosp=new Map();
+    for(const b of state.buildings){
+      if(b.kind!=="hospitalb"||!bldgReady(b))continue;
+      hosp.set(b.pid,(hosp.get(b.pid)||0)+bldgMul(b));
+    }
+    for(const u of state.units){
+      if(!u||u.str<=0)continue;
+      const h=hosp.get(u.pid)||0;
+      if(!h)continue;
+      if(u.owner!== (state.buildings.find(b=>b.pid===u.pid&&b.kind==="hospitalb"&&bldgReady(b))||{}).owner){
+        const ownerB=state.buildings.find(b=>b.pid===u.pid&&b.kind==="hospitalb"&&bldgReady(b)&&b.owner===u.owner);
+        if(!ownerB)continue;
+      }
+      const max=u.maxStr||u.str;
+      if(u.str<max) u.str=Math.min(max,u.str+max*0.04*h);
+    }
+  }
+}
+function tickBuildingCapture(){ /* owner follows province; handled in capture hook */ }
+
+function damageBuildingsAt(pid, amt, reason){
+  ensureBuildings();
+  // AA cuts incoming bomb damage in this province
+  let aa=0;
+  for(const b of state.buildings){
+    if(b.pid===pid&&b.kind==="aa_bat"&&bldgReady(b)) aa+=bldgMul(b);
+  }
+  const cut=1/(1+0.45*aa);
+  const hit=amt*cut;
+  for(const b of state.buildings.slice()){
+    if(b.pid!==pid)continue;
+    ensureBldg(b);
+    b.hp=Math.max(0,b.hp-hit);
+    if(b.hp<=0){
+      b.on=false;
+      b.hp=0;
+      const n=nations[b.owner], d=BUILDINGS[b.kind], p=provinces[pid];
+      if(n&&p&&d) log("war",(d.name||"Building")+" in "+p.name+" was "+(reason||"destroyed")+".");
+    }
+  }
+}
+function captureBuildingsAt(pid, newOwner, oldOwner){
+  ensureBuildings();
+  for(const b of state.buildings.slice()){
+    if(b.pid!==pid)continue;
+    if(Math.random()<0.2){
+      // wrecked in the fighting
+      b.hp=0; b.on=false;
+      continue;
+    }
+    b.owner=newOwner;
+    if((b.level||1)>1 && Math.random()<0.4) b.level=b.level-1;
+    b.hp=Math.max(12,Math.round((b.hp||80)*0.7));
+    b.buildLeft=0; b.pendingLevel=0;
+    if(b.kind==="wonder"){
+      // wonder may be claimed
+      const already=(state.buildings||[]).some(x=>x!==b&&x.owner===newOwner&&x.kind==="wonder");
+      if(already){ b.kind="propaganda"; b.level=1; } // demote a second wonder
+    }
+    const p=provinces[pid], A=nations[newOwner], d=BUILDINGS[b.kind];
+    if(A&&p&&d) log("cap",A.name+" captured a "+d.name+" in "+p.name+".");
+  }
+}
+
+function runSpyMission(nid,silent){
+  const n=nations[nid];
+  if(!n)return false;
+  ensureRes(n);
+  if(readyKind(n,"spyhq")<=0){ if(!silent&&nid===state.player) feedback("You need a finished Spy HQ.","war",true); return false; }
+  if((n._spyCD||0)>0){ if(!silent&&nid===state.player) feedback("Agents need "+n._spyCD+" more month(s).","war",true); return false; }
+  if((n.money||0)<80){ if(!silent&&nid===state.player) feedback("Need 80 cr to fund a mission.","war",true); return false; }
+  const foes=nations.filter(o=>o&&o.alive&&o.id!==nid && (atWar(nid,o.id)||((n.wars||[]).length?true:o.id!==state.player)));
+  // prefer a neighbor at war, else the richest living rival
+  let t=null, best=-1;
+  for(const o of nations){
+    if(!o||!o.alive||o.id===nid)continue;
+    const war=typeof atWar==="function"&&atWar(nid,o.id);
+    const score=(o.money||0)+(war?4000:0);
+    if(score>best){best=score;t=o;}
+  }
+  if(!t){ if(!silent&&nid===state.player) feedback("No useful target.","war",true); return false; }
+  n.money-=80;
+  n._spyCD=3;
+  const steal=Math.round(20+Math.random()*30+8*readyKind(n,"spyhq"));
+  const took=Math.min(t.money||0,steal);
+  t.money=(t.money||0)-took;
+  n.money+=took;
+  t.stability=Math.max(15,(t.stability||70)-3-readyKind(n,"spyhq"));
+  if(!silent){
+    log("war",n.name+" ran a spy mission against "+t.name+".");
+    if(nid===state.player) feedback("Mission complete: took "+fmt(took)+" cr from "+t.name+".","good",false);
+  }
+  renderBldPanel();
+  return true;
+}
+
+function aiBuildCivics(n){
+  if(!n||!n.alive||n.id===state.player)return;
+  if(typeof mpIsHuman==="function"&&mpIsHuman(n.id))return;
+  if((n.money||0)<280)return;
+  ensureBuildings();
+  const owned=nProvs(n.id);
+  if(!owned.length)return;
+  const have=(kind)=> (state.buildings||[]).filter(b=>b.owner===n.id&&b.kind===kind).length;
+  const total=(state.buildings||[]).filter(b=>b.owner===n.id).length;
+  const cap=Math.min(14, 2+Math.ceil(owned.length*0.5));
+  if(total>=cap) return;
+  const reserve=260;
+  const tryKind=(kind,minMoney)=>{
+    if((n.money||0)<(minMoney||buildingCost(kind))+reserve)return false;
+    if(have(kind)>=(BUILDINGS[kind].cap||4))return false;
+    const spots=owned.filter(p=>!canPlaceBuilding(n.id,p.id,kind));
+    // canPlace returns null if OK — filter inverted
+    const ok=owned.filter(p=>!canPlaceBuilding(n.id,p.id,kind));
+    if(!ok.length)return false;
+    // prefer capital, then terrain bonus
+    ok.sort((a,b)=>{
+      const ca=a.capital?2:0, cb=b.capital?2:0;
+      return (cb+terrainResBonus(kind,b))-(ca+terrainResBonus(kind,a));
+    });
+    return !!placeBuilding(n.id,ok[0].id,kind,true);
+  };
+  // sensible order
+  if(!have("farm") && tryKind("farm",220)) return;
+  if(!have("mine") && tryKind("mine",300)) return;
+  if(!have("oilwell") && tryKind("oilwell",340)) return;
+  if(!have("factory") && tryKind("factory",420)) return;
+  if(!have("lab") && tryKind("lab",420)) return;
+  if((have("factory")+have("mine")+have("oilwell"))>=2 && !have("power") && tryKind("power",400)) return;
+  if(!have("hospitalb") && (n.money||0)>700 && tryKind("hospitalb",320)) return;
+  if(!have("bank") && (n.money||0)>900 && tryKind("bank",380)) return;
+  if((n.wars||[]).length){
+    if(!have("bunker") && tryKind("bunker",260)) return;
+    const coasts=owned.filter(p=>p.coastal);
+    if(coasts.length && !have("coastal") && tryKind("coastal",360)) return;
+    if(!have("aa_bat") && tryKind("aa_bat",280)) return;
+  }
+  if(!have("propaganda") && (n.stability||70)<55 && tryKind("propaganda",200)) return;
+  if(!have("wonder") && (n.money||0)>4200 && (state.tick||0)>24 && tryKind("wonder",2400)) return;
+  // second copies later
+  if((n.money||0)>1100){
+    if(have("mine")<2 && tryKind("mine",300)) return;
+    if(have("factory")<2 && tryKind("factory",420)) return;
+    if(have("farm")<2 && tryKind("farm",220)) return;
+  }
+}
+
+/* ----- 3D meshes ----- */
+function addBuildingMeshes(){
+  if(typeof UnitMesh==="undefined"||!UnitMesh._box)return;
+  if(UnitMesh.meshes && UnitMesh.meshes.bld_factory) return;
+  if(!UnitMesh.meshes) UnitMesh.meshes={};
+  const box=UnitMesh._box.bind(UnitMesh);
+  const make=UnitMesh._make.bind(UnitMesh);
+  const add=(k,fn)=>{ UnitMesh.meshes[k]=make(fn); };
+  add("bld_factory",t=>{
+    box(-0.9,0,-0.5,0.9,0.55,0.5,t);
+    box(-0.7,0.55,-0.35,0.2,0.85,0.35,t);
+    box(0.45,0.55,0.05,0.65,1.55,0.25,t);
+    box(0.42,1.55,0.08,0.68,1.7,0.22,t);
+  });
+  add("bld_mine",t=>{
+    box(-0.7,0,-0.45,0.7,0.28,0.45,t);
+    box(-0.08,0.28,-0.08,0.08,1.45,0.08,t);
+    box(-0.55,1.15,-0.08,0.55,1.32,0.08,t);
+    box(-0.5,0,-0.7,-0.1,0.35,-0.25,t);
+    box(0.15,0,0.2,0.55,0.22,0.55,t);
+  });
+  add("bld_oilwell",t=>{
+    box(-0.35,0,-0.35,0.35,0.2,0.35,t);
+    box(-0.06,0.2,-0.06,0.06,1.7,0.06,t);
+    box(-0.45,0.2,-0.06,-0.06,1.35,0.06,t);
+    box(0.06,0.2,-0.06,0.45,1.35,0.06,t);
+    box(-0.5,1.2,-0.5,0.5,1.32,0.5,t);
+  });
+  add("bld_power",t=>{
+    box(-0.85,0,-0.4,0.2,0.5,0.4,t);
+    box(0.15,0,-0.35,0.7,0.85,0.35,t);
+    box(0.22,0.85,-0.28,0.63,1.35,0.28,t);
+    box(-0.75,0.5,-0.15,-0.45,1.15,0.15,t);
+  });
+  add("bld_farm",t=>{
+    box(-0.7,0,-0.4,0.4,0.5,0.4,t);
+    box(-0.8,0.5,-0.45,0.5,0.85,0.45,t);
+    box(0.5,0,-0.2,0.75,0.95,0.2,t);
+    box(-0.2,0,0.45,0.25,0.22,0.75,t);
+  });
+  add("bld_bank",t=>{
+    box(-0.7,0,-0.4,0.7,0.7,0.4,t);
+    box(-0.8,0.7,-0.45,0.8,0.85,0.45,t);
+    box(-0.6,0,-0.48,-0.48,0.7,-0.4,t);
+    box(-0.1,0,-0.48,0.1,0.7,-0.4,t);
+    box(0.48,0,-0.48,0.6,0.7,-0.4,t);
+  });
+  add("bld_market",t=>{
+    box(-0.8,0,-0.35,0.8,0.35,0.35,t);
+    box(-0.85,0.35,-0.4,0.0,0.55,0.4,t);
+    box(0.05,0.35,-0.4,0.85,0.6,0.4,t);
+    box(-0.5,0,0.35,-0.15,0.4,0.55,t);
+  });
+  add("bld_lab",t=>{
+    box(-0.65,0,-0.45,0.65,0.5,0.45,t);
+    box(0.15,0.5,-0.15,0.55,0.85,0.25,t);
+    box(-0.15,0.55,-0.15,0.15,0.7,0.15,t);
+    box(-0.55,0.5,0.1,-0.25,0.95,0.35,t);
+  });
+  add("bld_uni",t=>{
+    box(-0.75,0,-0.5,0.75,0.55,0.5,t);
+    box(-0.2,0.55,-0.2,0.2,1.45,0.2,t);
+    box(-0.28,1.45,-0.28,0.28,1.6,0.28,t);
+    box(-0.7,0.55,-0.15,-0.4,0.95,0.15,t);
+  });
+  add("bld_hospitalb",t=>{
+    box(-0.7,0,-0.5,0.7,0.6,0.5,t);
+    box(-0.15,0.6,-0.08,0.15,0.85,0.08,t);
+    box(-0.08,0.6,-0.22,0.08,0.85,0.22,t);
+    box(0.35,0.2,0.5,0.6,0.45,0.7,t);
+  });
+  add("bld_bunker",t=>{
+    box(-0.85,0,-0.55,0.85,0.28,0.55,t);
+    box(-0.55,0.28,-0.3,0.55,0.48,0.3,t);
+    box(-0.2,0.48,-0.15,0.2,0.62,0.15,t);
+  });
+  add("bld_aa_bat",t=>{
+    box(-0.55,0,-0.45,0.55,0.16,0.45,t);
+    box(-0.12,0.16,-0.12,0.12,0.4,0.12,t);
+    box(-0.08,0.3,-0.08,0.08,1.15,0.08,t);
+    box(-0.45,0.05,-0.15,-0.2,0.28,0.15,t);
+  });
+  add("bld_coastal",t=>{
+    box(-0.6,0,-0.4,0.6,0.28,0.4,t);
+    box(-0.2,0.28,-0.18,0.35,0.55,0.18,t);
+    box(0.2,0.4,-0.1,1.35,0.55,0.1,t);
+  });
+  add("bld_radar_stn",t=>{
+    box(-0.45,0,-0.35,0.45,0.25,0.35,t);
+    box(-0.07,0.25,-0.07,0.07,1.05,0.07,t);
+    box(-0.45,0.85,-0.08,0.45,0.95,0.55,t);
+    box(-0.4,0.7,0.35,0.4,1.1,0.5,t);
+  });
+  add("bld_silo",t=>{
+    box(-0.35,0,-0.35,0.35,1.35,0.35,t);
+    box(-0.22,1.35,-0.22,0.22,1.55,0.22,t);
+    box(-0.7,0,-0.25,-0.4,0.45,0.25,t);
+  });
+  add("bld_airfieldb",t=>{
+    box(-1.2,0,-0.15,1.2,0.08,0.15,t);
+    box(-0.7,0,0.25,0.1,0.45,0.7,t);
+    box(-0.6,0.45,0.3,0.0,0.65,0.65,t);
+    box(0.4,0,-0.55,0.85,0.28,-0.2,t);
+  });
+  add("bld_spyhq",t=>{
+    box(-0.5,0,-0.4,0.5,0.6,0.4,t);
+    box(-0.15,0.6,-0.15,0.15,0.95,0.15,t);
+    box(0.2,0.35,0.4,0.4,0.7,0.55,t);
+  });
+  add("bld_propaganda",t=>{
+    box(-0.45,0,-0.35,0.45,0.4,0.35,t);
+    box(-0.08,0.4,-0.08,0.08,1.5,0.08,t);
+    box(-0.35,1.15,-0.05,0.35,1.28,0.05,t);
+    box(-0.05,1.5,-0.2,0.05,1.7,0.2,t);
+  });
+  add("bld_wonder",t=>{
+    box(-0.85,0,-0.85,0.85,0.2,0.85,t);
+    box(-0.55,0.2,-0.55,0.55,0.45,0.55,t);
+    box(-0.28,0.45,-0.28,0.28,1.55,0.28,t);
+    box(-0.12,1.55,-0.12,0.12,1.85,0.12,t);
+    box(-0.2,1.85,-0.2,0.2,1.95,0.2,t);
+  });
+}
+function uploadBldgMeshesToGL(){
+  if(typeof UnitGL==="undefined"||!UnitGL.ok||!UnitGL.gl||!UnitMesh||!UnitMesh.meshes)return;
+  const gl=UnitGL.gl;
+  if(!UnitGL.meshes) UnitGL.meshes={};
+  for(const k of Object.keys(UnitMesh.meshes)){
+    if(UnitGL.meshes[k])continue;
+    const src=UnitMesh.meshes[k];
+    const ab=gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER,ab);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(src),gl.STATIC_DRAW);
+    UnitGL.meshes[k]={buf:ab,n:src.length/6,stride:24};
+  }
+}
+function bldgMeshOf(kind){ return "bld_"+(kind||"factory"); }
+function bldgWorldPos(b){
+  const p=provinces[b.pid]; if(!p)return {x:0,y:0};
+  const slot=(b.id*17+((b.kind||"").length*9))%8;
+  const ang=slot*(Math.PI/4)+0.3;
+  const r=22+((b.id||0)%3)*10;
+  return {x:p.cx+Math.cos(ang)*r, y:p.cy+Math.sin(ang)*r};
+}
+function collectBuildingFigures(now){
+  const out=[];
+  state._bldHits=[];
+  if(!state.buildings)return out;
+  const figS=(typeof figureScale==="function"?figureScale():1)*1.35;
+  const showAll=typeof combatShowUnits==="function"?combatShowUnits():true;
+  const t=(now||performance.now())/1000;
+  for(const b of state.buildings){
+    ensureBldg(b);
+    const p=provinces[b.pid]; if(!p)continue;
+    if(!showAll && b.owner!==state.player) continue;
+    const w=bldgWorldPos(b);
+    const scr=typeof scrOf==="function"?scrOf(w.x,w.y):{x:w.x,y:w.y,vis:true};
+    if(!scr||!scr.vis)continue;
+    if(scr.x<-50||scr.y<-50||scr.x>view.cssW+50||scr.y>view.cssH+50)continue;
+    const nat=nations[b.owner];
+    const col=nat?(typeof displayColor==="function"?displayColor(nat):nat.color):"#888";
+    const typ=bldgMeshOf(b.kind);
+    const scl=16.5*figS*(b.kind==="wonder"?1.35:b.kind==="silo"||b.kind==="uni"?1.15:1);
+    const ghost=(b.buildLeft||0)>0 || b.on===false || (b.hp||0)<=0;
+    const bob=b.kind==="radar_stn"?Math.sin(t*1.6+b.id)*0.08:0;
+    const rot=b.kind==="radar_stn"?t*0.4:(b.kind==="oilwell"?0.05:0);
+    out.push({typ,x:scr.x,y:scr.y,z:0,scl,rot,bob,col,ghost,bld:b.id});
+    const rad=18*figS;
+    state._bldHits.push({bid:b.id,x:scr.x-rad,y:scr.y-rad*1.6,w:rad*2,h:rad*2.2});
+  }
+  return out;
+}
+function hitBuilding(sx,sy){
+  const hits=state._bldHits||[];
+  for(let i=hits.length-1;i>=0;i--){
+    const h=hits[i];
+    if(sx>=h.x&&sx<=h.x+h.w&&sy>=h.y&&sy<=h.y+h.h) return h.bid;
+  }
+  return -1;
+}
+
+function selectBuilding(id){
+  state.selectedBld=id;
+  state.selectedUnits=[];
+  state.moveMode=false;
+  renderBldPanel();
+  if(typeof renderActionBar==="function") renderActionBar();
+  if(typeof renderArmyUI==="function") renderArmyUI();
+}
+
+function renderBldPanel(){
+  let el=$("bldPanel");
+  if(!el){
+    el=document.createElement("div");
+    el.id="bldPanel";
+    const wrap=$("mapwrap"); if(!wrap)return;
+    wrap.appendChild(el);
+  }
+  const b=state.selectedBld!=null?buildingById(state.selectedBld):null;
+  if(state.phase!=="play"||!b){ el.style.display="none"; return; }
+  const d=BUILDINGS[b.kind]||{name:b.kind,emoji:"🏠"};
+  const p=provinces[b.pid];
+  const mine=b.owner===state.player;
+  const hp=Math.max(0,Math.min(1,(b.hp||0)/(b.maxHp||1)));
+  const busy=(b.buildLeft||0)>0?(b.pendingLevel?("Upgrading to L"+b.pendingLevel+" — "+b.buildLeft+" mo"):("Building — "+b.buildLeft+" mo left")):(b.on===false||b.hp<=0?"Offline":"Operating");
+  const up=Math.round(bldgUpkeepOf(b));
+  const next=Math.min(3,(b.level||1)+1);
+  const upCost=buildingCost(b.kind,next);
+  const miss=Math.max(0,(b.maxHp||1)-(b.hp||0));
+  const fixCost=Math.max(8,Math.round((d.cost||200)*0.4*(miss/(b.maxHp||1))));
+  const acts=mine?`<div class="bldacts">
+      <button class="btn" id="bldUp" ${(b.level>=3||(b.buildLeft||0)>0||!b.hp)?"disabled":""}>Upgrade L${next} · ${fmt(upCost)}</button>
+      <button class="btn" id="bldFix" ${miss<=0?"disabled":""}>Repair · ${fmt(fixCost)}</button>
+      <button class="btn" id="bldOn">${b.on===false?"Turn on":"Turn off"}</button>
+      <button class="btn danger" id="bldRaz">${state._razAsk===b.id?"Confirm raze":"Demolish"}</button>
+      ${b.kind==="spyhq"&&bldgReady(b)?`<button class="btn gold" id="bldSpy">Spy mission · 80 cr</button>`:""}
+    </div>`:`<div class="small">Owned by ${(nations[b.owner]&&nations[b.owner].name)||"another nation"}.</div>`;
+  el.style.display="block";
+  el.innerHTML=`<div class="selrow"><span style="font-size:18px">${d.emoji||""}</span><b>${d.name}</b><span class="selhpt">L${b.level||1}</span></div>
+    <div class="small">${p?p.name:""} · ${busy}</div>
+    <div class="selrow"><div class="selhp"><i style="width:${hp*100}%;background:${hp<0.35?"#e25b4a":hp<0.7?"#e2b14a":"#7dce7a"}"></i></div><span class="selhpt">${Math.round(hp*100)}%</span></div>
+    <div class="small">${bldgEffectText(b.kind,b.level)} · upkeep ${fmt(up)} cr / mo</div>
+    ${acts}`;
+  const $=id=>document.getElementById(id); // local shadow? NO - don't shadow $
+}
+// The $ shadow above would break the rest of the IIFE if it leaked — renderBldPanel ends
+// before any inner function named $. Bind buttons after innerHTML without redefining $.
+function bindBldPanel(){
+  const up=document.getElementById("bldUp");
+  if(up) up.onclick=()=>upgradeBuilding(state.selectedBld);
+  const fx=document.getElementById("bldFix");
+  if(fx) fx.onclick=()=>repairBuilding(state.selectedBld);
+  const on=document.getElementById("bldOn");
+  if(on) on.onclick=()=>toggleBuilding(state.selectedBld);
+  const raz=document.getElementById("bldRaz");
+  if(raz) raz.onclick=()=>{
+    if(state._razAsk===state.selectedBld){ state._razAsk=null; demolishBuilding(state.selectedBld); }
+    else { state._razAsk=state.selectedBld; renderBldPanel(); }
+  };
+  const spy=document.getElementById("bldSpy");
+  if(spy) spy.onclick=()=>runSpyMission(state.player);
+}
+
+/* rewrite renderBldPanel cleanly without $ shadow — the first function already wrote HTML;
+   hook bind at the end by replacing it now. */
+renderBldPanel=function(){
+  let el=document.getElementById("bldPanel");
+  if(!el){
+    el=document.createElement("div");
+    el.id="bldPanel";
+    const wrap=document.getElementById("mapwrap"); if(!wrap)return;
+    wrap.appendChild(el);
+  }
+  const b=state.selectedBld!=null?buildingById(state.selectedBld):null;
+  if(state.phase!=="play"||!b){ el.style.display="none"; return; }
+  const d=BUILDINGS[b.kind]||{name:b.kind,emoji:"🏠"};
+  const p=provinces[b.pid];
+  const mine=b.owner===state.player;
+  const hp=Math.max(0,Math.min(1,(b.hp||0)/(b.maxHp||1)));
+  const busy=(b.buildLeft||0)>0?(b.pendingLevel?("Upgrading to L"+b.pendingLevel+" — "+b.buildLeft+" mo"):("Building — "+b.buildLeft+" mo left")):(b.on===false||(b.hp||0)<=0?"Offline":"Operating");
+  const up=Math.round(bldgUpkeepOf(b));
+  const next=Math.min(3,(b.level||1)+1);
+  const upCost=buildingCost(b.kind,next);
+  const miss=Math.max(0,(b.maxHp||1)-(b.hp||0));
+  const fixCost=Math.max(8,Math.round((d.cost||200)*0.4*(miss/(b.maxHp||1))));
+  const acts=mine?`<div class="bldacts">
+      <button class="btn" id="bldUp" ${(b.level>=3||(b.buildLeft||0)>0||!b.hp)?"disabled":""}>Upgrade L${next} · ${fmt(upCost)}</button>
+      <button class="btn" id="bldFix" ${miss<=0?"disabled":""}>Repair · ${fmt(fixCost)}</button>
+      <button class="btn" id="bldOn">${b.on===false?"Turn on":"Turn off"}</button>
+      <button class="btn danger" id="bldRaz">${state._razAsk===b.id?"Confirm raze":"Demolish"}</button>
+      ${b.kind==="spyhq"&&bldgReady(b)?`<button class="btn gold" id="bldSpy">Spy mission · 80 cr</button>`:""}
+    </div>`:`<div class="small">Owned by ${(nations[b.owner]&&nations[b.owner].name)||"another nation"}.</div>`;
+  el.style.display="block";
+  el.innerHTML=`<div class="selrow"><span style="font-size:18px">${d.emoji||""}</span><b>${escBld(d.name)}</b><span class="selhpt">L${b.level||1}</span></div>
+    <div class="small">${p?escBld(p.name):""} · ${busy}</div>
+    <div class="selrow"><div class="selhp"><i style="width:${hp*100}%;background:${hp<0.35?"#e25b4a":hp<0.7?"#e2b14a":"#7dce7a"}"></i></div><span class="selhpt">${Math.round(hp*100)}%</span></div>
+    <div class="small">${escBld(bldgEffectText(b.kind,b.level))} · upkeep ${fmt(up)} cr / mo</div>
+    ${acts}`;
+  bindBldPanel();
+};
+function escBld(s){ return String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+function buildingShopHTML(n){
+  ensureRes(n);
+  const cards=Object.entries(BUILDINGS).map(([id,d])=>{
+    const err=n?null: "—";
+    return `<button class="shopcard shopdrag" data-dragbuild="${id}" title="${escBld(d.desc)}">
+      <div class="ic">${d.emoji}</div><b>${escBld(d.name)}</b>
+      <div class="meta go">${fmt(d.cost)} cr · ${d.time} mo<br>${escBld(d.desc)}</div>
+    </button>`;
+  }).join("");
+  const owned=(state.buildings||[]).filter(b=>n&&b.owner===n.id);
+  const list=owned.length?owned.map(b=>{
+    const d=BUILDINGS[b.kind]||{};
+    const p=provinces[b.pid];
+    const st=(b.buildLeft||0)>0?("building "+b.buildLeft+" mo"):((b.hp||0)<=0||b.on===false?"offline":("L"+(b.level||1)));
+    return `<div class="item"><span>${d.emoji||""} ${escBld(d.name)} · ${p?escBld(p.name):"?"}</span><span class="small">${st} · upkeep ${fmt(Math.round(bldgUpkeepOf(b)))}/mo</span></div>`;
+  }).join(""):`<div class="empty">No civic buildings yet. Drag a card onto land you own.</div>`;
+  return `<div class="st">Buildings — drag onto your land</div>
+    <div class="small" style="margin-bottom:6px">Paid for with treasury money and a few months of work. Mines and oil wells supply steel and oil; tanks, planes, and ships spend those resources. Click a finished building on the map to upgrade, repair, shut it down, or demolish it.</div>
+    <div class="shopgrid">${cards}</div>
+    <div class="st">Your buildings</div>${list}`;
+}
+
+function installBuildingHUD(){
+  if(!$("resHud")){
+    const wrap=$("treasuryWrap");
+    const chip=document.createElement("div");
+    chip.className="chip";
+    chip.id="resHud";
+    chip.title="Steel and oil. Tanks, planes, and ships need both. Build mines and oil wells to produce more.";
+    chip.textContent="Steel — · Oil —";
+    if(wrap&&wrap.parentNode) wrap.parentNode.insertBefore(chip, wrap.nextSibling);
+    else {
+      const tl=$("tl"); if(tl) tl.appendChild(chip);
+    }
+  }
+  if(!document.getElementById("bldStyle")){
+    const st=document.createElement("style");
+    st.id="bldStyle";
+    st.textContent=`
+#resHud{border-color:#6a5a38;color:#f0e2b8}
+#resHud.warn{border-color:#a35a3a;color:#ffd0b0}
+#bldPanel{position:absolute;right:12px;bottom:86px;z-index:8;width:min(260px,44vw);background:rgba(12,18,30,.95);border:1px solid var(--line);border-radius:12px;padding:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+#bldPanel .selrow{display:flex;align-items:center;gap:6px;margin:4px 0}
+#bldPanel .selhp{flex:1;height:7px;background:rgba(0,0,0,.4);border-radius:4px;overflow:hidden}
+#bldPanel .selhp i{display:block;height:100%;background:#7dce7a}
+#bldPanel .selhpt{width:40px;text-align:right;color:#c9d6e8;font-size:11px}
+#bldPanel .bldacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+#bldPanel .bldacts button{flex:1 1 110px;min-width:0;font-size:12px}
+#bldPanel .btn.danger{border-color:#8a3a32;color:#ffd0c8}
+`;
+    document.head.appendChild(st);
+  }
+}
+
+function installBuildingClicks(){
+  const cv=typeof canvas!=="undefined"?canvas:document.getElementById("c");
+  if(!cv||cv._bldCtrl)return;
+  cv._bldCtrl=true;
+  const pt=e=>{
+    const r=cv.getBoundingClientRect();
+    return {sx:e.clientX-r.left, sy:e.clientY-r.top};
+  };
+  cv.addEventListener("mousedown", e=>{
+    if(state.phase!=="play"||state.player<0||e.button!==0)return;
+    const {sx,sy}=pt(e);
+    const bid=hitBuilding(sx,sy);
+    if(bid>=0){
+      state.boxSel=null;
+      state._bldClick=bid;
+    } else {
+      state._bldClick=-1;
+      if(state.selectedBld!=null && !(state.selectedUnits||[]).length){
+        /* leave selected until click handler clears */
+      }
+    }
+  }, true);
+  cv.addEventListener("click", e=>{
+    if(state.phase!=="play"||state.player<0)return;
+    const {sx,sy}=pt(e);
+    const bid=state._bldClick>=0?state._bldClick:hitBuilding(sx,sy);
+    state._bldClick=-1;
+    if(bid>=0){
+      const b=buildingById(bid);
+      if(!b)return;
+      if((state.selectedUnits||[]).length && b.owner!==state.player){
+        // units already attack via province order; still show the panel
+      }
+      selectBuilding(bid);
+      e.stopPropagation();
+      return;
+    }
+    if(state.selectedBld!=null && !e.shiftKey){
+      state.selectedBld=null;
+      renderBldPanel();
+    }
+  }, true);
+}
+
+function installBuildings(){
+  addBuildingMeshes();
+  if(typeof UnitMesh!=="undefined"){
+    const _init=UnitMesh.init.bind(UnitMesh);
+    UnitMesh.init=function(){
+      _init();
+      addBuildingMeshes();
+    };
+  }
+  uploadBldgMeshesToGL();
+  if(typeof collectUnitFigures==="function"){
+    const _cuf=collectUnitFigures;
+    collectUnitFigures=function(now){
+      const figs=_cuf(now)||[];
+      return figs.concat(collectBuildingFigures(now));
+    };
+  } else {
+    collectUnitFigures=function(now){ return collectBuildingFigures(now); };
+  }
+  // draw HP / selection ring for selected building
+  if(typeof Unit3D!=="undefined" && Unit3D.drawAndHit){
+    const _dh=Unit3D.drawAndHit.bind(Unit3D);
+    Unit3D.drawAndHit=function(ctx,now){
+      const hits=_dh(ctx,now);
+      const b=state.selectedBld!=null?buildingById(state.selectedBld):null;
+      if(b&&Unit3D.drawRing){
+        const w=bldgWorldPos(b);
+        const scr=typeof scrOf==="function"?scrOf(w.x,w.y):null;
+        if(scr&&scr.vis){
+          Unit3D.drawRing(ctx,scr.x,scr.y-8,20,"#f3e2a8",true);
+          const hp=Math.max(0,Math.min(1,(b.hp||0)/(b.maxHp||1)));
+          ctx.save();
+          ctx.fillStyle="rgba(12,16,20,0.75)";
+          ctx.fillRect(scr.x-14,scr.y-30,28,4);
+          ctx.fillStyle=hp<0.35?"#e25b4a":hp<0.7?"#e2b14a":"#7dce7a";
+          ctx.fillRect(scr.x-14,scr.y-30,28*hp,4);
+          ctx.restore();
+        }
+      }
+      return hits;
+    };
+  }
+
+  const _gt=typeof gameTick==="function"?gameTick:null;
+  if(_gt){
+    gameTick=function(){
+      _gt();
+      tickResources();
+      tickBuildingCare();
+    };
+  }
+  const _ai=typeof tickAI==="function"?tickAI:null;
+  if(_ai){
+    tickAI=function(n){
+      _ai(n);
+      aiBuildCivics(n);
+    };
+  }
+
+  const _buy=typeof buyUnit==="function"?buyUnit:null;
+  if(_buy){
+    buyUnit=function(n,type,pid,silent){
+      if(n) ensureRes(n);
+      const need=unitResCost(type);
+      if(need.steel||need.oil){
+        if((n.steel||0)<need.steel || (n.oil||0)<need.oil){
+          if(n.id===state.player&&!silent){
+            const def=typeof unitKind==="function"?unitKind(type):{name:type};
+            feedback("Need "+need.steel+" steel and "+need.oil+" oil to raise "+(def&&def.name||type)+". Build mines and oil wells.","war",true);
+          }
+          return false;
+        }
+      }
+      const ok=_buy(n,type,pid,silent);
+      if(ok){
+        n.steel=Math.max(0,(n.steel||0)-need.steel);
+        n.oil=Math.max(0,(n.oil||0)-need.oil);
+      }
+      return ok;
+    };
+  }
+  const _ship=typeof buyShip==="function"?buyShip:null;
+  if(_ship){
+    buyShip=function(n,type,silent){
+      if(n) ensureRes(n);
+      const need=unitResCost(type);
+      if((n.steel||0)<need.steel || (n.oil||0)<need.oil){
+        if(n.id===state.player&&!silent){
+          const def=(typeof SHIP_TYPES!=="undefined"&&SHIP_TYPES[type])||{name:type};
+          feedback("Need "+need.steel+" steel and "+need.oil+" oil to launch "+def.name+".","war",true);
+        }
+        return false;
+      }
+      const ok=_ship(n,type,silent);
+      if(ok){
+        n.steel=Math.max(0,(n.steel||0)-need.steel);
+        n.oil=Math.max(0,(n.oil||0)-need.oil);
+      }
+      return ok;
+    };
+  }
+
+  if(typeof baseSpeed==="function"){
+    const _bs=baseSpeed;
+    baseSpeed=function(b){
+      let s=_bs(b);
+      const n=b&&nations[b.owner];
+      if(n){
+        s*=(1+0.08*readyKind(n,"factory")+0.04*readyKind(n,"power"));
+        if(b.kind!=="nav") s*=(1+0.12*readyKind(n,"airfieldb"));
+      }
+      return s;
+    };
+  }
+
+  if(typeof tickManpower==="function"){
+    const _tm=tickManpower;
+    tickManpower=function(n,income){
+      _tm(n,income);
+      if(!n)return;
+      const farm=readyKind(n,"farm");
+      const hosp=readyKind(n,"hospitalb");
+      if(farm||hosp){
+        const extra=(n.pop||0)*0.00011*0.12*farm + (n.pop||0)*0.00003*hosp;
+        const cap=(n.mpCap||n.manpower||0)*(1+0.06*farm+0.02*hosp);
+        n.mpCap=cap;
+        n.manpower=Math.min(cap,(n.manpower||0)+extra);
+      }
+    };
+  }
+
+  if(typeof taxIncomeMul==="function"){
+    const _tax=taxIncomeMul;
+    taxIncomeMul=function(n){
+      let v=_tax(n);
+      if(n) v*=(1+0.03*readyKind(n,"bank"));
+      return v;
+    };
+  }
+  if(typeof techMul==="function"){
+    const _mul=techMul;
+    techMul=function(n,key,def){
+      let v=_mul(n,key,def);
+      if(n&&key==="income"){
+        const pwr=readyKind(n,"power");
+        v*=(1+0.025*readyKind(n,"bank")+0.03*readyKind(n,"market")+0.05*readyKind(n,"wonder")+0.015*pwr);
+        // factories already applied in the previous wrap; power slightly lifts them via this
+      }
+      if(n&&key==="trade"){
+        v*=(1+0.06*readyKind(n,"market"));
+      }
+      return v;
+    };
+  }
+  if(typeof previewLedger==="function"){
+    const _pl=previewLedger;
+    previewLedger=function(n){
+      _pl(n);
+      if(!n||!n.ledger)return;
+      const up=nationBldgUpkeep(n.id);
+      n.ledger.bldgUp=up;
+      n.ledger.upkeep=(n.ledger.upkeep||0)+up;
+      n.ledger.net=(n.ledger.net||0)-up;
+    };
+  }
+  if(typeof refreshHUD==="function"){
+    const _rh=refreshHUD;
+    refreshHUD=function(){
+      _rh();
+      const el=$("resHud");
+      const p=state.player>=0?nations[state.player]:null;
+      if(!el)return;
+      if(!p){ el.textContent="Steel — · Oil —"; return; }
+      ensureRes(p);
+      el.textContent="Steel "+Math.floor(p.steel||0)+" · Oil "+Math.floor(p.oil||0);
+      el.classList.toggle("warn",(p.steel||0)<8||(p.oil||0)<6);
+      const tip=$("econTip");
+      if(tip&&p.ledger&&!tip.innerHTML.includes("Building upkeep")&&(p.ledger.bldgUp||0)){
+        tip.innerHTML+=`<div class="r"><span>Building upkeep</span><span>−${fmt(Math.round(p.ledger.bldgUp))} cr</span></div>`;
+      }
+    };
+  }
+  if(typeof renderShop==="function"){
+    const _rs=renderShop;
+    renderShop=function(box){
+      _rs(box);
+      if(!box||state.player<0)return;
+      const n=nations[state.player];
+      if(!n)return;
+      const head=box.querySelector(".head .sub");
+      if(head && !/Steel/.test(head.textContent||"")){
+        ensureRes(n);
+        head.textContent+=" · Steel "+Math.floor(n.steel)+" · Oil "+Math.floor(n.oil);
+      }
+      const hold=document.createElement("div");
+      hold.innerHTML=buildingShopHTML(n);
+      box.appendChild(hold);
+      if(typeof hookShopDrag==="function") hookShopDrag(box);
+      // annotate unit cards with resource costs
+      box.querySelectorAll("[data-buy], [data-type], .shopcard").forEach(el=>{
+        const typ=el.dataset.buy||el.dataset.type||el.dataset.unit;
+        if(!typ||BUILDINGS[typ])return;
+        const need=unitResCost(typ);
+        if(!need.steel&&!need.oil)return;
+        const meta=el.querySelector(".meta")||el;
+        if(meta && !/steel/.test(meta.textContent||"")){
+          const span=document.createElement("div");
+          span.className="meta";
+          span.textContent=`${need.steel?need.steel+" steel":""}${need.steel&&need.oil?" · ":""}${need.oil?need.oil+" oil":""}`;
+          meta.appendChild(span);
+        }
+      });
+    };
+  }
+
+  if(typeof defModOf==="function"){
+    const _df=defModOf;
+    defModOf=function(p,sea){
+      let m=_df(p,sea);
+      if(p){
+        let bunk=0;
+        for(const b of (state.buildings||[])){
+          if(b.pid===p.id&&b.kind==="bunker"&&bldgReady(b)) bunk+=bldgMul(b);
+        }
+        if(bunk) m*=1+0.18*bunk;
+      }
+      return m;
+    };
+  }
+  if(typeof invasionOdds==="function"){
+    const _io=invasionOdds;
+    invasionOdds=function(att,def,pid){
+      const r=_io(att,def,pid);
+      let guns=0;
+      for(const b of (state.buildings||[])){
+        if(b.pid===pid&&b.kind==="coastal"&&bldgReady(b)) guns+=bldgMul(b);
+      }
+      if(guns&&r){
+        r.score=(r.score||1)/(1+0.28*guns);
+        r.pct=Math.max(5,Math.min(92,Math.round((r.pct||30)/(1+0.2*guns))));
+        if(r.score<0.7)r.label="Desperate";
+        else if(r.score<1.15)r.label="Poor";
+      }
+      return r;
+    };
+  }
+  if(typeof damageBasesAt==="function"){
+    const _db=damageBasesAt;
+    damageBasesAt=function(pid,amt){
+      _db(pid,amt);
+      damageBuildingsAt(pid,amt,"bombed");
+    };
+  }
+  if(typeof captureBasesAt==="function"){
+    const _cb=captureBasesAt;
+    captureBasesAt=function(pid,newOwner,oldOwner){
+      _cb(pid,newOwner,oldOwner);
+      captureBuildingsAt(pid,newOwner,oldOwner);
+    };
+  }
+  if(typeof canBomb==="function"){
+    const _cbm=canBomb;
+    canBomb=function(attId,pid){
+      const err=_cbm(attId,pid);
+      // radar extends reach: if the only error is range, retry conceptually by allowing slightly farther
+      if(err&&/range|far|reach|distance/i.test(err)){
+        const n=nations[attId];
+        if(n&&readyKind(n,"radar_stn")>=1) return null;
+      }
+      return err;
+    };
+  }
+  if(typeof launchMissile==="function"){
+    const _lm=launchMissile;
+    launchMissile=function(attId,pid,silent){
+      const n=nations[attId];
+      const silos=n?readyKind(n,"silo"):0;
+      const oldM=n&&n.money, oldCD=n&&n.missileCD;
+      const ok=_lm(attId,pid,silent);
+      if(ok&&silos&&n){
+        // rebate part of the 90 cr cost and trim cooldown
+        n.money=Math.min(oldM, (n.money||0)+Math.round(20*Math.min(2,silos)));
+        if((n.missileCD||0)>0) n.missileCD=Math.max(1,(n.missileCD||3)-1);
+      }
+      return ok;
+    };
+  }
+
+  const _snap=typeof snapshot==="function"?snapshot:null;
+  if(_snap){
+    snapshot=function(){
+      const s=_snap();
+      s.buildings=(state.buildings||[]).map(b=>({...b}));
+      s.nextBldId=state.nextBldId||1;
+      if(s.nations){
+        s.nations.forEach((sn,i)=>{
+          const n=nations[i];
+          if(n){ sn.steel=n.steel||0; sn.oil=n.oil||0; sn.prestige=n.prestige||0; }
+        });
+      }
+      return s;
+    };
+  }
+  const _ap=typeof applySnap==="function"?applySnap:null;
+  if(_ap){
+    applySnap=function(s){
+      const r=_ap(s);
+      if(s&&s.nations){
+        s.nations.forEach((sn,i)=>{
+          if(!nations[i])return;
+          if(sn.steel!=null) nations[i].steel=sn.steel;
+          else ensureRes(nations[i]);
+          if(sn.oil!=null) nations[i].oil=sn.oil;
+          if(sn.prestige!=null) nations[i].prestige=sn.prestige;
+        });
+      } else {
+        nations.forEach(ensureRes);
+      }
+      ensureBuildings();
+      (state.buildings||[]).forEach(ensureBldg);
+      return r;
+    };
+  }
+  if(typeof newCampaign==="function"){
+    const _nc=newCampaign;
+    newCampaign=function(){
+      const r=_nc.apply(this,arguments);
+      nations.forEach(ensureRes);
+      return r;
+    };
+  }
+
+  installBuildingHUD();
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",()=>{ installBuildingHUD(); installBuildingClicks(); });
+  else installBuildingClicks();
+
+  if(typeof refreshCExports==="function"){
+    const _r=refreshCExports;
+    refreshCExports=function(){
+      _r();
+      const C=window.CROWNFALL||(window.CROWNFALL={});
+      C.placeBuilding=placeBuilding;
+      C.canPlaceBuilding=canPlaceBuilding;
+      C.upgradeBuilding=upgradeBuilding;
+      C.repairBuilding=repairBuilding;
+      C.demolishBuilding=demolishBuilding;
+      C.toggleBuilding=toggleBuilding;
+      C.hitBuilding=hitBuilding;
+      C.buildingById=buildingById;
+      C.BUILDINGS=BUILDINGS;
+      C.unitResCost=unitResCost;
+      C.ensureRes=ensureRes;
+      C.runSpyMission=runSpyMission;
+      C.selectBuilding=selectBuilding;
+      C.collectBuildingFigures=collectBuildingFigures;
+    };
+    refreshCExports();
+  }
+
+  if(typeof TIPS!=="undefined"&&TIPS.push){
+    TIPS.push("Drag factories, farms, mines, and oil wells from the Shop onto your land. Tanks, planes, and ships spend steel and oil — watch the meters next to the treasury.");
+  }
+}
+
+installBuildings();
+
+/* ===== Crownfall v1.3 — camera helpers + decluttered HUD ===== */
+const HINTSEENKEY="crownfall-hints-v13";
+const MINIKEY="crownfall-minimap";
+const CLEANKEY="crownfall-cleanui";
+
+function isTypingTarget(el){
+  if(!el)return false;
+  const tag=(el.tagName||"").toUpperCase();
+  return tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||!!el.isContentEditable;
+}
+function screenToGlobeLonLat(sx,sy){
+  if(typeof globe==="undefined"||!globe)return null;
+  const {lon:l0,lat:b0,r}=globe;
+  const {cssW:w,cssH:h}=view;
+  if(!r)return null;
+  const cx=w/2, cy=h/2+4;
+  const x=(sx-cx)/r, y=(cy-sy)/r;
+  const rho2=x*x+y*y;
+  if(rho2>1.001)return null;
+  const z=Math.sqrt(Math.max(0,1-rho2));
+  const lam0=l0*Math.PI/180, phi0=b0*Math.PI/180;
+  const sinp=Math.sin(phi0), cosp=Math.cos(phi0);
+  const lat=Math.asin(Math.max(-1,Math.min(1, sinp*z + cosp*y)));
+  const dlon=Math.atan2(x, z*cosp - y*sinp);
+  return {lon:(lam0+dlon)*180/Math.PI, lat:lat*180/Math.PI};
+}
+function cameraWheel(e,sx,sy){
+  if(state._camLock)return;
+  const absX=Math.abs(e.deltaX||0), absY=Math.abs(e.deltaY||0);
+  const pinch=!!(e.ctrlKey||e.metaKey);
+  const trackPan=!pinch && (absX>absY*0.4 && absX>0.5 || (e.deltaMode===0 && absY<80 && absX<1 && absY>0 && !wheelLooksLikeMouse(e)));
+  // mouse-wheel notches and ctrl-pinch zoom; pixel two-finger pans
+  if(!pinch && wheelIsPan(e)){
+    const k=1;
+    if(typeof panBy==="function") panBy(-e.deltaX*k, -e.deltaY*k);
+    return;
+  }
+  let factor;
+  if(pinch && e.deltaMode===0){
+    factor=Math.pow(1.0035, -e.deltaY);
+    factor=Math.max(0.85, Math.min(1.18, factor));
+  } else {
+    factor=e.deltaY<0?1.12:1/1.12;
+  }
+  zoomToward(sx,sy,factor);
+}
+function wheelLooksLikeMouse(e){
+  if(e.deltaMode!==0)return true;
+  const y=Math.abs(e.deltaY||0);
+  return y>=80 && Math.abs(e.deltaX||0)<1;
+}
+function wheelIsPan(e){
+  if(e.ctrlKey||e.metaKey)return false;
+  const absX=Math.abs(e.deltaX||0), absY=Math.abs(e.deltaY||0);
+  if(absX>0.5 && absX>absY*0.35) return true;
+  if(e.deltaMode===0 && !wheelLooksLikeMouse(e)) return true;
+  return false;
+}
+function zoomToward(sx,sy,factor){
+  if(state.globeOn && typeof globe!=="undefined"){
+    const {cssW:w,cssH:h}=view;
+    const minR=Math.min(w,h)*0.22, maxR=Math.min(w,h)*1.85;
+    const stay=screenToGlobeLonLat(sx,sy);
+    globe.tr=globe.r=Math.max(minR, Math.min(maxR, (globe.r||globeFit()||globe.r)*factor));
+    if(stay && typeof globeLookAt==="function"){
+      // ease the look-at toward the point under the cursor so zoom feels anchored
+      const pull=factor>1?0.28:0.18;
+      globe.lon=globe.tlon=globe.lon+(stay.lon-globe.lon)*pull;
+      globe.lat=globe.tlat=Math.max(-80,Math.min(80, globe.lat+(stay.lat-globe.lat)*pull));
+    }
+    globe.dirty=true;
+    return;
+  }
+  if(typeof zoomAt==="function") zoomAt(sx,sy,factor);
+}
+function centerOnCountry(nid){
+  const id=nid!=null?nid:state.player;
+  if(id==null||id<0)return;
+  const cap=(typeof nProvs==="function"?nProvs(id):provinces.filter(p=>p.owner===id)).find(p=>p.capital)
+    || (typeof nProvs==="function"?nProvs(id)[0]:provinces.find(p=>p.owner===id));
+  if(!cap)return;
+  if(state.globeOn && typeof globeLookAt==="function"){
+    globeLookAt(cap.cx, cap.cy, false);
+    const {cssW:w,cssH:h}=view;
+    globe.tr=globe.r=Math.min(w,h)*0.82;
+    globe.dirty=true;
+    return;
+  }
+  if(typeof zoomToNation==="function") zoomToNation(id);
+}
+
+function loadUxPrefs(){
+  try{
+    const m=localStorage.getItem(MINIKEY);
+    state.minimapOn=m==null?false:m!=="0";
+    const c=localStorage.getItem(CLEANKEY);
+    state.cleanUI=c==="1";
+  }catch(e){ state.minimapOn=false; state.cleanUI=false; }
+}
+function saveUxPrefs(){
+  try{
+    localStorage.setItem(MINIKEY, state.minimapOn?"1":"0");
+    localStorage.setItem(CLEANKEY, state.cleanUI?"1":"0");
+  }catch(e){}
+}
+function hintSeen(id){
+  try{
+    const raw=JSON.parse(localStorage.getItem(HINTSEENKEY)||"{}");
+    return !!raw[id];
+  }catch(e){return false;}
+}
+function markHintSeen(id){
+  try{
+    const raw=JSON.parse(localStorage.getItem(HINTSEENKEY)||"{}");
+    raw[id]=1;
+    localStorage.setItem(HINTSEENKEY, JSON.stringify(raw));
+  }catch(e){}
+}
+
+function applyCleanUI(){
+  const on=!!state.cleanUI;
+  const root=document.getElementById("app")||document.body;
+  root.classList.toggle("cleanUI", on);
+  const dock=document.getElementById("dock");
+  if(dock) dock.style.display=on?"none":"";
+  const mini=document.getElementById("mini");
+  if(mini){
+    const show=!on && !!state.minimapOn && (state.phase==="play"||state.phase==="pick");
+    mini.style.display=show?"block":"none";
+    mini.style.pointerEvents=show?"auto":"none";
+  }
+  ["tr","panel","actionBar","minimapHint","tutor","unBanner","moveHint","pickHint","selPanel","bldPanel"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    if(on){
+      if(id==="actionBar"||id==="selPanel"||id==="bldPanel"||id==="moveHint"||id==="pickHint"||id==="tutor"||id==="unBanner"||id==="minimapHint"){
+        el.dataset._cleanWas=el.style.display||"";
+        el.style.display="none";
+      }
+    }
+  });
+  if(on){
+    const panel=document.getElementById("panel");
+    if(panel){ panel.dataset._cleanWas=panel.style.display||""; panel.style.display="none"; }
+    const tr=document.getElementById("tr");
+    if(tr){ tr.dataset._cleanWas=tr.style.display||""; tr.style.display="none"; }
+  } else {
+    const panel=document.getElementById("panel");
+    if(panel && panel.dataset._cleanWas!=null){ panel.style.display=panel.dataset._cleanWas||""; delete panel.dataset._cleanWas; }
+    const tr=document.getElementById("tr");
+    if(tr && tr.dataset._cleanWas!=null){ tr.style.display=tr.dataset._cleanWas||""; delete tr.dataset._cleanWas; }
+    if(typeof renderActionBar==="function") renderActionBar();
+    if(typeof renderArmyUI==="function") renderArmyUI();
+    syncMinimap();
+  }
+  const btn=document.getElementById("dockClean");
+  if(btn) btn.classList.toggle("on", on);
+  const top=document.getElementById("bClean");
+  if(top) top.classList.toggle("on", on);
+}
+function toggleCleanUI(force){
+  state.cleanUI=force==null?!state.cleanUI:!!force;
+  saveUxPrefs();
+  applyCleanUI();
+}
+function syncMinimap(){
+  const mini=document.getElementById("mini");
+  if(!mini)return;
+  const show=!state.cleanUI && !!state.minimapOn && state.phase!=="title";
+  mini.style.display=show?"block":"none";
+  mini.style.pointerEvents=show?"auto":"none";
+  const b=document.getElementById("dockMini");
+  if(b) b.classList.toggle("on", !!state.minimapOn);
+}
+function toggleMinimap(force){
+  state.minimapOn=force==null?!state.minimapOn:!!force;
+  saveUxPrefs();
+  syncMinimap();
+}
+
+function installDock(){
+  if(document.getElementById("dock")) return;
+  const wrap=document.getElementById("mapwrap"); if(!wrap)return;
+  const dock=document.createElement("div");
+  dock.id="dock";
+  dock.className="collapsed";
+  dock.innerHTML=`
+    <div class="dockicons" role="toolbar" aria-label="Map tools">
+      <button type="button" id="dockToggle" title="Show or hide the tool tray">☰</button>
+      <button type="button" id="dockBuild" title="Build">★</button>
+      <button type="button" id="dockMini" title="Minimap (M)">▣</button>
+      <button type="button" id="dockCenter" title="Center on your country (Home)">⌂</button>
+      <button type="button" id="dockClean" title="Clean screen (U or Tab)">⛶</button>
+    </div>
+    <div class="dockbody" id="dockBody"></div>`;
+  wrap.appendChild(dock);
+  const fillBuild=()=>{
+    const body=document.getElementById("dockBody"); if(!body)return;
+    const mil=typeof baseFoundCost==="function"?baseFoundCost("mil"):400;
+    const nav=typeof baseFoundCost==="function"?baseFoundCost("nav"):550;
+    const bld=typeof BUILDINGS!=="undefined"?Object.entries(BUILDINGS).slice(0,8):[];
+    const more=typeof BUILDINGS!=="undefined"&&Object.keys(BUILDINGS).length>8
+      ?`<div class="small" style="margin:4px 0 0">More buildings are in the Shop tab.</div>`:"";
+    const cards=[
+      `<button class="shopcard shopdrag" data-dragbuild="mil"><div class="ic">★</div><b>Military Base</b><div class="meta go">${typeof fmt==="function"?fmt(mil):mil} cr · drag onto the map</div></button>`,
+      `<button class="shopcard shopdrag" data-dragbuild="nav"><div class="ic">⚓</div><b>Naval Base</b><div class="meta go">${typeof fmt==="function"?fmt(nav):nav} cr · coastal only</div></button>`
+    ].concat(bld.map(([id,d])=>`<button class="shopcard shopdrag" data-dragbuild="${id}"><div class="ic">${d.emoji||""}</div><b>${d.name}</b><div class="meta go">${typeof fmt==="function"?fmt(d.cost):d.cost} cr · ${d.time} mo</div></button>`));
+    body.innerHTML=`<div class="small">Drag a card onto land you own. Hover or click ☰ to keep this tray open.</div><div class="shopgrid dockgrid">${cards.join("")}</div>${more}`;
+    if(typeof hookShopDrag==="function") hookShopDrag(body);
+  };
+  const setOpen=on=>{
+    dock.classList.toggle("collapsed", !on);
+    dock.classList.toggle("open", !!on);
+    state._dockOpen=!!on;
+    if(on) fillBuild();
+  };
+  document.getElementById("dockToggle").onclick=e=>{ e.stopPropagation(); setOpen(!dock.classList.contains("open")); };
+  document.getElementById("dockBuild").onclick=e=>{ e.stopPropagation(); setOpen(true); fillBuild(); };
+  document.getElementById("dockMini").onclick=e=>{ e.stopPropagation(); toggleMinimap(); };
+  document.getElementById("dockCenter").onclick=e=>{ e.stopPropagation(); centerOnCountry(); };
+  document.getElementById("dockClean").onclick=e=>{ e.stopPropagation(); toggleCleanUI(); };
+  dock.addEventListener("mouseenter", ()=>{ if(!state._dockPinned) setOpen(true); });
+  dock.addEventListener("mouseleave", ()=>{ if(!state._dockPinned && !state.buildDrag) setOpen(false); });
+  // clicking ☰ twice pins? first click opens; we'll treat open class as enough
+  fillBuild();
+  // Home / Clean live in the bottom dock and on the keyboard so the top bar stays compact.
+}
+
+function installUxStyle(){
+  if(document.getElementById("uxStyle"))return;
+  const st=document.createElement("style");
+  st.id="uxStyle";
+  st.textContent=`
+#toast{top:118px;left:50%;right:auto;bottom:auto;transform:translateX(-50%);align-items:center;max-width:min(380px,60%);max-height:none;z-index:9;pointer-events:none}
+#toast .toast{pointer-events:auto;padding:6px 10px;font-size:12px;max-width:100%}
+#mini{width:140px;height:72px;left:auto;right:10px;bottom:10px;z-index:5}
+#minimapHint, #tutor{pointer-events:none}
+#minimapHint{left:auto;right:10px;bottom:86px;max-width:200px;text-align:right}
+#actionBar{bottom:10px;padding:6px 8px;gap:6px;max-width:min(560px,90%);border-radius:10px}
+#actionBar .who{font-size:12px}
+#actionBar button, #actionBar .btn{font-size:12px;padding:4px 8px}
+#moveHint,#pickHint{padding:6px 12px;font:600 13px/1.3 system-ui;bottom:auto;top:58px;max-width:min(420px,80vw)}
+#moveHint{top:auto;bottom:58px}
+#dock{position:absolute;left:10px;bottom:10px;z-index:6;pointer-events:none;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px;max-width:min(420px,56vw)}
+#dock .dockicons, #dock .dockbody{pointer-events:auto}
+#dock .dockicons{display:flex;gap:4px;background:rgba(10,16,28,.92);border:1px solid var(--line);border-radius:12px;padding:4px;box-shadow:var(--shadow)}
+#dock .dockicons button{width:32px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--text);cursor:pointer;font-size:14px}
+#dock .dockicons button:hover, #dock .dockicons button.on{background:rgba(255,255,255,.1)}
+#dock .dockbody{display:none;background:rgba(10,16,28,.95);border:1px solid var(--line);border-radius:12px;padding:8px;box-shadow:var(--shadow);max-height:min(280px,46vh);overflow:auto}
+#dock.open .dockbody, #dock:hover .dockbody{display:block}
+#dock .dockgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:6px}
+#dock .shopcard{padding:6px;font-size:11px}
+#app.cleanUI #tr, #app.cleanUI #panel, #app.cleanUI #dock, #app.cleanUI #mini,
+#app.cleanUI #actionBar, #app.cleanUI #minimapHint, #app.cleanUI #tutor,
+#app.cleanUI #unBanner, #app.cleanUI #moveHint, #app.cleanUI #pickHint,
+#app.cleanUI #selPanel, #app.cleanUI #bldPanel, #app.cleanUI #toast {display:none !important}
+#app.cleanUI #mapwrap{cursor:grab}
+.camHint{position:absolute;left:50%;top:52px;transform:translateX(-50%);z-index:7;background:rgba(12,18,30,.94);border:1px solid #d8c07a;color:#f3e2a8;border-radius:10px;padding:6px 12px;font:600 12px/1.35 system-ui;text-align:center;pointer-events:none;max-width:min(520px,80vw);box-shadow:0 8px 20px rgba(0,0,0,.35)}
+`;
+  document.head.appendChild(st);
+}
+
+function showOnceHint(id, text, ms){
+  if(hintSeen(id)) return;
+  const wrap=document.getElementById("mapwrap"); if(!wrap)return;
+  let el=document.getElementById("camHint");
+  if(!el){ el=document.createElement("div"); el.id="camHint"; el.className="camHint"; wrap.appendChild(el); }
+  el.textContent=text;
+  el.style.display="block";
+  markHintSeen(id);
+  setTimeout(()=>{ if(el&&el.parentNode) el.remove(); }, ms||6000);
+}
+
+function installUx(){
+  loadUxPrefs();
+  installUxStyle();
+  installDock();
+  applyCleanUI();
+  syncMinimap();
+
+  // Toasts: top-center, max 2, 3 seconds, still respect notify/feedback filters
+  if(typeof toast==="function"){
+    const _toast=toast;
+    toast=function(text,kind){
+      const b=document.getElementById("toast");
+      if(b){ while(b.children.length>=2) b.firstChild.remove(); }
+      _toast(text,kind);
+      if(b){
+        const last=b.lastElementChild;
+        if(last){
+          // shorten the original 4.5s timer by removing and adding a 3s one
+          const gone=()=>{ if(last.parentNode) last.remove(); };
+          setTimeout(gone, 3000);
+        }
+        while(b.children.length>2) b.firstChild.remove();
+      }
+    };
+  }
+
+  // Action bar only when units (or a building) are selected, and compact
+  if(typeof renderActionBar==="function"){
+    const _rab=renderActionBar;
+    renderActionBar=function(){
+      if(state.cleanUI){
+        const bar=document.getElementById("actionBar");
+        if(bar){ bar.style.display="none"; bar.innerHTML=""; }
+        return;
+      }
+      const hasUnits=(state.selectedUnits||[]).length>0;
+      const hasBld=state.selectedBld!=null;
+      if(state.phase==="play" && !hasUnits && !hasBld){
+        const bar=document.getElementById("actionBar");
+        if(bar){ bar.style.display="none"; bar.innerHTML=""; }
+        return;
+      }
+      _rab();
+      const bar=document.getElementById("actionBar");
+      if(bar && !hasUnits && !hasBld){ bar.style.display="none"; bar.innerHTML=""; }
+    };
+  }
+
+  // Hints: show once, then gone
+  if(typeof renderMoveHint==="function"){
+    const _rm=renderMoveHint;
+    renderMoveHint=function(){
+      if(hintSeen("move") || state.cleanUI){
+        const el=document.getElementById("moveHint");
+        if(el) el.style.display="none";
+        return;
+      }
+      _rm();
+      const el=document.getElementById("moveHint");
+      if(el && el.style.display!=="none"){
+        // after the first time it actually appears, remember it and fade later
+        setTimeout(()=>{ markHintSeen("move"); if(el) el.style.display="none"; }, 7000);
+      }
+    };
+  }
+  const mh=document.getElementById("minimapHint");
+  if(mh){
+    mh.style.pointerEvents="none";
+    if(hintSeen("minihelp")) mh.style.display="none";
+    else setTimeout(()=>{ markHintSeen("minihelp"); mh.style.display="none"; }, 8000);
+  }
+
+  // Center-on-country also works on the globe
+  if(typeof zoomToNation==="function"){
+    const _zn=zoomToNation;
+    zoomToNation=function(id){
+      if(state.globeOn){ centerOnCountry(id); return; }
+      _zn(id);
+    };
+  }
+
+  // Help keys
+  if(typeof HELP_KEYS!=="undefined" && Array.isArray(HELP_KEYS)){
+    const upd={
+      "S":"Pan down (Ctrl+S saves)",
+      "M":"Toggle minimap",
+      "Drag a box":"Shift-drag, or drag starting on your troops, to select",
+      "Middle-drag, WASD, arrows":"Pan: left-drag empty ground, WASD/arrows, middle-drag, or right-drag",
+      "Ctrl+S":"Save"
+    };
+    for(const row of HELP_KEYS){ if(upd[row[0]]) row[1]=upd[row[0]]; }
+    const extras=[
+      ["Home","Center on your country"],
+      ["U or Tab","Clean screen (hide UI)"],
+      ["M","Minimap on/off"],
+      ["Scroll wheel","Zoom toward the cursor"],
+      ["Two-finger trackpad","Pan the map"]
+    ];
+    extras.forEach(x=>{ if(!HELP_KEYS.some(k=>k[0]===x[0])) HELP_KEYS.push(x); });
+  }
+
+  window.addEventListener("keydown", e=>{
+    if(isTypingTarget(e.target)) return;
+    const k=e.key, code=e.code||"";
+    if((k==="Tab"||k==="u"||k==="U") && state.phase!=="title"){
+      e.preventDefault();
+      toggleCleanUI();
+      return;
+    }
+    if((k==="m"||k==="M") && !e.ctrlKey && !e.metaKey){
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMinimap();
+      return;
+    }
+    if(k==="Home"||code==="Home"){
+      e.preventDefault();
+      centerOnCountry();
+    }
+  }, true);
+
+  // First-play camera hint, once
+  const bootHint=()=>{
+    if(state.phase==="play" && !hintSeen("camera")){
+      showOnceHint("camera","Drag empty ground to pan · Shift-drag to box-select · WASD or arrows · scroll to zoom · Home centers on you", 7000);
+    }
+  };
+  if(typeof startAs==="function"){
+    const _sa=startAs;
+    startAs=function(id){
+      const r=_sa(id);
+      setTimeout(bootHint, 500);
+      syncMinimap();
+      return r;
+    };
+  }
+
+  if(typeof refreshCExports==="function"){
+    const _r=refreshCExports;
+    refreshCExports=function(){
+      _r();
+      const C=window.CROWNFALL||(window.CROWNFALL={});
+      C.centerOnCountry=centerOnCountry;
+      C.toggleCleanUI=toggleCleanUI;
+      C.toggleMinimap=toggleMinimap;
+      C.zoomToward=zoomToward;
+      C.cameraWheel=cameraWheel;
+      C.panBy=typeof panBy==="function"?panBy:C.panBy;
+      if(typeof globe!=="undefined") C.globe=globe;
+    };
+    refreshCExports();
+  }
+}
+
+if(typeof document!=="undefined"){
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", installUx);
+  else installUx();
+}
+
+/* ===== Crownfall v1.3 — high-quality procedural 3D models ===== */
+const HQ_STRIDE=12;
+
+function hqC(c){
+  if(Array.isArray(c)) return c;
+  const s=String(c||"#888").replace("#","");
+  const n=s.length===3?s[0]+s[0]+s[1]+s[1]+s[2]+s[2]:s;
+  return [parseInt(n.slice(0,2),16)/255||0, parseInt(n.slice(2,4),16)/255||0, parseInt(n.slice(4,6),16)/255||0];
+}
+function HQMesh(){ this.t=[]; }
+HQMesh.prototype.tri=function(ax,ay,az,bx,by,bz,cx,cy,cz,nx,ny,nz,col,acc,bone){
+  const c=hqC(col), a=acc||0, b=bone||0;
+  const nlen=Math.hypot(nx,ny,nz)||1; nx/=nlen; ny/=nlen; nz/=nlen;
+  this.t.push(ax,ay,az,nx,ny,nz,c[0],c[1],c[2],a,b,0,
+              bx,by,bz,nx,ny,nz,c[0],c[1],c[2],a,b,0,
+              cx,cy,cz,nx,ny,nz,c[0],c[1],c[2],a,b,0);
+  return this;
+};
+HQMesh.prototype.box=function(x0,y0,z0,x1,y1,z1,col,acc,bone){
+  const f=[
+    [x0,y0,z1, x1,y0,z1, x1,y1,z1, x0,y1,z1, 0,0,1],
+    [x1,y0,z0, x0,y0,z0, x0,y1,z0, x1,y1,z0, 0,0,-1],
+    [x0,y1,z1, x1,y1,z1, x1,y1,z0, x0,y1,z0, 0,1,0],
+    [x0,y0,z0, x1,y0,z0, x1,y0,z1, x0,y0,z1, 0,-1,0],
+    [x1,y0,z1, x1,y0,z0, x1,y1,z0, x1,y1,z1, 1,0,0],
+    [x0,y0,z0, x0,y0,z1, x0,y1,z1, x0,y1,z0, -1,0,0]
+  ];
+  for(const q of f){
+    const v=[[q[0],q[1],q[2]],[q[3],q[4],q[5]],[q[6],q[7],q[8]],[q[9],q[10],q[11]]];
+    for(const idx of [0,1,2,0,2,3]){
+      const p=v[idx];
+      this.t.push(p[0],p[1],p[2], q[12],q[13],q[14], 0,0,0,0,0,0);
+      const n=this.t.length;
+      const c=hqC(col);
+      this.t[n-6]=c[0]; this.t[n-5]=c[1]; this.t[n-4]=c[2];
+      this.t[n-3]=acc||0; this.t[n-2]=bone||0; this.t[n-1]=0;
+    }
+  }
+  return this;
+};
+HQMesh.prototype.cyl=function(x,y0,y1,z,r,segs,col,acc,bone,caps){
+  segs=segs||8; if(caps==null) caps=true;
+  for(let i=0;i<segs;i++){
+    const a0=i/segs*Math.PI*2, a1=(i+1)/segs*Math.PI*2;
+    const c0=Math.cos(a0), s0=Math.sin(a0), c1=Math.cos(a1), s1=Math.sin(a1);
+    const x0=x+c0*r, z0=z+s0*r, x1=x+c1*r, z1=z+s1*r;
+    const nx=c0+c1, nz=s0+s1;
+    this.tri(x0,y0,z0, x1,y0,z1, x1,y1,z1, nx,0,nz, col,acc,bone);
+    this.tri(x0,y0,z0, x1,y1,z1, x0,y1,z0, nx,0,nz, col,acc,bone);
+    if(caps){
+      this.tri(x,y1,z, x0,y1,z0, x1,y1,z1, 0,1,0, col,acc,bone);
+      this.tri(x,y0,z, x1,y0,z1, x0,y0,z0, 0,-1,0, col,acc,bone);
+    }
+  }
+  return this;
+};
+HQMesh.prototype.cone=function(x,y0,y1,z,r0,r1,segs,col,acc,bone){
+  segs=segs||8;
+  for(let i=0;i<segs;i++){
+    const a0=i/segs*Math.PI*2, a1=(i+1)/segs*Math.PI*2;
+    const c0=Math.cos(a0), s0=Math.sin(a0), c1=Math.cos(a1), s1=Math.sin(a1);
+    this.tri(x+c0*r0,y0,z+s0*r0, x+c1*r0,y0,z+s1*r0, x+c1*r1,y1,z+s1*r1, c0+c1,0.2,s0+s1, col,acc,bone);
+    this.tri(x+c0*r0,y0,z+s0*r0, x+c1*r1,y1,z+s1*r1, x+c0*r1,y1,z+s0*r1, c0+c1,0.2,s0+s1, col,acc,bone);
+  }
+  return this;
+};
+HQMesh.prototype.cylZ=function(x,y,z0,z1,r,segs,col,acc,bone){
+  segs=segs||8;
+  for(let i=0;i<segs;i++){
+    const a0=i/segs*Math.PI*2, a1=(i+1)/segs*Math.PI*2;
+    const c0=Math.cos(a0), s0=Math.sin(a0), c1=Math.cos(a1), s1=Math.sin(a1);
+    const x0=x+c0*r, y0=y+s0*r, x1=x+c1*r, y1=y+s1*r;
+    this.tri(x0,y0,z0, x1,y1,z0, x1,y1,z1, c0+c1,s0+s1,0, col,acc,bone);
+    this.tri(x0,y0,z0, x1,y1,z1, x0,y0,z1, c0+c1,s0+s1,0, col,acc,bone);
+  }
+  return this;
+};
+HQMesh.prototype.cylX=function(x0,x1,y,z,r,segs,col,acc,bone){
+  segs=segs||8;
+  for(let i=0;i<segs;i++){
+    const a0=i/segs*Math.PI*2, a1=(i+1)/segs*Math.PI*2;
+    const c0=Math.cos(a0), s0=Math.sin(a0), c1=Math.cos(a1), s1=Math.sin(a1);
+    const y0=y+c0*r, z0=z+s0*r, y1=y+c1*r, z1=z+s1*r;
+    this.tri(x0,y0,z0, x0,y1,z1, x1,y1,z1, 0,c0+c1,s0+s1, col,acc,bone);
+    this.tri(x0,y0,z0, x1,y1,z1, x1,y0,z0, 0,c0+c1,s0+s1, col,acc,bone);
+  }
+  return this;
+};
+HQMesh.prototype.data=function(){ return this.t; };
+
+const PAL={
+  skin:"#c4a07a", skinD:"#a88462",
+  cloth:"#4f5840", clothD:"#3a4230", clothL:"#6a7354",
+  khaki:"#6b6348", web:"#4a4030",
+  helmet:"#2c3228", boot:"#1c1814",
+  metal:"#6a6e72", metalD:"#2c3034", metalL:"#9aa0a6",
+  gun:"#2a2e32", wood:"#5a3a22",
+  glass:"#8ec0d4", white:"#ececec", red:"#c43a32",
+  gold:"#d4b45a", concrete:"#8a8680", concreteD:"#5c5854",
+  brick:"#8a4a3a", roof:"#5a2e28", earth:"#5a4a32",
+  grass:"#4a6a38", sand:"#c2b289",
+  sea:"#3a4a58", rust:"#8a5a3a"
+};
+
+function meshHuman(kind){
+  const m=new HQMesh();
+  const cloth=(kind==="medic")?PAL.white:(kind==="sf")?"#2a2e2a":(kind==="marine")?"#3d4a40":(kind==="para")?PAL.khaki:PAL.cloth;
+  const prone=kind==="sniper";
+  const B={legL:1,legR:2,armL:3,armR:4,head:5,wep:6,root:0};
+  if(prone){
+    // lying along -Z, head toward -Z
+    m.box(-0.16,0.02,-0.55, 0.16,0.20,0.35, cloth,0.12,0);
+    m.box(-0.12,0.16,0.28, 0.12,0.36,0.62, PAL.skin,0, B.head);
+    m.cyl(0,0.18,0.42,0.55, 0.11,8, PAL.helmet,0.7, B.head);
+    m.box(-0.05,0.10,-1.25, 0.05,0.18,0.50, PAL.gun,0, B.wep);
+    m.box(-0.06,0.14,-0.10, 0.06,0.24,0.08, PAL.wood,0, B.wep);
+    m.box(-0.22,0.00,0.20, -0.14,0.10,0.55, cloth,0.1, B.armL);
+    m.box(0.14,0.00,0.05, 0.22,0.12,0.50, cloth,0.1, B.armR);
+    return m.data();
+  }
+  // boots
+  m.box(-0.16,0.00,-0.08, -0.04,0.10,0.12, PAL.boot,0,B.legL);
+  m.box( 0.04,0.00,-0.08,  0.16,0.10,0.12, PAL.boot,0,B.legR);
+  // lower / upper legs
+  m.box(-0.155,0.10,-0.07, -0.045,0.50,0.08, cloth,0.08,B.legL);
+  m.box( 0.045,0.10,-0.07,  0.155,0.50,0.08, cloth,0.08,B.legR);
+  m.box(-0.16,0.50,-0.08, -0.04,0.90,0.09, cloth,0.10,B.legL);
+  m.box( 0.04,0.50,-0.08,  0.16,0.90,0.09, cloth,0.10,B.legR);
+  // pelvis + torso
+  m.box(-0.18,0.86,-0.10, 0.18,1.08,0.12, cloth,0.15,0);
+  m.box(-0.20,1.08,-0.11, 0.20,1.40,0.13, cloth,0.18,0);
+  // webbing / nation chest tab
+  m.box(-0.21,1.18,-0.12, -0.06,1.28,0.14, cloth,0.75,0);
+  m.box( 0.06,1.18,-0.12,  0.21,1.28,0.14, cloth,0.75,0);
+  if(kind==="medic"){
+    m.box(-0.06,1.20,0.13, 0.06,1.36,0.16, PAL.red,0,0);
+    m.box(-0.10,1.25,0.13, 0.10,1.31,0.16, PAL.red,0,0);
+  }
+  // neck + head
+  m.cyl(0,1.40,1.50,0, 0.06,6, PAL.skin,0,B.head);
+  m.cyl(0,1.50,1.72,0, 0.12,8, PAL.skin,0,B.head);
+  // helmet (or beret for SF, cap for some)
+  if(kind==="sf"){
+    m.cyl(0,1.66,1.74,0, 0.13,8, "#1a2218",0.8,B.head);
+    m.box(-0.14,1.66,-0.04, 0.02,1.76,0.14, "#1a2218",0.8,B.head);
+  } else {
+    m.cyl(0,1.62,1.76,0, 0.135,8, PAL.helmet,0.7,B.head);
+    m.box(-0.14,1.62,-0.04, 0.14,1.68,0.16, PAL.helmet,0.55,B.head); // brim
+    m.box(-0.04,1.64,0.12, 0.04,1.70,0.17, cloth,0.9,B.head); // nation flash
+  }
+  // upper arms
+  m.box(-0.34,1.14,-0.07, -0.20,1.40,0.07, cloth,0.12,B.armL);
+  m.box( 0.20,1.14,-0.07,  0.34,1.40,0.07, cloth,0.12,B.armR);
+  // lower arms / hands
+  m.box(-0.33,0.88,-0.06, -0.21,1.14,0.06, PAL.skin,0,B.armL);
+  m.box( 0.21,0.88,-0.06,  0.33,1.14,0.06, PAL.skin,0,B.armR);
+  m.box(-0.34,0.80,-0.05, -0.20,0.90,0.06, PAL.skin,0,B.armL);
+  m.box( 0.20,0.80,-0.05,  0.34,0.90,0.06, PAL.skin,0,B.armR);
+  // backpack
+  if(kind==="para"){
+    m.box(-0.16,1.10,-0.28, 0.16,1.42,-0.12, PAL.khaki,0.2,0);
+    m.box(-0.28,1.20,-0.22, -0.16,1.55,-0.08, PAL.white,0,0); // packed chute
+    m.box( 0.16,1.20,-0.22,  0.28,1.55,-0.08, PAL.white,0,0);
+  } else if(kind==="eng"){
+    m.box(-0.14,1.12,-0.26, 0.14,1.36,-0.12, PAL.web,0.1,0);
+  } else if(kind!=="medic"){
+    m.box(-0.14,1.14,-0.24, 0.14,1.38,-0.12, PAL.web,0.15,0);
+  } else {
+    m.box(-0.12,1.16,0.13, 0.12,1.34,0.26, PAL.white,0,0);
+  }
+  // weapon in right hand (around y=0.95, x=0.28)
+  const wx=0.30, wy=0.98, wz=0.02;
+  if(kind==="mg"){
+    m.box(wx-0.04, wy-0.04, wz-0.55, wx+0.08, wy+0.08, wz+0.28, PAL.gun,0,B.wep);
+    m.box(wx-0.06, wy-0.08, wz-0.10, wx+0.16, wy-0.02, wz+0.10, PAL.metalD,0,B.wep);
+  } else if(kind==="at"){
+    m.box(wx-0.06, wy-0.02, wz-0.15, wx+0.70, wy+0.10, wz+0.08, PAL.metalD,0,B.wep);
+    m.cylX(wx+0.55, wx+0.85, wy+0.04, wz, 0.06, 6, PAL.metal,0,B.wep);
+  } else if(kind==="eng"){
+    m.box(wx-0.04, wy-0.08, wz-0.04, wx+0.22, wy+0.04, wz+0.04, PAL.metal,0,B.wep);
+    m.box(wx+0.16, wy-0.10, wz-0.10, wx+0.22, wy+0.10, wz+0.10, PAL.metalL,0,B.wep);
+  } else if(kind==="medic"){
+    // nothing heavy; small satchel already
+  } else {
+    // rifle / carbine held across the body, barrel forward -Z a bit and +X
+    m.box(wx-0.03, wy-0.03, wz-0.55, wx+0.04, wy+0.04, wz+0.22, PAL.gun,0,B.wep);
+    m.box(wx-0.035, wy-0.02, wz-0.05, wx+0.045, wy+0.07, wz+0.12, PAL.wood,0,B.wep);
+    m.box(wx-0.02, wy-0.01, wz-0.70, wx+0.03, wy+0.03, wz-0.55, PAL.metalD,0,B.wep);
+  }
+  if(kind==="marine"){
+    m.box(-0.18,1.00,-0.12, 0.18,1.08,0.14, "#2a3a48",0.3,0);
+  }
+  return m.data();
+}
+
+function meshAAUnit(){
+  const m=new HQMesh();
+  m.box(-0.55,0.00,-0.40, 0.55,0.16,0.40, PAL.metalD,0.15,0);
+  m.cylX(-0.50,-0.20,0.14,0.28,0.14,8, PAL.boot,0,0);
+  m.cylX(-0.50,-0.20,0.14,-0.28,0.14,8, PAL.boot,0,0);
+  m.cylX( 0.20, 0.50,0.14,0.28,0.14,8, PAL.boot,0,0);
+  m.cylX( 0.20, 0.50,0.14,-0.28,0.14,8, PAL.boot,0,0);
+  m.box(-0.20,0.16,-0.18, 0.20,0.42,0.18, PAL.metal,0.4,0);
+  m.cyl(0,0.42,1.35,0, 0.06,8, PAL.metalL,0.2,7); // barrel bone 7 spin/elevate
+  m.box(-0.08,0.40,-0.08, 0.08,0.55,0.08, PAL.metalD,0,0);
+  return m.data();
+}
+function meshTank(){
+  const m=new HQMesh();
+  // hull
+  m.box(-0.70,0.22,-1.05, 0.70,0.62,1.00, "#3d4536",0.25,0);
+  m.box(-0.60,0.62,-0.70, 0.60,0.78,0.80, "#454e3c",0.3,0);
+  // tracks
+  m.box(-0.85,0.00,-1.10, -0.55,0.42,1.05, PAL.metalD,0,0);
+  m.box( 0.55,0.00,-1.10,  0.85,0.42,1.05, PAL.metalD,0,0);
+  for(let i=-3;i<=3;i++){
+    const z=i*0.26;
+    m.cylX(-0.86,-0.54, 0.16, z, 0.12, 8, PAL.metal,0,0);
+    m.cylX( 0.54, 0.86, 0.16, z, 0.12, 8, PAL.metal,0,0);
+  }
+  m.box(-0.86,0.30,-1.10, -0.54,0.40,1.05, "#2a2e28",0,0);
+  m.box( 0.54,0.30,-1.10,  0.86,0.40,1.05, "#2a2e28",0,0);
+  // turret + nation band
+  m.cyl(0,0.78,1.12,0.05, 0.42, 10, "#3a4334",0.2,0);
+  m.box(-0.42,0.92,-0.08, 0.42,1.04,0.08, clothNation(),0.85,0);
+  // barrel
+  m.cylZ(0,0.98,0.40,1.55, 0.07, 8, PAL.metalD,0,0);
+  m.cylZ(0,0.98,1.55,1.70, 0.09, 8, PAL.metal,0,0);
+  // hatch
+  m.cyl(-0.12,1.12,1.20,0.00, 0.10, 6, PAL.metal,0,0);
+  return m.data();
+  function clothNation(){ return "#44503a"; }
+}
+function meshArt(){
+  const m=new HQMesh();
+  m.cylX(-0.55,0.55,0.22,0.00, 0.22, 8, PAL.boot,0,0);
+  m.box(-0.12,0.20,-0.30, 0.12,0.55,0.30, PAL.metalD,0.2,0);
+  m.box(-0.28,0.35,-0.20, 0.28,0.70,0.05, PAL.metal,0.25,0); // shield
+  m.cylZ(0,0.55,-0.15,1.70, 0.07, 8, PAL.metalD,0,0);
+  m.box(-0.10,0.20,0.10, 0.10,0.40,0.55, PAL.wood,0,0);
+  return m.data();
+}
+function meshPlane(kind){
+  const m=new HQMesh();
+  const bomber=kind==="bomb", trans=kind==="transport";
+  const fuseR=bomber||trans?0.18:0.14;
+  const fuseL=bomber?1.35:trans?1.20:1.05;
+  // fuselage along Z, nose +Z
+  m.cone(0,0.22,0.22, fuseL*0.15, fuseR*0.3, fuseR, 8, "#c8c4b8",0.15,0);
+  // approximate fuse as box + cyl
+  m.cylZ(0,0.22, -fuseL*0.55, fuseL*0.35, fuseR, 8, "#b8b4a8",0.2,0);
+  m.cone(0,0.22,0.22, -fuseL*0.85, fuseR, fuseR*0.2, 8, "#a8a498",0.15,0);
+  // cockpit
+  m.box(-0.10,0.30,0.05, 0.10,0.48,0.32, PAL.glass,0,0);
+  // wings
+  const wingW=bomber?1.55:trans?1.35:1.15;
+  const wingZ=bomber?0.05:-0.05;
+  m.box(-wingW,0.18,wingZ-0.22, wingW,0.26,wingZ+0.22, "#d0ccc0",0.15,0);
+  m.box(-wingW,0.16,wingZ-0.08, -wingW+0.15,0.28,wingZ+0.18, clothFlash(),0.85,0);
+  m.box( wingW-0.15,0.16,wingZ-0.08, wingW,0.28,wingZ+0.18, clothFlash(),0.85,0);
+  if(bomber){
+    m.cylZ(-0.7,0.14,-0.25,0.45, 0.10, 6, "#888480",0,0);
+    m.cylZ( 0.7,0.14,-0.25,0.45, 0.10, 6, "#888480",0,0);
+  }
+  // tail
+  m.box(-0.04,0.22,-fuseL*0.85, 0.04,0.62,-fuseL*0.55, "#c8c4b8",0.15,0);
+  m.box(-0.40,0.48,-fuseL*0.82, 0.40,0.56,-fuseL*0.60, "#c8c4b8",0.15,0);
+  m.box(-0.04,0.50,-fuseL*0.78, 0.04,0.66,-fuseL*0.62, clothFlash(),0.9,0); // tail flash
+  // propeller at nose, bone 9 rotZ around origin shifted — build at nose and use bone 9
+  if(!bomber){
+    m.box(-0.42,0.18,fuseL*0.35, 0.42,0.26,fuseL*0.38, PAL.metalD,0,9);
+    m.box(-0.04,0.00,fuseL*0.35, 0.04,0.44,fuseL*0.38, PAL.wood,0,9);
+  }
+  return m.data();
+  function clothFlash(){ return "#3a4a6a"; }
+}
+function meshShip(kind){
+  const m=new HQMesh();
+  const L=kind==="bb"?2.4:kind==="cv"?2.6:kind==="cl"?1.9:kind==="ss"?1.6:1.5;
+  const W=kind==="cv"?0.45:kind==="bb"?0.38:kind==="ss"?0.22:0.28;
+  const hull=kind==="ss"?"#1a2420":"#6a7076";
+  // hull tapered
+  m.box(-W,0.00,-L*0.45, W,0.28,L*0.35, hull,0.1,0);
+  m.box(-W*0.6,0.00,L*0.35, W*0.6,0.26,L*0.52, hull,0.1,0);
+  m.box(-W*0.5,0.00,-L*0.58, W*0.5,0.24,-L*0.45, hull,0.1,0);
+  if(kind==="ss"){
+    m.box(-0.10,0.28,-0.15, 0.10,0.55,0.25, PAL.metalD,0.3,0);
+    m.cyl(0,0.55,0.85,0.05, 0.03, 6, PAL.metal,0,0);
+    return m.data();
+  }
+  // deck
+  m.box(-W*0.9,0.28,-L*0.42, W*0.9,0.34,L*0.32, "#5a6064",0.05,0);
+  if(kind==="cv"){
+    m.box(-W*0.95,0.34,-L*0.40, W*0.95,0.38,L*0.40, "#4a4e48",0.1,0);
+    m.box(W*0.45,0.38,-0.20, W*0.85,0.85,0.40, "#4a5458",0.35,0); // island
+    m.box(W*0.50,0.85,-0.05, W*0.80,1.05,0.20, clothFlash(),0.85,0);
+  } else {
+    m.box(-0.16,0.34,-0.10, 0.16,0.72,0.35, "#8a8e92",0.2,0);
+    m.box(-0.12,0.72,-0.04, 0.12,0.95,0.22, "#7a7e82",0.25,0);
+    m.box(-0.08,0.85,0.00, 0.08,0.95,0.16, clothFlash(),0.9,0);
+    if(kind==="bb"){
+      m.cylZ(0,0.55,0.40,1.15, 0.06, 6, PAL.metalD,0,0);
+      m.cylZ(0,0.55,-0.85,-0.20, 0.06, 6, PAL.metalD,0,0);
+      m.box(-0.22,0.34,-0.70, 0.22,0.52,-0.35, PAL.metal,0.15,0);
+    } else if(kind==="cl"){
+      m.cylZ(0,0.50,0.35,0.95, 0.05, 6, PAL.metalD,0,0);
+    } else {
+      m.cylZ(0,0.48,0.30,0.80, 0.045, 6, PAL.metalD,0,0);
+    }
+  }
+  return m.data();
+  function clothFlash(){ return "#3a4a6a"; }
+}
+
+function buildAllUnitMeshes(){
+  const out={};
+  const types=["rifle","sniper","medic","eng","mg","at","sf","para","marine"];
+  for(const t of types) out[t]=meshHuman(t);
+  out.inf=out.rifle.slice();
+  out.aa=meshAAUnit();
+  out.arm=meshTank();
+  out.art=meshArt();
+  out.air=meshPlane("air");
+  out.bomb=meshPlane("bomb");
+  out.transport=meshPlane("transport");
+  out.dd=meshShip("dd");
+  out.cl=meshShip("cl");
+  out.bb=meshShip("bb");
+  out.cv=meshShip("cv");
+  out.ss=meshShip("ss");
+  // medic cross leftover typ still used as overlay — keep a small 3D cross
+  const cr=new HQMesh();
+  cr.box(-0.08,0.00,-0.28, 0.08,0.08,0.28, PAL.red,0,0);
+  cr.box(-0.28,0.00,-0.08, 0.28,0.08,0.08, PAL.red,0,0);
+  out.cross=cr.data();
+  out.tent=meshMilBase(1);
+  return out;
+}
+
+function meshMilBase(level){
+  const m=new HQMesh();
+  const lv=level||1;
+  // packed earth pad
+  m.box(-1.2,0.00,-1.0, 1.2,0.08,1.0, PAL.earth,0,0);
+  if(lv<=1){
+    // canvas tent
+    m.box(-0.7,0.08,-0.55, 0.7,0.08,0.55, "#6a6248",0.15,0);
+    m.box(-0.7,0.08,-0.55, 0.0,0.70,0.00, "#7a7358",0.2,0);
+    m.box( 0.0,0.70,-0.00, 0.7,0.08,0.55, "#7a7358",0.2,0);
+    m.box(-0.7,0.08,0.00, 0.0,0.70,0.55, "#6a6248",0.15,0);
+    m.box( 0.0,0.70,0.00, 0.7,0.08,-0.55, "#6a6248",0.15,0);
+    m.box(-0.04,0.08,-0.04, 0.04,0.82,0.04, PAL.wood,0,0);
+  } else {
+    m.box(-0.9,0.08,-0.6, 0.9,0.55,0.6, "#5a624c",0.25,0);
+    m.box(-0.95,0.55,-0.65, 0.95,0.70,0.65, "#4a523e",0.2,0);
+    m.box(-0.15,0.20,0.60, 0.15,0.48,0.72, PAL.wood,0.1,0);
+    if(lv>=3){
+      m.box(0.5,0.08,-0.4, 1.3,0.45,0.4, "#4a5244",0.2,0);
+      m.cyl(0.9,0.45,0.95,0.0, 0.06, 6, PAL.metalD,0,0);
+    }
+  }
+  m.box(-0.2,0.08,0.7, 0.2,0.16,1.1, clothNation(),0.8,0); // flag/marker
+  return m.data();
+  function clothNation(){ return "#3a4a30"; }
+}
+function meshNavBase(level){
+  const m=new HQMesh();
+  const lv=level||1;
+  m.box(-1.4,0.00,-0.4, 1.4,0.12,0.5, PAL.sea,0,0);
+  m.box(-1.3,0.12,-0.22, 1.3,0.22,0.22, PAL.concreteD,0.1,0); // pier
+  m.box(-0.5,0.22,-0.18, 0.4,0.70,0.18, "#6a6e68",0.25,0);
+  m.box(-0.55,0.70,-0.22, 0.45,0.82,0.22, "#5a5e58",0.2,0);
+  if(lv>=2) m.box(0.5,0.22,-0.15, 1.1,0.55,0.15, PAL.metal,0.15,0);
+  if(lv>=3){ m.box(-1.1,0.22,-0.15, -0.55,0.85,0.15, PAL.metalD,0.2,0); }
+  m.cyl(0.9,0.22,1.1,0.0, 0.05, 6, PAL.metalD,0,0); // crane/mast
+  return m.data();
+}
+
+
+function meshFactory(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.2,0.00,-0.7, 1.2,0.08,0.7, PAL.concreteD,0,0);
+  m.box(-1.1,0.08,-0.6, 0.4,0.70,0.6, "#6a6e70",0.15,0);
+  // sawtooth roof
+  for(let i=0;i<3;i++){
+    const x=-1.0+i*0.48;
+    m.box(x,0.70,-0.62, x+0.24,1.05,0.62, "#8a8e90",0.1,0);
+    m.box(x+0.24,1.05,-0.62, x+0.46,0.70,0.62, PAL.glass,0,0);
+  }
+  // smokestacks
+  const stacks=lv>=3?3:lv>=2?2:1;
+  for(let i=0;i<stacks;i++){
+    const x=0.55+i*0.28;
+    m.cyl(x,0.08,1.55,0.15, 0.11, 8, "#4a4e52",0.1,0);
+    m.cyl(x,1.55,1.68,0.15, 0.13, 8, "#3a3e42",0,0);
+  }
+  m.box(0.45,0.08,-0.5, 1.15,0.45,0.2, "#5a5e60",0.15,0);
+  if(lv>=2) m.box(-1.1,0.08,0.6, 0.2,0.50,1.05, "#5a5e62",0.15,0);
+  if(lv>=3) m.cyl(-0.8,0.50,1.15,0.85, 0.18, 8, PAL.metal,0.1,0);
+  return m.data();
+}
+function meshMine(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.9,0.00,-0.7, 0.9,0.12,0.7, PAL.earth,0,0);
+  m.box(-0.35,0.12,-0.25, 0.35,0.45,0.25, PAL.concreteD,0.1,0);
+  // headframe A
+  m.box(-0.08,0.12,-0.08, 0.08,1.70,0.08, PAL.metal,0,0);
+  m.box(-0.65,0.12,-0.07, -0.08,1.45,0.07, PAL.metalD,0,0);
+  m.box( 0.08,0.12,-0.07,  0.65,1.45,0.07, PAL.metalD,0,0);
+  m.box(-0.55,1.35,-0.12, 0.55,1.52,0.12, PAL.metal,0,0);
+  m.cylX(-0.2,0.2, 1.52,0, 0.16, 8, PAL.metalL,0,0); // wheel
+  m.box(-0.7,0.12,0.3, -0.2,0.40,0.75, PAL.earth,0,0); // spoil pile
+  if(lv>=2) m.box(0.3,0.12,-0.6, 0.85,0.55,0.1, "#5a4a38",0.15,0);
+  if(lv>=3) m.box(-0.9,0.12,-0.7, -0.4,0.70,-0.2, PAL.metalD,0.1,0);
+  return m.data();
+}
+function meshOilwell(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.55,0.00,-0.4, 0.55,0.12,0.4, PAL.earth,0,0);
+  m.box(-0.25,0.12,-0.18, 0.25,0.32,0.18, PAL.metalD,0.15,0);
+  // Samson post
+  m.box(-0.06,0.32,-0.06, 0.06,1.15,0.06, PAL.metal,0,0);
+  // walking beam — fulcrum at y=1.05, bone 7 rotX
+  m.box(-0.08,0.98,-0.85, 0.08,1.12,0.75, PAL.metalL,0,7);
+  m.box(-0.10,0.70,0.55, 0.10,1.05,0.72, PAL.metal,0,7); // horse head
+  m.box(-0.05,0.20,-0.80, 0.05,1.00,-0.68, PAL.metalD,0,7); // pitman
+  m.cyl(0,0.12,0.35,-0.05, 0.08, 6, PAL.rust,0,0);
+  if(lv>=2) m.box(0.3,0.12,-0.2, 0.7,0.45,0.25, PAL.metal,0.15,0);
+  if(lv>=3) m.cyl(0.5,0.45,0.95,0.0, 0.12, 8, PAL.metalD,0.1,0);
+  return m.data();
+}
+function meshPower(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.9,0.00,-0.5, 0.2,0.08,0.5, PAL.concrete,0,0);
+  m.box(-0.8,0.08,-0.4, 0.1,0.55,0.4, "#6a7074",0.15,0);
+  // cooling towers (hyperboloid approx)
+  const towers=lv>=2?2:1;
+  for(let i=0;i<towers;i++){
+    const x=0.45+i*0.55;
+    m.cone(x,0.08,0.55,0, 0.32,0.22, 10, PAL.concrete,0,0);
+    m.cone(x,0.55,1.15,0, 0.22,0.30, 10, PAL.concrete,0,0);
+    m.cyl(x,1.15,1.22,0, 0.30, 10, PAL.concreteD,0,0);
+  }
+  if(lv>=3) m.box(-0.8,0.55,-0.2, -0.4,0.95,0.2, PAL.metal,0.15,0);
+  return m.data();
+}
+function meshFarm(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.1,0.00,-0.8, 1.1,0.04,0.8, PAL.grass,0,0);
+  // barn
+  m.box(-0.7,0.04,-0.4, 0.25,0.55,0.4, PAL.brick,0.05,0);
+  m.box(-0.78,0.55,-0.45, 0.33,0.92,0.45, PAL.roof,0.05,0);
+  m.box(-0.15,0.08,0.40, 0.05,0.40,0.50, PAL.wood,0,0);
+  // silo
+  m.cyl(0.55,0.04,1.05,0.0, 0.20, 8, PAL.concrete,0.1,0);
+  m.cone(0.55,1.05,1.28,0, 0.22,0.02, 8, PAL.metalD,0,0);
+  if(lv>=2) m.cyl(0.90,0.04,0.85,0.15, 0.16, 8, PAL.concrete,0.1,0);
+  if(lv>=3){
+    m.box(0.3,0.04,0.4, 0.9,0.28,0.75, PAL.wood,0,0);
+  }
+  // paddock
+  m.box(-1.05,0.04,0.45, -0.3,0.10,0.78, "#3a5a2c",0,0);
+  return m.data();
+}
+function meshBank(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.9,0.00,-0.55, 0.9,0.12,0.55, PAL.concrete,0,0);
+  m.box(-0.75,0.12,-0.40, 0.75,0.85,0.40, "#e8e2d4",0.05,0);
+  // columns
+  const cols=lv>=3?6:4;
+  for(let i=0;i<cols;i++){
+    const x=-0.55+(i/(cols-1))*1.10;
+    m.cyl(x,0.12,0.85,-0.42, 0.06, 8, "#f0ece0",0,0);
+  }
+  // pediment
+  m.box(-0.85,0.85,-0.50, 0.85,0.98,0.50, "#e0d8c8",0.05,0);
+  m.box(-0.40,0.98,-0.20, 0.40,1.18,0.20, "#e8e2d4",0,0);
+  m.box(-0.12,0.20,-0.50, 0.12,0.55,-0.40, PAL.gold,0.4,0);
+  if(lv>=2) m.box(-0.95,0.12,0.15, -0.75,0.70,0.55, "#e8e2d4",0.05,0);
+  if(lv>=3) m.cyl(0,1.18,1.35,0, 0.08, 6, PAL.gold,0.6,0);
+  return m.data();
+}
+function meshMarket(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.0,0.00,-0.5, 1.0,0.06,0.5, PAL.earth,0,0);
+  m.box(-0.9,0.06,-0.35, 0.0,0.40,0.35, "#c45a3a",0.1,0);
+  m.box(-0.95,0.40,-0.40, 0.05,0.55,0.40, "#d4a04a",0.1,0);
+  m.box(0.1,0.06,-0.35, 0.95,0.38,0.35, "#3a6a8a",0.15,0);
+  m.box(0.05,0.38,-0.40, 1.00,0.52,0.40, "#e8d8a8",0.1,0);
+  m.box(-0.5,0.06,0.35, -0.15,0.28,0.55, PAL.wood,0,0);
+  if(lv>=2) m.box(-0.9,0.06,0.55, 0.9,0.20,0.85, "#c4a070",0.1,0);
+  if(lv>=3) m.box(0.4,0.06,-0.7, 0.9,0.45,-0.4, "#5a3a28",0.1,0);
+  return m.data();
+}
+function meshLab(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.9,0.00,-0.55, 0.9,0.08,0.55, PAL.concrete,0,0);
+  m.box(-0.8,0.08,-0.45, 0.8,0.70,0.45, "#c8d0d4",0.08,0);
+  // glass strips
+  for(let i=0;i<4;i++){
+    const y=0.18+i*0.12;
+    m.box(-0.82,y,-0.46, 0.82,y+0.07, -0.42, PAL.glass,0,0);
+    m.box(-0.82,y, 0.42, 0.82,y+0.07,  0.46, PAL.glass,0,0);
+  }
+  m.box(-0.15,0.08,-0.55, 0.15,0.45,-0.45, "#8a969c",0.1,0);
+  // roof dish + mast
+  m.cyl(0.35,0.70,0.95,0.15, 0.04, 6, PAL.metal,0,8);
+  m.cyl(0.35,0.95,1.05,0.15, 0.28, 10, PAL.metalL,0,8);
+  m.box(-0.2,0.70,-0.2, 0.15,0.85,0.15, "#a8b0b4",0,0);
+  if(lv>=2) m.box(0.4,0.08,-0.45, 1.15,0.55,0.20, "#b8c0c4",0.08,0);
+  if(lv>=3) m.cyl(-0.5,0.70,1.25,-0.2, 0.05, 6, PAL.metalD,0,0);
+  return m.data();
+}
+function meshUni(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.15,0.00,-0.85, 1.15,0.10,0.95, PAL.concrete,0,0);
+  // front steps (+Z, reads in 3/4 view)
+  m.box(-0.65,0.04,0.70, 0.65,0.10,0.95, PAL.concreteD,0,0);
+  m.box(-0.55,0.10,0.82, 0.55,0.16,1.08, PAL.concrete,0,0);
+  // main hall
+  m.box(-0.72,0.10,-0.45, 0.72,0.72,0.62, "#e6dfd0",0.05,0);
+  // portico columns along the front
+  for(let i=0;i<4;i++){
+    const x=-0.48+i*0.32;
+    m.cyl(x,0.16,0.80,0.70, 0.075, 8, "#f4eee2",0,0);
+    m.box(x-0.10,0.16,0.60, x+0.10,0.22,0.80, "#f4eee2",0,0);
+    m.box(x-0.10,0.80,0.60, x+0.10,0.86,0.80, "#f4eee2",0,0);
+  }
+  m.box(-0.75,0.80,0.52, 0.75,0.92,0.82, "#e8e0d0",0.05,0);
+  m.box(-0.40,0.92,0.56, 0.40,1.08,0.80, "#e8e0d0",0,0);
+  // large dome
+  m.cyl(0,0.72,0.95,0.05, 0.42, 10, "#e2d8c4",0,0);
+  m.cone(0,0.95,1.32,0.05, 0.42,0.08, 10, "#d4b45a",0.28,0);
+  m.cyl(0,1.32,1.44,0.05, 0.06, 6, PAL.gold,0.55,0);
+  // clock tower
+  const tx=0.88;
+  m.box(tx-0.22,0.10,-0.22, tx+0.22,1.35,0.22, "#e0d8c6",0.05,0);
+  m.cylZ(tx,1.12,0.22,0.27, 0.14, 10, PAL.white,0,0);
+  m.box(tx-0.02,1.12,0.27, tx+0.02,1.22,0.29, PAL.metalD,0,0);
+  m.box(tx-0.10,1.12,0.27, tx+0.00,1.14,0.29, PAL.metalD,0,0);
+  m.box(tx-0.22,1.35,-0.22, tx+0.22,1.50,0.22, "#c4b898",0,0);
+  m.cyl(tx,1.50,1.68,0, 0.09, 6, PAL.gold,0.45,0);
+  if(lv>=2) m.box(-1.20,0.10,-0.35, -0.72,0.62,0.50, "#e6dfd0",0.05,0);
+  if(lv>=3){
+    m.box(0.72,0.10,-0.35, 1.25,0.62,0.20, "#e6dfd0",0.05,0);
+    m.cyl(0,1.44,1.62,0.05, 0.05, 6, PAL.gold,0.65,0);
+  }
+  return m.data();
+}
+function meshHospital(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.0,0.00,-0.55, 1.0,0.08,0.55, PAL.concrete,0,0);
+  m.box(-0.9,0.08,-0.45, 0.9,0.70,0.45, PAL.white,0.05,0);
+  // red cross roof + facade
+  m.box(-0.12,0.70,-0.08, 0.12,0.86,0.08, PAL.red,0,0);
+  m.box(-0.08,0.70,-0.22, 0.08,0.86,0.22, PAL.red,0,0);
+  m.box(-0.18,0.30,0.45, 0.18,0.58,0.50, PAL.red,0,0);
+  m.box(-0.08,0.22,0.45, 0.08,0.66,0.50, PAL.red,0,0);
+  m.box(-0.15,0.08,-0.55, 0.15,0.40,-0.45, PAL.glass,0,0);
+  if(lv>=2) m.box(-1.2,0.08,-0.30, -0.9,0.55,0.30, PAL.white,0.05,0);
+  if(lv>=3) m.box(0.9,0.08,-0.30, 1.25,0.55,0.30, PAL.white,0.05,0);
+  return m.data();
+}
+function meshBunker(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.0,0.00,-0.7, 1.0,0.18,0.7, PAL.earth,0,0);
+  m.box(-0.75,0.10,-0.45, 0.75,0.38,0.45, PAL.concreteD,0.1,0);
+  m.box(-0.50,0.38,-0.28, 0.50,0.52,0.28, PAL.concrete,0.1,0);
+  m.box(-0.16,0.28,0.45, 0.16,0.40,0.62, PAL.metalD,0,0); // embrasure
+  if(lv>=2) m.box(-1.0,0.10,-0.2, -0.75,0.42,0.2, PAL.concreteD,0.1,0);
+  if(lv>=3) m.cyl(0,0.52,0.72,0, 0.10, 6, PAL.metalD,0,0);
+  return m.data();
+}
+function meshAABat(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.cyl(0,0.00,0.10,0, 0.7, 10, PAL.earth,0,0);
+  m.box(-0.55,0.08,-0.40, 0.55,0.20,0.40, PAL.sand,0,0);
+  m.box(-0.18,0.20,-0.18, 0.18,0.40,0.18, PAL.metalD,0.15,0);
+  m.cyl(0,0.40,1.25,0, 0.06, 8, PAL.metalL,0.15,7);
+  m.box(-0.45,0.10,-0.15, -0.22,0.28,0.15, PAL.metal,0,0);
+  if(lv>=2) m.box(0.25,0.10,-0.15, 0.50,0.28,0.15, PAL.metal,0,0);
+  if(lv>=3) m.cyl(0.0,0.40,1.45,0, 0.05, 6, PAL.metal,0,7);
+  return m.data();
+}
+function meshCoastal(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.8,0.00,-0.5, 0.8,0.22,0.5, PAL.concreteD,0.1,0);
+  m.box(-0.55,0.22,-0.32, 0.35,0.55,0.32, PAL.concrete,0.1,0);
+  m.cylZ(0.2,0.42,0.20,1.45, 0.09, 8, PAL.metalD,0,0);
+  m.cylZ(0.2,0.42,1.45,1.65, 0.12, 8, PAL.metal,0,0);
+  if(lv>=2) m.box(-0.8,0.22,-0.15, -0.55,0.70,0.15, PAL.concrete,0.1,0);
+  if(lv>=3) m.cylZ(0.2,0.28,0.20,1.20, 0.07, 8, PAL.metalD,0,0);
+  return m.data();
+}
+function meshRadar(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.45,0.00,-0.35, 0.45,0.22,0.35, PAL.concrete,0.1,0);
+  m.cyl(0,0.22,1.05,0, 0.06, 6, PAL.metal,0,0);
+  // dish, fulcrum ~ y=1.15, bone 8 rotY
+  m.cyl(0,1.00,1.15,0, 0.08, 6, PAL.metalL,0,8);
+  m.cone(0,1.05,1.15,0.35, 0.55,0.08, 10, PAL.metalL,0.15,8);
+  m.box(-0.25,0.22,-0.25, 0.25,0.50,0.25, "#4a5258",0.2,0);
+  if(lv>=2) m.cyl(0,1.05,1.15,-0.35, 0.40, 10, PAL.metal,0.1,8);
+  if(lv>=3) m.cyl(0,0.22,1.35,0, 0.05, 6, PAL.metalD,0,0);
+  return m.data();
+}
+function meshSilo(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.8,0.00,-0.8, 0.8,0.10,0.8, PAL.earth,0,0);
+  m.cyl(0,0.10,1.45,0, 0.38, 10, PAL.concrete,0.1,0);
+  m.cone(0,1.45,1.62,0, 0.38,0.12, 10, PAL.concreteD,0,0);
+  m.box(-0.18,1.50,-0.18, 0.18,1.58,0.18, PAL.metalD,0,0); // hatch
+  m.box(-0.9,0.10,-0.15, -0.45,0.45,0.15, PAL.concreteD,0.1,0);
+  if(lv>=2) m.box(0.45,0.10,-0.2, 0.85,0.55,0.2, PAL.metal,0.15,0);
+  if(lv>=3) m.cyl(0,0.10,1.75,0, 0.32, 10, PAL.concrete,0.1,0);
+  return m.data();
+}
+function meshAirfield(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.6,0.00,-0.18, 1.6,0.05,0.18, "#4a4e50",0,0); // runway
+  m.box(-0.08,0.05,-0.20, 0.08,0.06,0.20, PAL.white,0,0);
+  m.box(-0.8,0.00,0.30, 0.15,0.42,0.85, "#8a9094",0.15,0); // hangar
+  m.box(-0.85,0.42,0.28, 0.20,0.58,0.88, "#6a7074",0.1,0);
+  m.box(0.5,0.00,-0.15, 0.8,0.55,0.15, PAL.concrete,0.1,0); // tower
+  m.box(0.48,0.55,-0.18, 0.82,0.72,0.18, PAL.glass,0,0);
+  if(lv>=2) m.box(0.2,0.00,0.30, 0.9,0.32,0.75, "#7a8084",0.15,0);
+  if(lv>=3) m.box(-1.6,0.00,0.22, 1.6,0.04,0.28, PAL.white,0,0);
+  return m.data();
+}
+function meshSpy(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.7,0.00,-0.5, 0.7,0.08,0.5, PAL.concreteD,0,0);
+  m.box(-0.6,0.08,-0.4, 0.6,0.70,0.4, "#2a2e32",0.15,0);
+  m.box(-0.65,0.70,-0.45, 0.65,0.82,0.45, "#1a1e22",0.1,0);
+  m.box(-0.12,0.08,-0.50, 0.12,0.40,-0.40, "#111418",0,0);
+  m.cyl(0.25,0.82,1.15,0.15, 0.03, 6, PAL.metalD,0,0);
+  m.box(-0.35,0.35,0.40, -0.15,0.50,0.42, PAL.glass,0,0);
+  if(lv>=2) m.box(0.6,0.08,-0.2, 1.0,0.55,0.2, "#2a2e32",0.15,0);
+  if(lv>=3) m.cyl(-0.3,0.82,1.35,-0.1, 0.03, 6, PAL.metal,0,0);
+  return m.data();
+}
+function meshProp(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-0.5,0.00,-0.4, 0.5,0.40,0.4, "#6a3a32",0.15,0);
+  m.cyl(0,0.40,1.65,0, 0.05, 6, PAL.metal,0,0);
+  m.box(-0.35,1.15,-0.04, 0.35,1.28,0.04, PAL.metalL,0,0);
+  m.box(-0.08,1.45,-0.08, 0.08,1.70,0.08, PAL.metal,0,0);
+  m.box(-0.45,0.20,0.40, 0.45,0.50,0.46, clothNation(),0.85,0);
+  if(lv>=2) m.cyl(0.25,0.40,1.25,0.2, 0.04, 6, PAL.metalD,0,0);
+  if(lv>=3) m.box(-0.8,0.00,-0.2, -0.5,0.55,0.2, "#5a3230",0.15,0);
+  return m.data();
+  function clothNation(){ return "#dce6f0"; }
+}
+function meshWonder(lv){
+  const m=new HQMesh();
+  lv=lv||1;
+  m.box(-1.2,0.00,-1.2, 1.2,0.10,1.2, PAL.concrete,0,0);
+  m.box(-0.95,0.10,-0.95, 0.95,0.32,0.95, "#c2b49a",0.1,0);
+  m.box(-0.70,0.32,-0.70, 0.70,0.58,0.70, "#d0c4a8",0.1,0);
+  m.box(-0.42,0.58,-0.42, 0.42,1.15,0.42, "#ddd2b8",0.1,0);
+  m.box(-0.18,1.15,-0.18, 0.18,1.65,0.18, "#e8dcc0",0.1,0);
+  m.box(-0.10,1.65,-0.10, 0.10,1.85,0.10, PAL.gold,0.55,0);
+  m.box(-0.16,1.85,-0.16, 0.16,1.92,0.16, PAL.gold,0.7,0);
+  m.box(-1.15,0.10,-0.06, -0.95,0.55,0.06, clothNation(),0.8,0);
+  m.box( 0.95,0.10,-0.06,  1.15,0.55,0.06, clothNation(),0.8,0);
+  if(lv>=2) m.box(-0.55,0.58,-0.85, 0.55,0.78,-0.55, "#d0c4a8",0.1,0);
+  if(lv>=3) m.cyl(0,1.92,2.15,0, 0.05, 6, PAL.gold,0.8,0);
+  return m.data();
+  function clothNation(){ return "#e8eef4"; }
+}
+
+function meshMod(id){
+  const m=new HQMesh();
+  if(id==="barracks"){
+    m.box(-0.6,0.00,-0.3, 0.6,0.40,0.3, "#6a6248",0.2,0);
+    m.box(-0.65,0.40,-0.35, 0.65,0.55,0.35, PAL.roof,0,0);
+    for(let i=-2;i<=2;i++) m.box(i*0.18-0.06,0.16,0.30, i*0.18+0.06,0.28,0.34, PAL.glass,0,0);
+  } else if(id==="depot"){
+    m.box(-0.6,0.00,-0.4, 0.6,0.45,0.4, PAL.metal,0.2,0);
+    m.box(-0.20,0.08,0.40, 0.20,0.38,0.46, PAL.metalD,0,0);
+    m.box(-0.35,0.10,-0.15, 0.35,0.22,0.25, "#3d4536",0.3,0);
+  } else if(id==="airfield"){
+    m.box(-0.8,0.00,-0.12, 0.8,0.04,0.12, "#4a4e50",0,0);
+    m.box(-0.45,0.00,0.18, 0.15,0.32,0.50, "#8a9094",0.15,0);
+  } else if(id==="hospital"){
+    m.box(-0.45,0.00,-0.3, 0.45,0.35,0.3, PAL.white,0.1,0);
+    m.box(-0.08,0.35,-0.05, 0.08,0.50,0.05, PAL.red,0,0);
+    m.box(-0.05,0.35,-0.12, 0.05,0.50,0.12, PAL.red,0,0);
+  } else if(id==="defenses"){
+    m.box(-0.7,0.00,-0.15, 0.7,0.32,0.15, PAL.concreteD,0.1,0);
+    m.cyl(0,0.32,0.85,0, 0.05, 6, PAL.metal,0,0);
+  } else if(id==="supply"){
+    m.box(-0.4,0.00,-0.3, 0.4,0.40,0.3, PAL.wood,0.1,0);
+    m.box(-0.55,0.00,0.15, -0.25,0.22,0.40, PAL.web,0,0);
+    m.box(0.20,0.00,0.10, 0.50,0.20,0.38, PAL.web,0,0);
+  } else if(id==="radar"){
+    m.box(-0.25,0.00,-0.2, 0.25,0.18,0.2, PAL.concrete,0,0);
+    m.cyl(0,0.18,0.65,0, 0.04, 6, PAL.metal,0,0);
+    m.cone(0,0.60,0.68,0.15, 0.32,0.05, 8, PAL.metalL,0.15,8);
+  } else if(id==="drydock"){
+    m.box(-0.8,0.00,-0.35, 0.8,0.12,0.35, PAL.sea,0,0);
+    m.box(-0.85,0.00,-0.40, -0.65,0.45,0.40, PAL.concrete,0,0);
+    m.box( 0.65,0.00,-0.40,  0.85,0.45,0.40, PAL.concrete,0,0);
+  } else if(id==="marines"){
+    m.box(-0.5,0.00,-0.3, 0.5,0.38,0.3, "#3d4a40",0.25,0);
+    m.box(-0.55,0.38,-0.35, 0.55,0.50,0.35, PAL.roof,0,0);
+  } else if(id==="coastal"){
+    m.box(-0.4,0.00,-0.25, 0.4,0.22,0.25, PAL.concreteD,0,0);
+    m.cylZ(0.1,0.28,0.15,0.85, 0.06, 6, PAL.metalD,0,0);
+  } else if(id==="subpens"){
+    m.box(-0.7,0.00,-0.4, 0.7,0.08,0.4, PAL.sea,0,0);
+    m.box(-0.7,0.08,-0.4, 0.7,0.50,0.05, PAL.concreteD,0.1,0);
+    m.box(-0.7,0.08,0.25, -0.15,0.45,0.40, PAL.concrete,0,0);
+    m.box(0.15,0.08,0.25, 0.7,0.45,0.40, PAL.concrete,0,0);
+  } else {
+    m.box(-0.3,0.00,-0.3, 0.3,0.35,0.3, PAL.concrete,0.1,0);
+  }
+  return m.data();
+}
+
+function buildingModelId(kind, level){
+  const lv=Math.max(1, Math.min(3, level||1));
+  return "bld_"+kind+(lv>1?("_L"+lv):"");
+}
+function allBuildingModelKinds(){
+  const civic=typeof BUILDINGS!=="undefined"?Object.keys(BUILDINGS):[
+    "factory","mine","oilwell","power","farm","bank","market","lab","uni","hospitalb",
+    "bunker","aa_bat","coastal","radar_stn","silo","airfieldb","spyhq","propaganda","wonder"];
+  const mods=["barracks","depot","airfield","hospital","defenses","supply","radar","drydock","marines","coastal","subpens"];
+  return {civic, bases:["mil","nav"], mods};
+}
+
+function buildAllBuildingMeshes(){
+  const out={};
+  const makers={
+    factory:meshFactory, mine:meshMine, oilwell:meshOilwell, power:meshPower, farm:meshFarm,
+    bank:meshBank, market:meshMarket, lab:meshLab, uni:meshUni, hospitalb:meshHospital,
+    bunker:meshBunker, aa_bat:meshAABat, coastal:meshCoastal, radar_stn:meshRadar, silo:meshSilo,
+    airfieldb:meshAirfield, spyhq:meshSpy, propaganda:meshProp, wonder:meshWonder
+  };
+  for(const k of Object.keys(makers)){
+    for(const lv of [1,2,3]){
+      out[buildingModelId(k,lv)] = makers[k](lv);
+    }
+  }
+  out.bld_mil = meshMilBase(1);
+  out.bld_mil_L2 = meshMilBase(2);
+  out.bld_mil_L3 = meshMilBase(3);
+  out.bld_nav = meshNavBase(1);
+  out.bld_nav_L2 = meshNavBase(2);
+  out.bld_nav_L3 = meshNavBase(3);
+  const mods=["barracks","depot","airfield","hospital","defenses","supply","radar","drydock","marines","coastal","subpens"];
+  for(const id of mods) out["bld_mod_"+id]=meshMod(id);
+  return out;
+}
+
+function hqInstallMeshes(){
+  if(typeof UnitMesh==="undefined") return;
+  const units=buildAllUnitMeshes();
+  const blds=buildAllBuildingMeshes();
+  UnitMesh.meshes = UnitMesh.meshes||{};
+  for(const k of Object.keys(units)) UnitMesh.meshes[k]=units[k];
+  for(const k of Object.keys(blds)) UnitMesh.meshes[k]=blds[k];
+  UnitMesh.stride=HQ_STRIDE;
+  UnitMesh.hq=true;
+  UnitMesh.ready=true;
+}
+
+function hqCompileGL(){
+  if(typeof UnitGL==="undefined"||!UnitGL.gl) return false;
+  const gl=UnitGL.gl;
+  const vs=`
+attribute vec3 aPos; attribute vec3 aNrm; attribute vec3 aCol; attribute float aAcc; attribute float aBone;
+attribute vec3 iPos; attribute vec3 iCol; attribute float iScl; attribute float iRot; attribute float iBob;
+attribute float iPhase; attribute float iAnim;
+uniform vec2 uRes; uniform float uOutline;
+varying vec3 vCol;
+vec3 rotX(vec3 p, float ang){ float c=cos(ang), s=sin(ang); return vec3(p.x, c*p.y-s*p.z, s*p.y+c*p.z); }
+vec3 rotY(vec3 p, float ang){ float c=cos(ang), s=sin(ang); return vec3(c*p.x+s*p.z, p.y, -s*p.x+c*p.z); }
+vec3 rotZ(vec3 p, float ang){ float c=cos(ang), s=sin(ang); return vec3(c*p.x-s*p.y, s*p.x+c*p.y, p.z); }
+vec3 skin(vec3 p, float bone, float phase, float anim){
+  float sw=sin(phase);
+  vec3 j; float ang;
+  if(bone>0.5 && bone<1.5){ j=vec3(-0.11,0.90,0.0); p=j+rotX(p-j, 0.55*sw); }
+  else if(bone<2.5 && bone>1.5){ j=vec3(0.11,0.90,0.0); p=j+rotX(p-j, -0.55*sw); }
+  else if(bone<3.5 && bone>2.5){ j=vec3(-0.28,1.36,0.0); p=j+rotX(p-j, -0.45*sw); }
+  else if(bone<4.5 && bone>3.5){
+    j=vec3(0.28,1.36,0.0);
+    ang = anim>0.05 ? (-1.05+anim*0.35) : 0.45*sw;
+    p=j+rotX(p-j, ang);
+  }
+  else if(bone<5.5 && bone>4.5){ j=vec3(0.0,1.50,0.0); p=j+rotX(p-j, 0.08*sw); }
+  else if(bone<6.5 && bone>5.5){
+    j=vec3(0.28,1.36,0.0);
+    ang = anim>0.05 ? (-1.05+anim*0.35) : 0.45*sw;
+    p=j+rotX(p-j, ang);
+  }
+  else if(bone<7.5 && bone>6.5){ j=vec3(0.0,1.05,0.0); p=j+rotX(p-j, phase); }
+  else if(bone<8.5 && bone>7.5){ j=vec3(0.0,1.10,0.0); p=j+rotY(p-j, phase); }
+  else if(bone<9.5 && bone>8.5){ p=rotZ(p, phase); }
+  return p;
+}
+void main(){
+  vec3 p=skin(aPos, aBone, iPhase, iAnim);
+  vec3 n=skin(aPos+aNrm*0.05, aBone, iPhase, iAnim)-p;
+  float c=cos(iRot), s=sin(iRot);
+  p=vec3(c*p.x+s*p.z, p.y, -s*p.x+c*p.z);
+  n=vec3(c*n.x+s*n.z, n.y, -s*n.x+c*n.z);
+  p.y+=iBob;
+  if(uOutline>0.5) p+=normalize(n+vec3(0.001))*0.045;
+  p*=iScl;
+  vec3 base=mix(aCol, iCol, clamp(aAcc,0.0,1.0));
+  n=normalize(n);
+  float amb=0.40;
+  float diff=0.62*max(0.0, dot(n, normalize(vec3(0.40,0.88,0.32))));
+  float fill=0.10*max(0.0, dot(n, normalize(vec3(-0.3,0.2,-0.4))));
+  vCol = uOutline>0.5 ? vec3(0.05,0.06,0.08) : base*(amb+diff+fill);
+  vec2 scr=iPos.xy + vec2(p.x, -p.y - p.z*0.35);
+  vec2 clip=(scr/uRes)*2.0-1.0;
+  gl_Position=vec4(clip.x, -clip.y, (iPos.z+p.z)*0.001 + (uOutline>0.5?-0.0004:0.0), 1.0);
+}`;
+  const fs=`precision mediump float; varying vec3 vCol; void main(){ gl_FragColor=vec4(vCol,1.0); }`;
+  const vsO=gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vsO,vs); gl.compileShader(vsO);
+  if(!gl.getShaderParameter(vsO,gl.COMPILE_STATUS)){ UnitGL.shaderLog=gl.getShaderInfoLog(vsO)||"hq vs"; return false; }
+  const fsO=gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fsO,fs); gl.compileShader(fsO);
+  if(!gl.getShaderParameter(fsO,gl.COMPILE_STATUS)){ UnitGL.shaderLog=gl.getShaderInfoLog(fsO)||"hq fs"; return false; }
+  const p=gl.createProgram(); gl.attachShader(p,vsO); gl.attachShader(p,fsO); gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS)){ UnitGL.shaderLog=gl.getProgramInfoLog(p)||"hq link"; return false; }
+  UnitGL.prog=p;
+  UnitGL.loc={
+    aPos:gl.getAttribLocation(p,"aPos"), aNrm:gl.getAttribLocation(p,"aNrm"),
+    aCol:gl.getAttribLocation(p,"aCol"), aAcc:gl.getAttribLocation(p,"aAcc"), aBone:gl.getAttribLocation(p,"aBone"),
+    iPos:gl.getAttribLocation(p,"iPos"), iCol:gl.getAttribLocation(p,"iCol"),
+    iScl:gl.getAttribLocation(p,"iScl"), iRot:gl.getAttribLocation(p,"iRot"), iBob:gl.getAttribLocation(p,"iBob"),
+    iPhase:gl.getAttribLocation(p,"iPhase"), iAnim:gl.getAttribLocation(p,"iAnim"),
+    uRes:gl.getUniformLocation(p,"uRes"), uOutline:gl.getUniformLocation(p,"uOutline")
+  };
+  return true;
+}
+function hqUploadMeshes(){
+  if(typeof UnitGL==="undefined"||!UnitGL.gl||!UnitMesh||!UnitMesh.meshes)return;
+  const gl=UnitGL.gl;
+  UnitGL.meshes={};
+  const S=HQ_STRIDE*4;
+  for(const k of Object.keys(UnitMesh.meshes)){
+    const src=UnitMesh.meshes[k];
+    const ab=gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER,ab);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(src), gl.STATIC_DRAW);
+    UnitGL.meshes[k]={buf:ab, n:src.length/HQ_STRIDE, stride:S};
+  }
+  UnitGL.ibuf=gl.createBuffer();
+  UnitGL.maxInst=UnitGL.maxInst||256;
+  UnitGL.data=new Float32Array(UnitGL.maxInst*12);
+}
+
+function hqSkinCPU(x,y,z, bone, phase, anim){
+  const rotX=(p,ang)=>{const c=Math.cos(ang),s=Math.sin(ang); return [p[0], c*p[1]-s*p[2], s*p[1]+c*p[2]];};
+  const rotY=(p,ang)=>{const c=Math.cos(ang),s=Math.sin(ang); return [c*p[0]+s*p[2], p[1], -s*p[0]+c*p[2]];};
+  const rotZ=(p,ang)=>{const c=Math.cos(ang),s=Math.sin(ang); return [c*p[0]-s*p[1], s*p[0]+c*p[1], p[2]];};
+  const add=(j,p)=>[j[0]+p[0], j[1]+p[1], j[2]+p[2]];
+  const sub=(p,j)=>[p[0]-j[0], p[1]-j[1], p[2]-j[2]];
+  let p=[x,y,z];
+  const sw=Math.sin(phase||0);
+  if(bone>0.5&&bone<1.5){ const j=[-0.11,0.90,0]; p=add(j,rotX(sub(p,j),0.55*sw)); }
+  else if(bone<2.5&&bone>1.5){ const j=[0.11,0.90,0]; p=add(j,rotX(sub(p,j),-0.55*sw)); }
+  else if(bone<3.5&&bone>2.5){ const j=[-0.28,1.36,0]; p=add(j,rotX(sub(p,j),-0.45*sw)); }
+  else if(bone<4.5&&bone>3.5){ const j=[0.28,1.36,0]; const ang=(anim>0.05)?(-1.05+anim*0.35):0.45*sw; p=add(j,rotX(sub(p,j),ang)); }
+  else if(bone<5.5&&bone>4.5){ const j=[0,1.50,0]; p=add(j,rotX(sub(p,j),0.08*sw)); }
+  else if(bone<6.5&&bone>5.5){ const j=[0.28,1.36,0]; const ang=(anim>0.05)?(-1.05+anim*0.35):0.45*sw; p=add(j,rotX(sub(p,j),ang)); }
+  else if(bone<7.5&&bone>6.5){ const j=[0,1.05,0]; p=add(j,rotX(sub(p,j),phase||0)); }
+  else if(bone<8.5&&bone>7.5){ const j=[0,1.10,0]; p=add(j,rotY(sub(p,j),phase||0)); }
+  else if(bone<9.5&&bone>8.5){ p=rotZ(p,phase||0); }
+  return p;
+}
+
+function installHQDraw(){
+  if(typeof Unit3D==="undefined") return;
+  Unit3D.drawShadow=function(ctx,x,y,s){
+    ctx.save();
+    const g=ctx.createRadialGradient(x, y+3, 0, x, y+3, 10*s);
+    g.addColorStop(0,"rgba(0,0,0,0.38)");
+    g.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.ellipse(x, y+3, 8.5*s, 2.8*s, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  };
+  Unit3D.drawMesh=function(ctx, typ, px, py, scl, rot, bob, col, alpha, phase, anim){
+    if(typeof UnitMesh!=="undefined") UnitMesh.init();
+    const mesh=(UnitMesh.meshes&&(UnitMesh.meshes[typ]||UnitMesh.meshes.rifle));
+    if(!mesh||!mesh.length)return;
+    const stride=(UnitMesh.stride||HQ_STRIDE);
+    const rgb=this._hex?this._hex(col):[0.4,0.45,0.5];
+    const cr=Math.cos(rot||0), sr=Math.sin(rot||0);
+    const L=[0.40,0.88,0.32], llen=Math.hypot(L[0],L[1],L[2])||1;
+    const lx=L[0]/llen, ly=L[1]/llen, lz=L[2]/llen;
+    const faces=[];
+    for(let i=0;i<mesh.length;i+=stride*3){
+      const pts=[]; let depth=0; let r=0,g=0,b=0, acc=0;
+      let nx=0,ny=0,nz=0;
+      for(let k=0;k<3;k++){
+        const o=i+k*stride;
+        let x=mesh[o], y=mesh[o+1], z=mesh[o+2];
+        const sk=hqSkinCPU(x,y,z, mesh[o+10]||0, phase||0, anim||0);
+        x=sk[0]; y=sk[1]+(bob||0); z=sk[2];
+        const rx=cr*x+sr*z, rz=-sr*x+cr*z;
+        const sx=px+rx*scl, sy=py+(-y - rz*0.35)*scl;
+        depth+=sy+rz*scl;
+        pts.push(sx,sy);
+        r+=mesh[o+6]; g+=mesh[o+7]; b+=mesh[o+8]; acc+=mesh[o+9]||0;
+        nx+=mesh[o+3]; ny+=mesh[o+4]; nz+=mesh[o+5];
+      }
+      const rnx=cr*nx+sr*nz, rnz=-sr*nx+cr*nz;
+      const nd=Math.hypot(rnx,ny,rnz)||1;
+      const lit=0.40+0.62*Math.max(0,(rnx*lx+ny*ly+rnz*lz)/nd)+0.08;
+      const a=acc/3;
+      const col3=[
+        (r/3)*(1-a)+rgb[0]*a,
+        (g/3)*(1-a)+rgb[1]*a,
+        (b/3)*(1-a)+rgb[2]*a
+      ];
+      faces.push({pts, depth:depth/3, col:this._shade(col3, lit), back:(rnx*0+ny*0.35+rnz*1)< -0.08});
+    }
+    faces.sort((a,b)=>a.depth-b.depth);
+    ctx.save();
+    ctx.globalAlpha=alpha==null?1:alpha;
+    ctx.lineJoin="round";
+    // subtle outline
+    ctx.lineWidth=Math.max(0.9, scl*0.055);
+    ctx.strokeStyle="rgba(8,10,14,0.55)";
+    for(const f of faces){
+      if(f.back) continue;
+      ctx.beginPath();
+      ctx.moveTo(f.pts[0],f.pts[1]); ctx.lineTo(f.pts[2],f.pts[3]); ctx.lineTo(f.pts[4],f.pts[5]);
+      ctx.closePath(); ctx.stroke();
+    }
+    ctx.lineWidth=Math.max(0.35, scl*0.025);
+    for(const f of faces){
+      if(f.back) continue;
+      ctx.beginPath();
+      ctx.moveTo(f.pts[0],f.pts[1]); ctx.lineTo(f.pts[2],f.pts[3]); ctx.lineTo(f.pts[4],f.pts[5]);
+      ctx.closePath();
+      ctx.fillStyle=f.col;
+      ctx.strokeStyle="rgba(10,12,16,0.22)";
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  };
+
+  if(typeof UnitGL!=="undefined"){
+    const _draw=UnitGL.draw.bind(UnitGL);
+    UnitGL.draw=function(now){
+      if(!this.ok||!this.gl||!this.prog||this.loc.aCol==null){ _draw(now); return; }
+      if(typeof unitStyle==="function" && unitStyle()==="nato"){ this._clear(); return; }
+      const gl=this.gl;
+      if(this.w!==view.cssW||this.h!==view.cssH) this.resize();
+      gl.viewport(0,0,this.canv.width,this.canv.height);
+      gl.clearColor(0,0,0,0);
+      gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL);
+      gl.disable(gl.CULL_FACE);
+      const groups={};
+      const add=(typ,x,y,z,col,scl,rot,bob,phase,anim)=>{
+        typ=typ||"rifle";
+        if(!this.meshes[typ]) typ="rifle";
+        if(!groups[typ]) groups[typ]=[];
+        groups[typ].push(x,y,z,col[0],col[1],col[2],scl,rot,bob,phase||0,anim||0,0);
+      };
+      const figs=typeof collectUnitFigures==="function"?collectUnitFigures(now):[];
+      for(const f of figs){
+        if(f.ghost) continue;
+        add(f.typ,f.x,f.y,0,this._hex(f.col),f.scl,f.rot,f.bob,f.phase,f.anim);
+      }
+      gl.useProgram(this.prog);
+      gl.uniform2f(this.loc.uRes, view.cssW, view.cssH);
+      const va=this.is2
+        ?(loc,sz,st,off,div)=>{ if(loc<0)return; gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,st,off); gl.vertexAttribDivisor(loc,div); }
+        :(loc,sz,st,off,div)=>{ if(loc<0)return; gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,sz,gl.FLOAT,false,st,off); this.ext.vertexAttribDivisorANGLE(loc,div); };
+      const VS=HQ_STRIDE*4, IS=48;
+      for(const typ of Object.keys(groups)){
+        const arr=groups[typ];
+        const n=arr.length/12; if(!n)continue;
+        const mesh=this.meshes[typ]; if(!mesh)continue;
+        gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buf);
+        va(this.loc.aPos, 3, VS, 0, 0);
+        va(this.loc.aNrm, 3, VS, 12, 0);
+        va(this.loc.aCol, 3, VS, 24, 0);
+        va(this.loc.aAcc, 1, VS, 36, 0);
+        va(this.loc.aBone, 1, VS, 40, 0);
+        const instN=Math.min(n,this.maxInst);
+        const f=this.data;
+        for(let i=0;i<instN*12;i++) f[i]=arr[i];
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.ibuf);
+        gl.bufferData(gl.ARRAY_BUFFER, f.subarray(0, instN*12), gl.DYNAMIC_DRAW);
+        va(this.loc.iPos, 3, IS, 0, 1);
+        va(this.loc.iCol, 3, IS, 12, 1);
+        va(this.loc.iScl, 1, IS, 24, 1);
+        va(this.loc.iRot, 1, IS, 28, 1);
+        va(this.loc.iBob, 1, IS, 32, 1);
+        va(this.loc.iPhase, 1, IS, 36, 1);
+        va(this.loc.iAnim, 1, IS, 40, 1);
+        // outline pass
+        gl.uniform1f(this.loc.uOutline, 1);
+        gl.depthMask(false);
+        if(this.is2) gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.n, instN);
+        else this.ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, mesh.n, instN);
+        gl.depthMask(true);
+        gl.uniform1f(this.loc.uOutline, 0);
+        if(this.is2) gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.n, instN);
+        else this.ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, mesh.n, instN);
+      }
+    };
+  }
+}
+
+function collectBaseFigures(now){
+  const out=[];
+  if(!state.bases)return out;
+  const figS=(typeof figureScale==="function"?figureScale():1)*1.35;
+  const showAll=typeof combatShowUnits==="function"?combatShowUnits():true;
+  const colOf=nat=>(typeof displayColor==="function"?displayColor(nat):nat&&nat.color)||"#888";
+  const t=(now||performance.now())/1000;
+  state._baseHits=state._baseHits||[];
+  for(const b of state.bases){
+    if(typeof ensureBaseMods==="function") ensureBaseMods(b);
+    const p=provinces[b.pid]; if(!p)continue;
+    if(!showAll && b.owner!==state.player) continue;
+    const offX=b.kind==="nav"?10:-12, offY=b.kind==="nav"?8:-18;
+    // place in world, not screen — use province + small offset in world units
+    const wx=p.cx+(b.kind==="nav"?14:-16), wy=p.cy+(b.kind==="nav"?10:-16);
+    const scr=typeof scrOf==="function"?scrOf(wx,wy):{x:wx,y:wy,vis:true};
+    if(!scr||!scr.vis)continue;
+    if(scr.x<-50||scr.y<-50||scr.x>view.cssW+50||scr.y>view.cssH+50)continue;
+    const nat=nations[b.owner];
+    const col=nat?colOf(nat):"#888";
+    const lv=b.level||1;
+    const typ=b.kind==="nav" ? (lv>=3?"bld_nav_L3":lv>=2?"bld_nav_L2":"bld_nav")
+                             : (lv>=3?"bld_mil_L3":lv>=2?"bld_mil_L2":"bld_mil");
+    const scl=18*figS*(1+(lv-1)*0.08);
+    const ghost=(b.buildLeft||0)>0 && !b.pendingModule && !b.pendingLevel;
+    out.push({typ,x:scr.x,y:scr.y,scl,rot:0,bob:0,col,ghost,base:true,bid:b.id,phase:0,anim:0});
+    const rad=22*figS;
+    state._baseHits.push({bid:b.id,x:scr.x-rad,y:scr.y-rad*1.5,w:rad*2,h:rad*2.2});
+    // modules around the compound
+    const mods=Object.keys(b.modules||{}).filter(k=>b.modules[k]);
+    mods.forEach((mid,i)=>{
+      const ang=i*0.9, rr=26+i*2;
+      const sx=scr.x+Math.cos(ang)*rr, sy=scr.y+8+Math.sin(ang)*rr*0.6;
+      const mtyp="bld_mod_"+mid;
+      out.push({typ:mtyp,x:sx,y:sy,scl:scl*0.55,rot:0,bob:0,col,ghost:false,base:true,bid:b.id,phase:t*(mid==="radar"?1.5:0),anim:0});
+    });
+  }
+  return out;
+}
+
+function installHQCollectors(){
+  // richer civic buildings with level variants
+  collectBuildingFigures=function(now){
+    const out=[];
+    state._bldHits=[];
+    if(!state.buildings)return out;
+    const figS=(typeof figureScale==="function"?figureScale():1)*1.35;
+    const showAll=typeof combatShowUnits==="function"?combatShowUnits():true;
+    const t=(now||performance.now())/1000;
+    for(const b of state.buildings){
+      if(typeof ensureBldg==="function") ensureBldg(b);
+      const p=provinces[b.pid]; if(!p)continue;
+      if(!showAll && b.owner!==state.player) continue;
+      const w=typeof bldgWorldPos==="function"?bldgWorldPos(b):{x:p.cx,y:p.cy};
+      const scr=typeof scrOf==="function"?scrOf(w.x,w.y):{x:w.x,y:w.y,vis:true};
+      if(!scr||!scr.vis)continue;
+      if(scr.x<-50||scr.y<-50||scr.x>view.cssW+50||scr.y>view.cssH+50)continue;
+      const nat=nations[b.owner];
+      const col=nat?(typeof displayColor==="function"?displayColor(nat):nat.color):"#888";
+      const typ=buildingModelId(b.kind, b.level||1);
+      const scl=18.5*figS*(b.kind==="wonder"?1.3:b.kind==="silo"||b.kind==="uni"?1.12:1);
+      const ghost=(b.buildLeft||0)>0 || b.on===false || (b.hp||0)<=0;
+      let phase=0;
+      if(b.kind==="oilwell") phase=t*2.4;
+      else if(b.kind==="radar_stn") phase=t*1.5;
+      else if(b.kind==="factory") phase=t;
+      out.push({typ,x:scr.x,y:scr.y,z:0,scl,rot:0,bob:0,col,ghost,bld:b.id,phase,anim:0});
+      const rad=20*figS;
+      state._bldHits.push({bid:b.id,x:scr.x-rad,y:scr.y-rad*1.6,w:rad*2,h:rad*2.2});
+    }
+    return out;
+  };
+
+  const _cuf=typeof collectUnitFigures==="function"?collectUnitFigures:null;
+  collectUnitFigures=function(now){
+    let figs=_cuf?(_cuf(now)||[]):[];
+    figs=figs.filter(f=>!(f.base && (f.typ==="tent"||f.typ==="dd")));
+    figs=figs.concat(collectBaseFigures(now));
+    const t=(now||performance.now())/1000;
+    for(const f of figs){
+      if(f.phase==null){
+        const u=(f.uid!=null && typeof unitById==="function")?unitById(f.uid):null;
+        if(u){
+          const typ=typeof normType==="function"?normType(u.type):(u.type||"rifle");
+          const loco=u.loco||(typeof unitLocomotion==="function"?unitLocomotion(typ):"walk");
+          const moving=u.dest>=0&&u.dest!==u.pid&&!(u._hold)&&!u._firing;
+          if(loco==="walk") f.phase=moving?(t*8+(u.id||0)):0;
+          else if(loco==="drive") f.phase=moving?(t*10):0;
+          else if(loco==="fly") f.phase=t*14;
+          else if(loco==="sail") f.phase=t*1.5;
+          else f.phase=0;
+          f.anim=(u.recoil||0)+(u._firing||u.aimId!=null?0.7:0);
+          // slightly taller, better-proportioned figures
+          if(loco==="walk"||!loco) f.scl=(f.scl||10)*0.78;
+        } else {
+          f.phase=f.phase||0; f.anim=f.anim||0;
+        }
+      }
+    }
+    return figs;
+  };
+
+  if(typeof Unit3D!=="undefined"){
+    Unit3D.drawAndHit=function(ctx, now){
+      const nato=typeof unitStyle==="function" && unitStyle()==="nato";
+      const useGL=typeof UnitGL!=="undefined" && UnitGL.ok && !nato;
+      const figs=typeof collectUnitFigures==="function"?collectUnitFigures(now):[];
+      const hits=[];
+      if(!nato){
+        for(const f of figs){
+          const s=Math.max(0.7,(f.scl||8)/10);
+          const yb=f.typ&&String(f.typ).indexOf("bld_")==0?4:2;
+          this.drawShadow(ctx, f.x, f.y+yb, s*(String(f.typ||"").indexOf("bld_")==0?1.35:1));
+          if(!useGL || f.ghost){
+            this.drawMesh(ctx, f.typ||"rifle", f.x, f.y, f.scl||9, f.rot||0, f.bob||0, f.col, f.ghost?0.55:1, f.phase, f.anim);
+          }
+        }
+      }
+      for(const u of (state.units||[])){
+        if(!u||u.str<=0)continue;
+        const p=scrOf(u.ax,u.ay); if(!p||!p.vis)continue;
+        if(p.x<-60||p.y<-50||p.x>view.cssW+60||p.y>view.cssH+50)continue;
+        const selected=(state.selectedUnits||[]).includes(u.id);
+        const born=u.bornAt && (now-(u.bornAt))<5000;
+        const typ=typeof normType==="function"?normType(u.type):u.type;
+        const figS=(typeof figureScale==="function"?figureScale():1)*1.25;
+        const rad=16*figS*(typ==="arm"||typ==="art"||typ==="air"?1.2:1);
+        if(selected) this.drawRing(ctx, p.x, p.y-6, rad+4, "#f3e2a8", true);
+        else if(born) this.drawRing(ctx, p.x, p.y-6, rad+6, "#7dce7a", true);
+        if(selected || born){
+          const maxHp=u.maxStr||u.str;
+          const hp=Math.max(0,Math.min(1,u.str/(maxHp||u.str||1)));
+          ctx.save();
+          ctx.fillStyle="rgba(12,16,20,0.75)";
+          ctx.fillRect(p.x-12, p.y-28, 24, 4);
+          ctx.fillStyle=hp<0.35?"#e25b4a":hp<0.7?"#e2b14a":"#7dce7a";
+          ctx.fillRect(p.x-12, p.y-28, 24*hp, 4);
+          ctx.restore();
+        }
+        hits.push({uid:u.id,x:p.x-rad-4,y:p.y-rad*1.6-8,w:rad*2+8,h:rad*2.2+14});
+      }
+      state._unitHits=hits;
+      const b=state.selectedBld!=null&&typeof buildingById==="function"?buildingById(state.selectedBld):null;
+      if(b&&this.drawRing){
+        const w=typeof bldgWorldPos==="function"?bldgWorldPos(b):null;
+        const scr=w&&typeof scrOf==="function"?scrOf(w.x,w.y):null;
+        if(scr&&scr.vis){
+          this.drawRing(ctx,scr.x,scr.y-8,20,"#f3e2a8",true);
+          const hp=Math.max(0,Math.min(1,(b.hp||0)/(b.maxHp||1)));
+          ctx.save();
+          ctx.fillStyle="rgba(12,16,20,0.75)";
+          ctx.fillRect(scr.x-14,scr.y-30,28,4);
+          ctx.fillStyle=hp<0.35?"#e25b4a":hp<0.7?"#e2b14a":"#7dce7a";
+          ctx.fillRect(scr.x-14,scr.y-30,28*hp,4);
+          ctx.restore();
+        }
+      }
+    };
+  }
+
+  if(typeof drawBaseFigs==="function"){
+    const _db=drawBaseFigs;
+    drawBaseFigs=function(){
+      // 3D models come from collectBaseFigures; keep hit boxes + HP bars only
+      const show=typeof combatShowUnits==="function"?combatShowUnits():true;
+      if(!state._baseHits) state._baseHits=[];
+      // If collect hasn't run this frame yet, still record hits
+      if(!state.bases)return;
+      for(const b of state.bases){
+        if(typeof ensureBaseMods==="function") ensureBaseMods(b);
+        const p=provinces[b.pid]; if(!p)continue;
+        const wx=p.cx+(b.kind==="nav"?14:-16), wy=p.cy+(b.kind==="nav"?10:-16);
+        const c=typeof scrOf==="function"?scrOf(wx,wy):null;
+        if(!c||!c.vis)continue;
+        const damaged=(b.hp||100)/(b.maxHp||100);
+        if(damaged<1 || state.baseTarget===b.id || state.selectedBase===b.id){
+          const ctx2=typeof ctx!=="undefined"?ctx:null;
+          if(!ctx2)continue;
+          ctx2.save();
+          const w=22, y=c.y+10;
+          ctx2.fillStyle="rgba(20,16,12,0.7)";
+          ctx2.fillRect(c.x-w/2,y,w,3);
+          ctx2.fillStyle=damaged<0.35?"#e25b4a":damaged<0.7?"#e2b14a":"#7dce7a";
+          ctx2.fillRect(c.x-w/2,y,w*Math.max(0,damaged),3);
+          ctx2.restore();
+        }
+      }
+    };
+  }
+}
+
+function installModelsHQ(){
+  // Always rebuild meshes (even if UnitMesh.init already ran)
+  const _init=typeof UnitMesh!=="undefined"?UnitMesh.init.bind(UnitMesh):null;
+  if(typeof UnitMesh!=="undefined"){
+    UnitMesh.init=function(){
+      if(this.hq && this.ready) return;
+      if(_init && !this.hq){ /* skip old low-poly bake or run then replace */ }
+      hqInstallMeshes();
+    };
+  }
+  hqInstallMeshes();
+
+  if(typeof UnitGL!=="undefined"){
+    const _glInit=UnitGL.init.bind(UnitGL);
+    UnitGL.init=function(){
+      _glInit();
+      if(this.ok){
+        if(!hqCompileGL()){ this.fail=(this.fail||"")+" HQ shader failed: "+(this.shaderLog||""); this.ok=this.ok && !!this.prog; }
+        else hqUploadMeshes();
+      }
+    };
+    if(UnitGL.ok){
+      if(hqCompileGL()) hqUploadMeshes();
+    }
+  }
+  installHQDraw();
+  installHQCollectors();
+
+  if(typeof refreshCExports==="function"){
+    const _r=refreshCExports;
+    refreshCExports=function(){
+      _r();
+      const C=window.CROWNFALL||(window.CROWNFALL={});
+      C.UnitMesh=typeof UnitMesh!=="undefined"?UnitMesh:C.UnitMesh;
+      C.UnitGL=typeof UnitGL!=="undefined"?UnitGL:C.UnitGL;
+      C.Unit3D=typeof Unit3D!=="undefined"?Unit3D:C.Unit3D;
+      C.buildingModelId=buildingModelId;
+      C.allBuildingModelKinds=allBuildingModelKinds;
+      C.hqInstallMeshes=hqInstallMeshes;
+    };
+    refreshCExports();
+  }
+}
+
+installModelsHQ();
 
 })();
 </script>
