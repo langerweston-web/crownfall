@@ -2583,7 +2583,7 @@ function snapshot(){
     })),
     provinces:provinces.map(p=>({id:p.id,owner:p.owner,pop:p.pop,dev:p.dev,wealth:p.wealth,capital:p.capital,capture:{...p.capture},nukeScar:p.nukeScar,terrain:p.terrain,fort:p.fort||0,forting:p.forting||0})),
     invasions:(state.invasions||[]).map(i=>({...i})),
-    units:(state.units||[]).map(u=>({id:u.id,owner:u.owner,pid:u.pid,str:u.str,type:u.type,dest:u.dest,manual:u.manual})),
+    units:(state.units||[]).map(u=>({id:u.id,owner:u.owner,pid:u.pid,str:u.str,type:u.type,dest:u.dest,manual:u.manual,ax:u.ax,ay:u.ay,tx:u.tx,ty:u.ty,fromPid:u.fromPid,assault:u.assault,facing:u.facing,loco:u.loco,wps:u.wps?u.wps.map(w=>({...w})):null,wpI:u.wpI,route:u.route&&u.route.slice(),hold:!!u._hold,fromDrop:!!u.fromDrop})),
     battles:(state.battles||[]).map(b=>({...b})),
     autoFront:!!state.autoFront, globeOn:!!state.globeOn, nextUnitId:state.nextUnitId||1,
     bases:(state.bases||[]).map(b=>({...b})), nextBaseId:state.nextBaseId||1,
@@ -2812,11 +2812,11 @@ const _landCache={cv:null,key:"",ok:false};
 function invalidateLand(){_landCache.ok=false; state.mapDirty=true;}
 function drawMapBase(){
   const {cssW:w,cssH:h,scale,ox,oy,dpr}=view;
-  if(!w)return;
+  if(!w || scale==null || ox==null || oy==null)return;
   ctx.setTransform(dpr,0,0,dpr,0,0);
   paintOcean(ctx,w,h);
   const flashing=provinces.some(p=>p.flash>0);
-  const key=[scale.toFixed(3),ox.toFixed(1),oy.toFixed(1),state.mapVer||0,w|0,h|0].join("|");
+  const key=[Number(scale).toFixed(3),Number(ox).toFixed(1),Number(oy).toFixed(1),state.mapVer||0,w|0,h|0].join("|");
   const camStill=Math.abs((view.ts||scale)-scale)<1e-3 && Math.abs((view.tox||ox)-ox)<0.2;
   if(_landCache.ok && _landCache.key===key && !flashing){
     ctx.drawImage(_landCache.cv,0,0,w,h);
@@ -5490,11 +5490,14 @@ function drawCombatLayer(now){
   const {dpr}=view;
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.textAlign="center"; ctx.textBaseline="middle";
-  // lerp unit positions
+  // Keep continuous world positions. Never lerp or snap toward a target here —
+  // tickUnitTravel is the only thing that advances ax/ay, and only when unpaused.
   for(const u of (state.units||[])){
-    if(u.tx==null){const p=provinces[u.pid]; if(p){u.tx=p.cx;u.ty=p.cy;u.ax=p.cx;u.ay=p.cy;}}
-    u.ax=u.ax==null?u.tx:u.ax+(u.tx-u.ax)*0.18;
-    u.ay=u.ay==null?u.ty:u.ay+(u.ty-u.ay)*0.18;
+    if((u.ax==null||u.ay==null) && provinces[u.pid]){
+      const p=provinces[u.pid];
+      u.ax=u.ax!=null?u.ax:p.cx; u.ay=u.ay!=null?u.ay:p.cy;
+      if(u.tx==null) u.tx=u.ax; if(u.ty==null) u.ty=u.ay;
+    }
   }
   drawFrontBands(now);
   drawBattleTheaters(now);
@@ -8578,7 +8581,7 @@ function buildTravel(u, dest){
   if(!u||dest==null||dest<0)return false;
   if(dest===u.pid && (!u.route||u.route.length<=1)){
     u.dest=-1; u.route=null; u.wps=null; u.wpI=0;
-    const p=provinces[u.pid]; if(p){u.tx=p.cx;u.ty=p.cy;}
+    if(u.ax!=null){ u.tx=u.ax; u.ty=u.ay; }
     return true;
   }
   const path=typeof fullUnitPath==="function"?fullUnitPath(u,dest):null;
@@ -8607,12 +8610,12 @@ function buildTravel(u, dest){
 function stopTravel(u, snap){
   if(!u)return;
   u.dest=-1; u.route=null; u.wps=null; u.wpI=0; u._hold=false;
-  if(snap){
+  if(u.ax==null||u.ay==null){
     const p=provinces[u.pid];
-    if(p){ u.ax=p.cx; u.ay=p.cy; u.tx=p.cx; u.ty=p.cy; }
-  } else {
-    u.tx=u.ax; u.ty=u.ay;
+    if(p){ u.ax=p.cx; u.ay=p.cy; }
   }
+  u.tx=u.ax; u.ty=u.ay;
+
 }
 function enemiesAt(pid, nid, skipId){
   const out=[];
@@ -8691,7 +8694,7 @@ function tickUnitTravel(dt){
       if(wp.pid!=null) tryEnterProvince(u, wp.pid);
       u.wpI++;
       if(!u.wps||u.wpI>=u.wps.length){
-        if(u.pid===u.dest || u.dest<0) stopTravel(u,true);
+        if(u.pid===u.dest || u.dest<0) stopTravel(u,false);
         else if(!buildTravel(u,u.dest)) stopTravel(u,false);
       } else {
         const nwp=u.wps[u.wpI];
@@ -12842,7 +12845,7 @@ function collectBaseFigures(now){
     // modules around the compound
     const mods=Object.keys(b.modules||{}).filter(k=>b.modules[k]);
     mods.forEach((mid,i)=>{
-      const mul=(typeof modelSizeMul==="function"?modelSizeMul():0.55);
+      const mul=(typeof modelSizeMul==="function"?modelSizeMul():0.275);
       const ang=i*0.9, rr=(26+i*2)*mul;
       const sx=scr.x+Math.cos(ang)*rr, sy=scr.y+8+Math.sin(ang)*rr*0.6;
       const mtyp="bld_mod_"+mid;
@@ -13049,15 +13052,26 @@ function installModelsHQ(){
 
 installModelsHQ();
 
-/* ===== v1.4: edge scroll off by default + smaller 3D models ===== */
+/* ===== v1.4/v1.5: edge scroll off by default + smaller 3D models ===== */
 const EDGEKEY="crownfall-edgescroll";
-const MODELSIZEKEY="crownfall-modelsize";
+const MODELSIZEKEY="crownfall-modelsize-v15"; // bumped so v1.4 "small" saves don't stick
 
 function modelSizeMul(){
-  const s=state.modelSize||"small";
+  const s=state.modelSize||"tiny";
   if(s==="large") return 1;
   if(s==="medium") return 0.8;
-  return 0.55; // Small (default): ~55% of the v1.3 on-map size
+  if(s==="small") return 0.55;
+  return 0.275; // Tiny (default): ~50% of v1.4 Small, ~27.5% of v1.3
+}
+
+function zoomModelScale(){
+  if(state.globeOn && typeof globe!=="undefined" && globe){
+    return clamp((globe.r||300)/450, 0.22, 1.6);
+  }
+  const sc=(typeof view!=="undefined" && view && view.scale)||0.15;
+  // Matches the old mid/close curve near scale 1.35, but shrinks when zoomed out
+  // so models don't cover provinces on the world view (old floor was 0.8).
+  return clamp(0.20 + sc*0.83, 0.22, 1.7);
 }
 
 function loadV14Prefs(){
@@ -13068,14 +13082,14 @@ function loadV14Prefs(){
   }catch(err){ state.edgeScroll=false; }
   try{
     const s=localStorage.getItem(MODELSIZEKEY);
-    state.modelSize=(s==="medium"||s==="large"||s==="small")?s:"small";
-  }catch(err){ state.modelSize="small"; }
+    state.modelSize=(s==="tiny"||s==="small"||s==="medium"||s==="large")?s:"tiny";
+  }catch(err){ state.modelSize="tiny"; }
 }
 
 function saveV14Prefs(){
   try{
     localStorage.setItem(EDGEKEY, state.edgeScroll?"1":"0");
-    localStorage.setItem(MODELSIZEKEY, state.modelSize||"small");
+    localStorage.setItem(MODELSIZEKEY, state.modelSize||"tiny");
   }catch(err){}
 }
 
@@ -13087,7 +13101,7 @@ function setEdgeScroll(on){
 }
 
 function setModelSize(s){
-  state.modelSize=(s==="medium"||s==="large")?s:"small";
+  state.modelSize=(s==="small"||s==="medium"||s==="large")?s:"tiny";
   saveV14Prefs();
   syncV14SettingsUI();
   if(typeof draw==="function") try{ draw(); }catch(e){}
@@ -13096,8 +13110,8 @@ function setModelSize(s){
 
 function fillModelSizeButtons(el){
   if(!el) return;
-  const cur=state.modelSize||"small";
-  el.innerHTML=["small","medium","large"].map(s=>{
+  const cur=state.modelSize||"tiny";
+  el.innerHTML=["tiny","small","medium","large"].map(s=>{
     const lab=s[0].toUpperCase()+s.slice(1);
     return `<button class="btn${s===cur?" on":""}" type="button" data-ms="${s}">${lab}</button>`;
   }).join("");
@@ -13124,12 +13138,13 @@ function bindV14Settings(){
   syncV14SettingsUI();
 }
 
-function padHitList(arr, minR){
+function padHitList(arr, minPx){
   if(!arr) return;
+  const m=minPx==null?24:minPx;
   for(const h of arr){
     if(!h) continue;
     const cx=h.x+(h.w||0)/2, cy=h.y+(h.h||0)/2;
-    const w=Math.max(h.w||0, minR*2), ht=Math.max(h.h||0, minR*2);
+    const w=Math.max(h.w||0, m), ht=Math.max(h.h||0, m);
     h.x=cx-w/2; h.y=cy-ht/2; h.w=w; h.h=ht;
   }
 }
@@ -13142,7 +13157,7 @@ function installV14(){
   if(typeof figureScale==="function"){
     const _fs=figureScale;
     figureScale=function(){
-      return _fs() * modelSizeMul();
+      return zoomModelScale() * modelSizeMul();
     };
   }
 
@@ -13150,9 +13165,9 @@ function installV14(){
     const _dh=Unit3D.drawAndHit.bind(Unit3D);
     Unit3D.drawAndHit=function(ctx, now){
       const r=_dh(ctx, now);
-      padHitList(state._unitHits, 16);
-      padHitList(state._baseHits, 18);
-      padHitList(state._bldHits, 16);
+      padHitList(state._unitHits, 24);
+      padHitList(state._baseHits, 24);
+      padHitList(state._bldHits, 24);
       return r;
     };
   }
@@ -13196,7 +13211,8 @@ function installV14(){
       C.setModelSize=setModelSize;
       C.modelSizeMul=modelSizeMul;
       C.edgeScroll=()=>!!state.edgeScroll;
-      C.modelSize=()=>state.modelSize||"small";
+      C.modelSize=()=>state.modelSize||"tiny";
+      if(typeof zoomModelScale==="function") C.zoomModelScale=zoomModelScale;
       if(typeof armyPanTick==="function") C.armyPanTick=armyPanTick;
     };
     refreshCExports();
@@ -13206,6 +13222,289 @@ function installV14(){
 if(typeof document!=="undefined"){
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", installV14);
   else installV14();
+}
+
+/* ===== v1.5: no-teleport movement — every unit walks a continuous world path ===== */
+function packUnitMotion(u){
+  if(!u)return u;
+  return {
+    id:u.id,owner:u.owner,pid:u.pid,str:u.str,type:u.type,dest:u.dest,manual:u.manual,
+    ax:u.ax,ay:u.ay,tx:u.tx,ty:u.ty,fromPid:u.fromPid,assault:u.assault,
+    facing:u.facing,loco:u.loco,
+    wps:u.wps?u.wps.map(w=>({x:w.x,y:w.y,pid:w.pid,border:!!w.border})):null,
+    wpI:u.wpI, route:u.route&&u.route.slice(), hold:!!u._hold, fromDrop:!!u.fromDrop
+  };
+}
+function ensureUnitPos(u){
+  if(!u)return;
+  if(u.ax==null||u.ay==null){
+    const p=provinces[u.pid];
+    if(p){ u.ax=u.ax!=null?u.ax:p.cx; u.ay=u.ay!=null?u.ay:p.cy; }
+  }
+  if(u.tx==null) u.tx=u.ax;
+  if(u.ty==null) u.ty=u.ay;
+}
+function walkUnitTo(u, destPid, opts){
+  if(!u||destPid==null||destPid<0)return false;
+  ensureUnitPos(u);
+  // Province membership changes only when tickUnitTravel crosses the border.
+  u.dest=destPid;
+  if(opts&&opts.assault) u.assault=destPid;
+  if(opts&&opts.manual) u.manual=state.tick;
+  if(opts&&opts.fly) u.loco="fly";
+  if(opts&&opts.fly){
+    const dest=provinces[destPid]; if(!dest)return false;
+    u.wps=[{x:u.ax,y:u.ay,pid:u.pid},{x:dest.cx,y:dest.cy,pid:destPid}];
+    u.wpI=1; u.tx=dest.cx; u.ty=dest.cy; u._hold=false; u.route=[u.pid,destPid];
+    return true;
+  }
+  return typeof buildTravel==="function"?buildTravel(u,destPid):false;
+}
+
+function drawUnitFormationsAtWorldPos(now){
+  const zoomed=typeof combatZoomedIn==="function"?combatZoomedIn():true;
+  const cell=zoomed?36:80;
+  const groups=new Map();
+  for(const u of (state.units||[])){
+    if(!u||u.str<=0)continue;
+    ensureUnitPos(u);
+    const k=u.owner+":"+Math.round((u.ax||0)/cell)+":"+Math.round((u.ay||0)/cell);
+    if(!groups.has(k))groups.set(k,[]);
+    groups.get(k).push(u);
+  }
+  const hits=[];
+  for(const list of groups.values()){
+    list.sort((a,b)=>b.str-a.str);
+    const owner=list[0].owner, nat=nations[owner]; if(!nat||!nat.alive)continue;
+    const col=typeof displayColor==="function"?displayColor(nat):nat.color;
+    const mx=list.reduce((s,u)=>s+u.ax,0)/list.length;
+    const my=list.reduce((s,u)=>s+u.ay,0)/list.length;
+    const pr=scrOf(mx,my);
+    if(!pr||!pr.vis)continue;
+    if(pr.x<-60||pr.y<-40||pr.x>view.cssW+60||pr.y>view.cssH+40)continue;
+    const typ=typeof dominantType==="function"?dominantType(list):list[0].type;
+    const str=list.reduce((s,u)=>s+u.str,0);
+    const selected=(state.selectedUnits||[]).some(id=>list.some(u=>u.id===id));
+    const supplied=list.every(u=>u.supplied!==false);
+    if(typeof drawFormation==="function") drawFormation(ctx, pr.x, pr.y-8, typ, col, list.length, selected, str, supplied);
+    const s=typeof figureScale==="function"?figureScale():1;
+    const hw=16*s, hh=14*s;
+    const box={x:pr.x-hw,y:pr.y-hh-8,w:hw*2,h:hh*2+10};
+    for(const u of list.slice().reverse()) hits.push({uid:u.id,x:box.x,y:box.y,w:box.w,h:box.h});
+  }
+  state._unitHits=hits;
+}
+
+function installSmoothMotion(){
+  if(installSmoothMotion._ok)return;
+  installSmoothMotion._ok=true;
+
+  if(typeof retreatDefenders==="function"){
+    retreatDefenders=function(p,def,att){
+      if(!def||!p)return;
+      const us=typeof unitsAt==="function"?unitsAt(p.id,def.id):(state.units||[]).filter(u=>u.pid===p.id&&u.owner===def.id&&u.str>0);
+      const opt=(typeof moveAdj==="function"?moveAdj(p):[]).map(j=>provinces[j]).filter(q=>q&&q.owner===def.id);
+      for(const u of us){
+        if(!opt.length){u.str=0;continue;}
+        walkUnitTo(u, opt[0].id);
+      }
+    };
+  }
+  if(typeof advanceInto==="function"){
+    advanceInto=function(p,nid){
+      if(!p)return;
+      let moved=0;
+      const adj=typeof moveAdj==="function"?moveAdj(p):[];
+      for(const j of adj){
+        const us=typeof unitsAt==="function"?unitsAt(j,nid):(state.units||[]).filter(u=>u.pid===j&&u.owner===nid&&u.str>0);
+        for(const u of us){
+          if((u.type==="air")||(typeof normType==="function"&&["air","bomb","transport"].includes(normType(u.type)))) continue;
+          if(moved>=3)return;
+          walkUnitTo(u, p.id);
+          moved++;
+        }
+      }
+    };
+  }
+  if(typeof beachheadUnits==="function"){
+    const _bh=beachheadUnits;
+    beachheadUnits=function(nid,pid){
+      const us=(typeof unitsOf==="function"?unitsOf(nid):(state.units||[]).filter(u=>u.owner===nid)).filter(u=>u.str>0&&u.type!=="air").sort((a,b)=>b.str-a.str);
+      let n=0;
+      for(const u of us){
+        if(n>=3)break;
+        walkUnitTo(u, pid);
+        n++;
+      }
+      if(n===0){
+        const att=nations[nid];
+        const str=Math.min((att&&att.army||0)*0.12,12000);
+        if(str>400 && typeof spawnUnit==="function"){ spawnUnit(nid,pid,str,"rifle"); if(typeof recountArmy==="function") recountArmy(att); }
+      }
+    };
+  }
+  if(typeof repatriateUnits==="function"){
+    repatriateUnits=function(nid){
+      const cap=(typeof nProvs==="function"?nProvs(nid):provinces.filter(p=>p.owner===nid)).find(p=>p.capital)
+        || (typeof nProvs==="function"?nProvs(nid)[0]:null);
+      if(!cap)return;
+      const us=typeof unitsOf==="function"?unitsOf(nid):(state.units||[]).filter(u=>u.owner===nid);
+      for(const u of us){
+        const p=provinces[u.pid];
+        if(!p||p.owner===nid||(typeof allied==="function"&&allied(u.owner,p.owner)))continue;
+        walkUnitTo(u, cap.id);
+      }
+    };
+  }
+  if(typeof dropParatroops==="function"){
+    const _drop=dropParatroops;
+    dropParatroops=function(attId,pid,silent){
+      const before=new Map();
+      for(const u of (state.units||[])) before.set(u.id,{pid:u.pid,ax:u.ax,ay:u.ay,dest:u.dest});
+      const ok=_drop(attId,pid,silent);
+      for(const u of (state.units||[])){
+        const b=before.get(u.id); if(!b)continue;
+        if(u.fromDrop && u.pid!==b.pid){
+          const destPid=u.pid;
+          u.pid=b.pid;
+          u.ax=b.ax!=null?b.ax:u.ax; u.ay=b.ay!=null?b.ay:u.ay;
+          ensureUnitPos(u);
+          u.fromDrop=true;
+          walkUnitTo(u, destPid, {fly:true,assault:true});
+        }
+      }
+      return ok;
+    };
+  }
+  if(typeof splitUnit==="function"){
+    const _sp=splitUnit;
+    splitUnit=function(id){
+      const u=typeof unitById==="function"?unitById(id):null;
+      const b=_sp(id);
+      if(b&&u){
+        b.ax=u.ax; b.ay=u.ay; b.tx=u.tx; b.ty=u.ty;
+        if(b.dest>=0 && b.dest!==b.pid && typeof buildTravel==="function") buildTravel(b,b.dest);
+      }
+      return b;
+    };
+  }
+  if(typeof autoFrontFor==="function"){
+    const _af=autoFrontFor;
+    autoFrontFor=function(n){
+      const before=new Map();
+      const us=typeof unitsOf==="function"?unitsOf(n&&n.id):[];
+      for(const u of us) before.set(u.id,u.dest);
+      const r=_af(n);
+      for(const u of (typeof unitsOf==="function"?unitsOf(n&&n.id):[])){
+        if(u&&u.dest>=0 && u.dest!==before.get(u.id)){
+          ensureUnitPos(u);
+          if(typeof buildTravel==="function") buildTravel(u,u.dest);
+        }
+      }
+      return r;
+    };
+  }
+  if(typeof snapshot==="function"){
+    const _snap=snapshot;
+    snapshot=function(){
+      const s=_snap();
+      if(s) s.units=(state.units||[]).map(packUnitMotion);
+      return s;
+    };
+  }
+  if(typeof applySnap==="function"){
+    const _ap=applySnap;
+    applySnap=function(s){
+      const r=_ap(s);
+      for(const u of (state.units||[])){
+        if(u.hold!=null && u._hold==null) u._hold=!!u.hold;
+        ensureUnitPos(u);
+        if(u.dest>=0 && u.dest!==u.pid && (!u.wps||!u.wps.length) && typeof buildTravel==="function") buildTravel(u,u.dest);
+      }
+      return r;
+    };
+  }
+  if(typeof spawnUnit==="function"){
+    const _su=spawnUnit;
+    spawnUnit=function(nid,pid,str,type,opts){
+      const u=_su(nid,pid,str,type,opts);
+      if(u){
+        // Prefer the military/naval base location when the spawn province has one
+        if((u.ax==null||(opts&&opts.atBase!==false)) && typeof state.bases!=="undefined" && !(opts&&opts.ax!=null)){
+          const base=(state.bases||[]).find(b=>b.pid===u.pid&&b.owner===nid);
+          if(base){
+            const pr=provinces[u.pid];
+            if(pr){
+              const wx=pr.cx+(base.kind==="nav"?14:-16), wy=pr.cy+(base.kind==="nav"?10:-16);
+              if(u.ax==null||(u.ax===pr.cx&&u.ay===pr.cy)){ u.ax=wx; u.ay=wy; u.tx=wx; u.ty=wy; }
+            }
+          }
+        }
+        ensureUnitPos(u);
+        if(u.dest>=0 && u.dest!==u.pid && typeof buildTravel==="function") buildTravel(u,u.dest);
+      }
+      return u;
+    };
+  }
+  if(typeof drawUnitFormations==="function"){
+    const _df=drawUnitFormations;
+    drawUnitFormations=function(now){
+      const nato=typeof unitStyle==="function" && unitStyle()==="nato";
+      if(nato){
+        drawUnitFormationsAtWorldPos(now);
+        drawUnitFormations._drew=true;
+        return;
+      }
+      // 3D path already uses u.ax/u.ay; keep that wrapper
+      return _df(now);
+    };
+  }
+
+  if(typeof refreshCExports==="function"){
+    const _r=refreshCExports;
+    refreshCExports=function(){
+      _r();
+      const C=window.CROWNFALL||(window.CROWNFALL={});
+      C.walkUnitTo=walkUnitTo;
+      C.tickUnitTravel=typeof tickUnitTravel==="function"?tickUnitTravel:C.tickUnitTravel;
+      C.buildTravel=typeof buildTravel==="function"?buildTravel:C.buildTravel;
+      C.unitSpeed=typeof unitSpeed==="function"?unitSpeed:C.unitSpeed;
+      if(typeof gameTick==="function") C.gameTick=gameTick;
+      if(typeof tickCam==="function") C.tickCam=tickCam;
+      if(typeof scrOf==="function") C.scrOf=scrOf;
+      if(typeof retreatDefenders==="function") C.retreatDefenders=retreatDefenders;
+      if(typeof draw==="function") C.draw=draw;
+      C.setSimFlags=function(o){
+        if(!o)return;
+        if(o.paused!=null) state.paused=!!o.paused;
+        if(o.speed!=null) state.speed=+o.speed||1;
+        if(o.camLock){
+          state._camLock={s:view.scale, ox:view.ox, oy:view.oy, ts:view.ts, tox:view.tox, toy:view.toy};
+        } else if(o.camLock===false){
+          state._camLock=null;
+        }
+        if(o.accum!=null) state.accum=o.accum;
+        if(o.forceTravel!=null) state._forceTravel=!!o.forceTravel;
+      };
+      C.advanceAccum=function(add, tickMs){
+        state.accum=(state.accum||0)+add;
+        const T=tickMs||700;
+        let n=0;
+        while(state.accum>=T){ state.accum-=T; if(typeof gameTick==="function") gameTick(); n++; }
+        return n;
+      };
+      C.getLiveUnit=function(id){ return (state.units||[]).find(u=>u.id===id); };
+      C.getUnitWorld=function(){
+        return (state.units||[]).filter(u=>u&&u.str>0).map(u=>({id:u.id,owner:u.owner,type:u.type,pid:u.pid,str:u.str,ax:u.ax,ay:u.ay,dest:u.dest,hold:!!u._hold}));
+      };
+    };
+    refreshCExports();
+  }
+}
+
+if(typeof document!=="undefined"){
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", installSmoothMotion);
+  else installSmoothMotion();
 }
 
 })();

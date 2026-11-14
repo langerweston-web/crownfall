@@ -6,7 +6,14 @@ A real-world grand strategy game that runs in your browser. Pick any country, bu
 - **In your browser:** https://langerweston-web.github.io/crownfall/
 - **Windows:** download `Crownfall-World.zip` from [Releases](https://github.com/langerweston-web/crownfall/releases), unzip, and run `Crownfall.exe`. If Windows SmartScreen warns, click **More info → Run anyway**. Needs Edge or Chrome installed.
 - **Offline:** download `index.html` and open it in any browser.
-- **v1.4 mirrors:** [HTML](https://files.catbox.moe/yqh6bh.html) · [Windows zip](https://files.catbox.moe/30s7a5.zip)
+- **v1.5 mirrors:** [HTML](https://files.catbox.moe/8n9oib.html) · [Windows zip](https://files.catbox.moe/apvqea.zip)
+
+## What's new in v1.5
+- 3D models are much smaller: the new default is **Tiny** (about half of v1.4 Small, ~27% of the v1.3 size). Options are Tiny, Small, Medium, and Large on the title screen and in Help (?). An older saved size is ignored so everyone gets Tiny.
+- Models also shrink when you zoom out, so they don't cover provinces on the world view. Click targets stay at least 24 pixels.
+- Units no longer jump or teleport. Every figure walks, drives, flies, or sails along a continuous path in real time (scaled by game speed). Province membership changes only when they actually cross the border. Retreats, auto-front moves, landings, and paratroop drops walk or fly there too. Nothing moves while the game is paused. The same interpolated position is used in WebGL, the Canvas 3D fallback, and the 2D/NATO view.
+
+![v1.5 Tiny models](screenshots/v15.png)
 
 ## What's new in v1.4
 - The camera no longer pans when you move the pointer to the edge of the screen. Turn **Edge scroll** on in the title screen or the Help (?) panel if you want it back. The setting is remembered. WASD, arrow keys, drag, and the scroll wheel still pan and zoom.
