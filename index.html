@@ -16487,7 +16487,9 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   function oddsFor(ids,pid){
     const dp=provinces[pid]; if(!dp)return null;
     const P=state.player;
-    const us=(ids||[]).map(unitById).filter(u=>u&&u.str>0&&u.type!=="air");
+    // accepts (fromProvinceId, toProvinceId) or (unitIds, toProvinceId)
+    const list=typeof ids==="number"?unitsOf(P).filter(u=>u.pid===ids).map(u=>u.id):(ids||[]);
+    const us=list.map(unitById).filter(u=>u&&u.str>0&&u.type!=="air");
     if(!us.length)return null;
     const {defs,militia}=defenseOf(dp);
     const dT=defs.length?dominantType(defs):"rifle", aT=dominantType(us);
@@ -16499,7 +16501,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const chance=Math.round(w/N*100);
     const atkMen=us.reduce((s,u)=>s+u.str,0), defMen=defs.reduce((s,u)=>s+u.str,0);
     const last=nProvs(dp.owner).length<=1;
-    return {chance,attack:Math.round(a),defense:Math.round(d),atkMen:Math.round(atkMen),defMen:Math.round(defMen),militia:Math.round(militia),fortMul:+mod.toFixed(2),needsTwoWins:last,
+    return {chance,att:Math.round(a),def:Math.round(d),attack:Math.round(a),defense:Math.round(d),atkMen:Math.round(atkMen),defMen:Math.round(defMen),militia:Math.round(militia),fortMul:+mod.toFixed(2),needsTwoWins:last,
       label:chance>=70?"likely win":chance>=40?"even fight":chance>=15?"risky":"likely loss",
       text:"Attack "+fm(a)+" vs defense "+fm(d)+" ("+fm(defMen)+" troops + militia"+(mod>1.05?", fort x"+mod.toFixed(1):"")+"): "+chance+"% to win"+(last?", capital needs 2 wins":"")};
   }
@@ -16595,15 +16597,24 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const stacks={}; for(const u of mine)(stacks[u.pid]=stacks[u.pid]||[]).push(u);
     // 1) attack the best target if we have the edge
     let best=null;
+    // combine every stack that borders a target into one attack; get bolder the longer it waits
+    const need=Math.max(0.9,1.15-0.05*(n._waited||0));
+    const byTarget={};
     for(const k in stacks){
       const here=provinces[k]; if(!here)continue;
       for(const j of moveAdj(here,n.id)){
         const q=provinces[j]; if(!q||q.owner!==P)continue;
-        const r=estimate(stacks[k],q);
-        if(r>1.15&&(!best||r>best.r))best={r,from:+k,to:j,us:stacks[k]};
+        const t=byTarget[j]||(byTarget[j]={us:[],from:+k,big:0});
+        const sz=stacks[k].reduce((s,u)=>s+u.str,0);
+        for(const u of stacks[k]) if(!t.us.includes(u))t.us.push(u);
+        if(sz>t.big){t.big=sz;t.from=+k;}
       }
     }
-    if(best){ const res=fight(n.id,best.us,best.to); return {kind:"attack",from:best.from,to:best.to,result:res}; }
+    for(const j in byTarget){
+      const t=byTarget[j], r=estimate(t.us,provinces[j]);
+      if(r>need&&(!best||r>best.r))best={r,from:t.from,to:+j,us:t.us};
+    }
+    if(best){ n._waited=0; const res=fight(n.id,best.us,best.to); return {kind:"attack",from:best.from,to:best.to,result:res}; }
     // 2) pick a target and a staging province next to it; gather armies there
     const myP=nProvs(n.id);
     let plan=null;
@@ -16646,7 +16657,8 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const border=plan?[plan.stage]:myP.filter(p=>moveAdj(p).some(j=>provinces[j]&&provinces[j].owner===P));
     // 4) nothing to do on the front: recruit at the border (or capital)
     const site=border[0]||myP.find(p=>p.capital)||myP[0];
-    if(site){ const got=raise(n,site,Math.max(2000,gdpOf(n)*0.15)); if(got)return {kind:"recruit",from:site.id,to:site.id,result:{str:got}}; }
+    if(site){ const got=raise(n,site,Math.max(2000,gdpOf(n)*0.15)); if(got){ n._waited=(n._waited||0)+0.5; return {kind:"recruit",from:site.id,to:site.id,result:{str:got}}; } }
+    n._waited=(n._waited||0)+1;
     return {kind:"hold",from:-1,to:-1};
   }
   function actors(){ const P=state.player, me=nations[P]; if(!me)return []; return me.wars.filter(id=>nations[id]&&nations[id].alive&&!human(id)); }
@@ -16883,23 +16895,34 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   setInterval(draw,400);
   if(window.CROWNFALL) window.CROWNFALL.actionLog=()=>items.map(i=>i.t);
 })();
-// v2.2.2: keep action bar + move log clear of the tutorial card and the bottom build bar
+// v2.3: attack odds preview when hovering an enemy province with troops selected (uses logic's attackOdds)
 (function(){
-  const vis=e=>e&&e.offsetParent&&getComputedStyle(e).display!=="none"&&e.offsetWidth>0;
-  const hit=(a,b)=>!(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom);
-  function lift(el,obs){
-    if(!vis(el))return; let bot=14; el.style.bottom=bot+"px";
-    for(let k=0;k<6;k++){
-      const r=el.getBoundingClientRect(); let moved=false;
-      for(const o of obs){ if(!vis(o)||o===el)continue; const q=o.getBoundingClientRect(); if(hit(r,q)){ bot+=r.bottom-q.top+8; el.style.bottom=bot+"px"; moved=true; break; } }
-      if(!moved)break;
-    }
+  const tip=document.createElement("div"); tip.id="oddsTip";
+  tip.style.cssText="position:fixed;z-index:30;display:none;pointer-events:none;max-width:280px;background:rgba(14,16,22,.95);border:1px solid #c9a24a;border-radius:9px;padding:6px 10px;color:#eee;font:12.5px/1.4 system-ui;box-shadow:0 6px 16px rgba(0,0,0,.5)";
+  document.body.appendChild(tip);
+  let mx=0,my=0,last="";
+  window.addEventListener("mousemove",e=>{mx=e.clientX;my=e.clientY; if(tip.style.display==="block"){tip.style.left=(mx+16)+"px";tip.style.top=(my+14)+"px";}},{passive:true});
+  const col={"likely win":"#7fd47f","even fight":"#e7c56a","risky":"#ffb066","likely loss":"#ff7a6a"};
+  function upd(){
+    const C=window.CROWNFALL; let html="";
+    try{
+      if(C&&C.attackOdds&&state.phase==="play"){
+        const h=state.hover, p=h>=0&&provinces[h], sel=(state.selectedUnits||[]);
+        const mine=sel.filter(id=>{const u=(state.units||[]).find(x=>x.id===id);return u&&u.owner===state.player;});
+        const war=p&&p.owner>=0&&p.owner!==state.player&&(typeof atWar==="function"?atWar(state.player,p.owner):true);
+        if(war&&mine.length){
+          const o=C.attackOdds(mine,h);
+          if(o&&o.att!=null){ const c=col[o.label]||"#eee";
+            html=`<b style="color:${c}">⚔ ${Math.round(o.chance||0)}% to win · ${o.label||""}</b><div style="opacity:.85">${(o.text||"").replace(/[<>]/g,"")}</div><div style="opacity:.6;font-size:11px">Right-click to attack</div>`; }
+        }
+      }
+    }catch(e){}
+    if(html!==last){ tip.innerHTML=html; last=html; }
+    tip.style.display=html?"block":"none";
+    if(html){tip.style.left=(mx+16)+"px";tip.style.top=(my+14)+"px";}
   }
-  setInterval(()=>{
-    const $$=id=>document.getElementById(id);
-    const bar=$$("actBar"), log=$$("actLog"), tut=$$("tutor"), ab=$$("actionBar");
-    lift(tut,[ab]); lift(bar,[ab,tut]); lift(log,[ab,tut,bar]);
-  },350);
+  setInterval(upd,150);
+  if(window.CROWNFALL) window.CROWNFALL.previewAttack=(ids,pid)=>{state.selectedUnits=ids;state.hover=pid;upd();return document.getElementById("oddsTip").innerText;};
 })();
 
 })();
