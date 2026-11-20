@@ -13005,6 +13005,15 @@ function installHQDraw(){
     ctx.save();
     ctx.globalAlpha=alpha==null?1:alpha;
     ctx.lineJoin="round";
+    if(Unit3D._spriteMode){
+      // sprite-cache render (no-WebGL fallback): fill only, seams closed with the face's own colour;
+      // the cache adds one clean silhouette outline afterwards (per-face dark strokes turned tiny models into blobs)
+      ctx.lineWidth=Math.max(0.6, scl*0.012);
+      for(const f of faces){ if(f.back) continue;
+        ctx.beginPath(); ctx.moveTo(f.pts[0],f.pts[1]); ctx.lineTo(f.pts[2],f.pts[3]); ctx.lineTo(f.pts[4],f.pts[5]); ctx.closePath();
+        ctx.fillStyle=f.col; ctx.strokeStyle=f.col; ctx.fill(); ctx.stroke(); }
+      ctx.restore(); return;
+    }
     // subtle outline
     ctx.lineWidth=Math.max(0.9, scl*0.055);
     ctx.strokeStyle="rgba(8,10,14,0.55)";
@@ -13101,6 +13110,16 @@ function hqLabelDodge(x,y,pad){
   }
   return {x,y};
 }
+/* v1.8 declutter: other countries' buildings only when zoomed well in (or that country is selected);
+   enemy bases show whenever units do. Your own are always shown. */
+function gfxShowForeignBldg(owner, isBase){
+  if(owner===state.player) return true;
+  if(owner===state.selected && state.selected!==state.player) return true;
+  const deep=state.globeOn ? (typeof globe!=="undefined"&&globe.r>Math.min(view.cssW,view.cssH)*1.6) : view.scale>=4;
+  if(deep) return true;
+  if(isBase && state.player>=0 && typeof atWar==="function" && atWar(state.player,owner)) return typeof combatShowUnits==="function"?combatShowUnits():true;
+  return false;
+}
 function collectBaseFigures(now){
   const out=[];
   if(!state.bases)return out;
@@ -13113,6 +13132,7 @@ function collectBaseFigures(now){
     if(typeof ensureBaseMods==="function") ensureBaseMods(b);
     const p=provinces[b.pid]; if(!p)continue;
     if(!showAll && b.owner!==state.player) continue;
+    if(!gfxShowForeignBldg(b.owner,true)) continue;
     const offX=b.kind==="nav"?10:-12, offY=b.kind==="nav"?8:-18;
     // place in world, not screen — use province + small offset in world units
     const _bw=baseWorldPos(b), wx=_bw.x, wy=_bw.y;
@@ -13143,6 +13163,29 @@ function collectBaseFigures(now){
   return out;
 }
 
+/* v1.8 perf + declutter: when zoomed out, a parked stack of the same unit type in one province
+   is drawn as one model with a "×N" badge (zoom in and every unit is drawn on its own again). */
+function gfxMergeStacks(figs){
+  state._stackBadges=[];
+  const close=typeof combatZoomedIn==="function"?combatZoomedIn():true;
+  if(close) return figs;
+  const groups=new Map(), out=[];
+  for(const f of figs){
+    if(f.uid==null||f.base||f.mark){ out.push(f); continue; }
+    const u=typeof unitById==="function"?unitById(f.uid):null;
+    if(!u){ out.push(f); continue; }
+    const parked=!(u.dest>=0&&u.dest!==u.pid)&&!u._firing&&u.aimId==null;
+    if(!parked){ out.push(f); continue; }
+    const k=u.owner+"|"+u.pid+"|"+f.typ;
+    let g=groups.get(k); if(!g){ g={f,uids:new Set(),n:0}; groups.set(k,g); out.push(f); }
+    if(!g.uids.has(f.uid)){ g.uids.add(f.uid); }
+  }
+  const me=state.player;
+  for(const g of groups.values()){ const n=g.uids.size; if(n<2) continue;
+    const o=g.f.owner; if(o!==me && !(me>=0&&typeof atWar==="function"&&atWar(me,o))) continue;   // badges only for you and your enemies
+    state._stackBadges.push({x:g.f.x,y:g.f.y,n,col:g.f.col,scl:g.f.scl}); }
+  return out;
+}
 function installHQCollectors(){
   // richer civic buildings with level variants
   collectBuildingFigures=function(now){
@@ -13156,6 +13199,7 @@ function installHQCollectors(){
       if(typeof ensureBldg==="function") ensureBldg(b);
       const p=provinces[b.pid]; if(!p)continue;
       if(!showAll && b.owner!==state.player) continue;
+      if(!gfxShowForeignBldg(b.owner,false)) continue;
       const w=typeof bldgWorldPos==="function"?bldgWorldPos(b):{x:p.cx,y:p.cy};
       const scr=typeof scrOf==="function"?scrOf(w.x,w.y):{x:w.x,y:w.y,vis:true};
       if(!scr||!scr.vis)continue;
@@ -13202,7 +13246,7 @@ function installHQCollectors(){
         }
       }
     }
-    return figs;
+    return gfxMergeStacks(figs);
   };
 
   if(typeof Unit3D!=="undefined"){
@@ -13245,6 +13289,16 @@ function installHQCollectors(){
         hits.push({uid:u.id,x:p.x-rad-4,y:p.y-rad*1.6-8,w:rad*2+8,h:rad*2.2+14});
       }
       state._unitHits=hits;
+      if(state._stackBadges&&state._stackBadges.length){
+        ctx.save(); ctx.font="700 9.5px 'Segoe UI',sans-serif"; ctx.textAlign="center"; ctx.textBaseline="middle";
+        for(const g of state._stackBadges){
+          const t="×"+g.n, w=ctx.measureText(t).width+7, x=g.x+(g.scl||9)*0.75, y=g.y-(g.scl||9)*1.1;
+          ctx.fillStyle="rgba(10,14,20,0.82)"; ctx.beginPath(); if(ctx.roundRect) ctx.roundRect(x-w/2,y-6.5,w,13,6.5); else ctx.rect(x-w/2,y-6.5,w,13); ctx.fill();
+          ctx.lineWidth=1.2; ctx.strokeStyle=g.col||"#ccc"; ctx.stroke();
+          ctx.fillStyle="#f3ead2"; ctx.fillText(t,x,y+0.5);
+        }
+        ctx.restore();
+      }
       const b=state.selectedBld!=null&&typeof buildingById==="function"?buildingById(state.selectedBld):null;
       if(b&&this.drawRing){
         const w=typeof bldgWorldPos==="function"?bldgWorldPos(b):null;
@@ -13274,6 +13328,7 @@ function installHQCollectors(){
       for(const b of state.bases){
         if(typeof ensureBaseMods==="function") ensureBaseMods(b);
         const p=provinces[b.pid]; if(!p)continue;
+        if(!gfxShowForeignBldg(b.owner,true)) continue;
         const _bw=baseWorldPos(b), wx=_bw.x, wy=_bw.y;
         const c=typeof scrOf==="function"?scrOf(wx,wy):null;
         if(!c||!c.vis)continue;
@@ -14144,6 +14199,20 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   };
 })();
 
+// v1.8.1: battles freeze while paused (guns kept firing between turns)
+(function(){
+  if(typeof tickBattleFX!=="function")return;
+  const _tb=tickBattleFX;
+  tickBattleFX=function(dt){ if(state.phase==="play"&&state.paused) return; return _tb.apply(this,arguments); };
+})();
+// v1.8.1: unit firefights (muzzle flashes, tracers, sounds) also freeze while paused
+(function(){
+  if(typeof tickFirefight!=="function")return;
+  const _tf=tickFirefight;
+  tickFirefight=function(dt){ if(state.phase==="play"&&state.paused) return; return _tf.apply(this,arguments); };
+  if(window.CROWNFALL)window.CROWNFALL.tickFirefight=tickFirefight;
+})();
+
 /* ===== v1.6 graphics: title fit, distinct neighbor colors, live hover card ===== */
 (function installV16Graphics(){
   // 1) Title and other overlays: never clip the top. Cards scroll on short screens and stay centered when they fit.
@@ -14281,6 +14350,24 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const was=drag; cand=null; drag=false; canvas.style.cursor="";
     if(was){ state._handledClick=true; e.stopPropagation(); }
   },true);
+})();
+
+/* ===== v1.8: polished End Turn button (logic's turn_ops controls; position and green kept) ===== */
+(function(){
+  const st=document.createElement("style");
+  st.textContent=`
+#tc .seg button#bTurn{background:linear-gradient(180deg,#46a85c,#2c7140)!important;color:#fff!important;font:800 14px "Segoe UI",sans-serif;
+  padding:7px 20px;letter-spacing:.02em;text-shadow:0 1px 1px rgba(0,0,0,.45);
+  box-shadow:inset 0 0 0 1px rgba(170,245,180,.55),inset 0 1px 0 rgba(255,255,255,.25),0 2px 12px rgba(60,200,100,.35);
+  transition:transform .08s,box-shadow .15s,filter .15s;animation:cfTurnGlow 2.4s ease-in-out infinite}
+#tc .seg button#bTurn:hover:not(:disabled){filter:brightness(1.15);box-shadow:inset 0 0 0 1px rgba(200,255,205,.8),0 0 18px rgba(90,230,130,.6)}
+#tc .seg button#bTurn:active:not(:disabled){transform:translateY(1px) scale(.98)}
+#tc .seg button#bTurn:disabled{animation:none;filter:saturate(.5)}
+@keyframes cfTurnGlow{0%,100%{box-shadow:inset 0 0 0 1px rgba(170,245,180,.55),0 2px 10px rgba(60,200,100,.25)}50%{box-shadow:inset 0 0 0 1px rgba(190,255,200,.8),0 2px 18px rgba(80,225,120,.55)}}
+#tc .seg button#bTurnMode,#tc .seg button#bTurnLen{font-size:11.5px;padding:5px 10px;border:1px solid rgba(255,255,255,.14)}
+#tc .seg button#bTurnLen{color:#cfd6e2;background:rgba(255,255,255,.04)}
+#tc .seg button#bTurnLen:hover{background:rgba(255,255,255,.1)}`;
+  document.head.appendChild(st);
 })();
 
 /* ===== v1.6 balance (logic): longer peace, starter garrison, fair AI ramp (alerts live in alert_ops.js) ===== */
@@ -14818,9 +14905,12 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const shade=c.createLinearGradient(cx-R,cy,cx+R,cy);
     shade.addColorStop(0,"rgba(0,0,0,0.28)"); shade.addColorStop(0.45,"rgba(0,0,0,0)"); shade.addColorStop(1,"rgba(255,240,210,0.08)");
     c.fillStyle=shade; c.fillRect(cx-R,cy-R,R*2,R*2);
+    const land=()=>{
+    const G=GFX18; G.gpaths=new Map();
     for(const p of provinces){
       if(!p._gVis||!p._gPath)continue;
       const nat=nations[p.owner]; if(!nat)continue;
+      let gp=G.gpaths.get(p.owner); if(!gp){ gp=new Path2D(); G.gpaths.set(p.owner,gp); } gp.addPath(p._gPath);
       const col=hexRgb(displayColor(nat));
       let r=col.r,g=col.g,b=col.b;
       const tt=typeof terrainTint==="function"?terrainTint(p,r,g,b):[r,g,b];
@@ -14828,13 +14918,32 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
       r=clamp(tt[0]*lit,0,255); g=clamp(tt[1]*lit,0,255); b=clamp(tt[2]*lit,0,255);
       if(p.nukeScar){r=lerp(r,40,0.45);g=lerp(g,40,0.45);b=lerp(b,36,0.4);}
       c.fillStyle=rgb(r,g,b); c.fill(p._gPath,"evenodd");
+      if(G.occupied&&G.occupied(p)){
+        const H=nations[GFX18.home?GFX18.home[p.id]:p.owner];
+        if(H){ c.fillStyle=displayColor(H); c.globalAlpha=0.9; c.fill(p._gPath,"evenodd"); c.globalAlpha=1;
+          const pt=G.pattern(c,displayColor(nat)); try{pt.setTransform(new DOMMatrix());}catch(e){} c.fillStyle=pt; c.fill(p._gPath,"evenodd"); }
+      }
     }
-    c.lineJoin="round"; c.lineWidth=0.7;
+    c.lineJoin="round"; c.lineWidth=0.6;
     for(const p of provinces){
       if(!p._gVis||!p._gPath)continue;
       const nat=nations[p.owner]; if(!nat)continue;
       c.strokeStyle=shadeColor(displayColor(nat),0.45); c.stroke(p._gPath);
     }
+    // country borders: dark casing + each country's colour just inside
+    c.lineWidth=2; c.strokeStyle="rgba(6,8,14,0.85)";
+    for(const [oid,gp] of G.gpaths){ const n=nations[oid]; if(n&&n.alive) c.stroke(gp); }
+    if(!moving){
+      c.lineWidth=3.4;
+      for(const [oid,gp] of G.gpaths){ const n=nations[oid]; if(!n||!n.alive) continue;
+        const k=hexRgb(displayColor(n)); c.strokeStyle=rgb(k.r+(255-k.r)*0.35,k.g+(255-k.g)*0.35,k.b+(255-k.b)*0.35); G.edge(c,gp,gp); }
+      c.lineWidth=1; c.strokeStyle="rgba(6,8,14,0.9)";
+      for(const [oid,gp] of G.gpaths){ const n=nations[oid]; if(n&&n.alive) c.stroke(gp); }
+      c.lineWidth=2.6; c.strokeStyle="rgba(205,52,40,0.85)";
+      for(const [a,b] of G.warPairs()){ if(a===state.player||b===state.player) continue; const A=G.gpaths.get(a),B=G.gpaths.get(b); if(A&&B){ G.edge(c,A,B); G.edge(c,B,A); } }
+    }
+    };
+    if(typeof GFX18!=="undefined"){ GFX18.cb=land; paintLand(c,1,true); if(GFX18.cb){ GFX18.cb=null; land(); } } else land();
     if(state.player>=0){
       // one combined path, blurred once (was one blur per province)
       const all=new Path2D();
@@ -14878,6 +14987,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const hover=state.hover>=0?provinces[state.hover]:null;
     if(hover&&hover._gPath){ctx.lineWidth=2;ctx.strokeStyle="rgba(255,255,255,0.9)";ctx.stroke(hover._gPath);}
     if(state.attackTarget>=0){const tp=provinces[state.attackTarget]; if(tp&&tp._gPath){ctx.lineWidth=3;ctx.strokeStyle="rgba(255,80,60,0.95)";ctx.stroke(tp._gPath);}}
+    try{ GFX18.liveGlobe(ctx,performance.now()); }catch(e){}
     drawGlobeOverlays();
     drawUnitsGlobe();
     drawParticlesGlobe();
@@ -14931,8 +15041,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const rb=Math.round((((rot||0)%TAU)+TAU)%TAU/TAU*16)%16;              // 16 facings
     const pb=Math.round((((phase||0)%TAU)+TAU)%TAU/TAU*8)%8;              // 8 walk poses
     const ab=Math.round(Math.max(0,Math.min(1,anim||0))*4);              // aim pose
-    const bb=Math.round((bob||0)*20);
-    const key=typ+"|"+col+"|"+rb+"|"+pb+"|"+ab+"|"+bb+"|"+sb+"|"+dpr;
+    const key=typ+"|"+col+"|"+rb+"|"+pb+"|"+ab+"|"+sb+"|"+dpr;   // bob is applied as a shift, not cached
     let e=cache.get(key);
     if(!e){
       // supersample small models so the dark outline doesn't swallow them
@@ -14942,7 +15051,16 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
       const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
       const ox=w/2, oy=3+(b.y1+b.R*0.35)*S;
       const c=cv.getContext("2d");
-      raw.call(this, c, typ, ox, oy, S, rb/16*TAU, bb/20, col, 1, pb/8*TAU, ab/4);
+      // fill-only render, then one thin dark silhouette outline behind it (like the WebGL look)
+      const tmp=document.createElement("canvas"); tmp.width=w; tmp.height=h; const tc=tmp.getContext("2d");
+      Unit3D._spriteMode=true;
+      try{ raw.call(this, tc, typ, ox, oy, S, rb/16*TAU, 0, col, 1, pb/8*TAU, ab/4); } finally{ Unit3D._spriteMode=false; }
+      const sil=document.createElement("canvas"); sil.width=w; sil.height=h; const sc=sil.getContext("2d");
+      sc.drawImage(tmp,0,0); sc.globalCompositeOperation="source-in"; sc.fillStyle="rgba(8,10,14,1)"; sc.fillRect(0,0,w,h);
+      const o=Math.max(1,D*0.5);
+      c.globalAlpha=0.42;
+      for(const [dx,dy] of [[o,0],[-o,0],[0,o],[0,-o]]) c.drawImage(sil,dx,dy);
+      c.globalAlpha=1; c.drawImage(tmp,0,0);
       e={cv, ox:ox/D, oy:oy/D, w:w/D, h:h/D, sb};
       if(cache.size>2500) cache.clear();
       cache.set(key,e);
@@ -14950,8 +15068,421 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const k=scl/e.sb;
     const a0=ctx.globalAlpha;
     if(alpha!=null&&alpha!==1) ctx.globalAlpha=a0*alpha;
-    ctx.drawImage(e.cv, px-e.ox*k, py-e.oy*k, e.w*k, e.h*k);
+    ctx.drawImage(e.cv, px-e.ox*k, py-e.oy*k-(bob||0)*scl, e.w*k, e.h*k);
     ctx.globalAlpha=a0;
+  };
+})();
+/* ===== gfx v1.8 (graphics): who owns what during a war =====
+   - every country gets a dark outline plus a band of its own colour just inside its border
+   - borders between countries at war are drawn red; your own front pulses bright red
+   - provinces taken in a war that is still going are striped: occupier's colour over the old owner
+   - a province that changes hands flashes white for a couple of seconds
+   - the selected foreign country is outlined (animated), never filled
+   Works with war_ops' War map: all colours still come from displayColor() inside paintLand. */
+const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKey:"", adj:null, gpaths:null, gpKey:""};
+(function(){
+  const G=GFX18;
+  const homeOf=i=>{ if(!G.home){ G.home=provinces.map((p,j)=>RAW.provinces[j]?RAW.provinces[j].nid:p.owner); } return G.home[i]; };
+  if(typeof newCampaign==="function"){ const f=newCampaign; newCampaign=function(){ const r=f.apply(this,arguments); G.home=provinces.map(p=>p.owner); G.last=null; G.chg.clear(); return r; }; }
+  if(typeof applySnap==="function"){ const f=applySnap; applySnap=function(){ const r=f.apply(this,arguments); G.last=null; G.chg.clear(); return r; }; }
+  // watch for ownership changes (276 provinces, only re-scanned when the map version changes)
+  let lastVer=-1;
+  function track(){
+    const v=state.mapVer||0; if(v===lastVer&&G.last) return; lastVer=v;
+    if(!G.last||G.last.length!==provinces.length){ G.last=provinces.map(p=>p.owner); return; }
+    const now=performance.now();
+    for(let i=0;i<provinces.length;i++){ const o=provinces[i].owner; if(o!==G.last[i]){ G.chg.set(i,now); G.last[i]=o; } }
+  }
+  G.track=track;
+  G.occupied=function(p){ const h=homeOf(p.id); if(h==null||h===p.owner) return false; const H=nations[h]; return !!(H&&H.alive&&typeof atWar==="function"&&atWar(p.owner,h)); };
+  G.pattern=function(c,col){
+    let pt=G.pats.get(col); if(pt&&pt.c===c) return pt.p;
+    let cv=pt&&pt.cv;
+    if(!cv){ cv=document.createElement("canvas"); cv.width=cv.height=14; const g=cv.getContext("2d");
+      g.strokeStyle=col; g.lineWidth=4.2; g.lineCap="square";
+      for(const o of [-14,0,14]){ g.beginPath(); g.moveTo(o,14); g.lineTo(o+14,0); g.stroke(); } }
+    const p=c.createPattern(cv,"repeat"); G.pats.set(col,{c,cv,p}); return p;
+  };
+  // which pairs of countries actually touch (rebuilt when the map changes)
+  G.touching=function(){
+    const k=(state.mapVer||0)+"|"+provinces.length; if(G.adjKey===k&&G.adj) return G.adj;
+    const s=new Set();
+    for(const p of provinces) for(const j of (p.neighbors||[])){ const q=provinces[j]; if(q&&q.owner!==p.owner){ const a=Math.min(p.owner,q.owner), b=Math.max(p.owner,q.owner); s.add(a+","+b); } }
+    G.adj=s; G.adjKey=k; return s;
+  };
+  G.warPairs=function(){
+    const out=[]; for(const key of G.touching()){ const [a,b]=key.split(",").map(Number); if(atWar(a,b)) out.push([a,b]); } return out;
+  };
+  const light=(hex,k)=>{ const c=hexRgb(hex); return rgb(c.r+(255-c.r)*k, c.g+(255-c.g)*k, c.b+(255-c.b)*k); };
+  // stroke only the stretch of `path` that lies on top of `clipPath` (shared border trick)
+  G.edge=function(c,clipPath,path){ c.save(); c.clip(clipPath,"evenodd"); c.stroke(path); c.restore(); };
+  function ownershipLayer(c,scale,forCache){
+    track();
+    if(state.mapDirty||!state.nationPaths) rebuildNationPaths();
+    const NP=state.nationPaths; if(!NP) return;
+    c.lineJoin="round";
+    // occupied provinces: old owner's colour with the occupier's stripes
+    for(const p of provinces){
+      if(!p.path||!G.occupied(p)) continue;
+      const H=nations[homeOf(p.id)], O=nations[p.owner];
+      c.fillStyle=displayColor(H); c.fill(p.path,"evenodd");
+      const pat=G.pattern(c,displayColor(O));
+      try{ pat.setTransform(new DOMMatrix().scaleSelf(1/scale,1/scale)); }catch(e){}
+      c.fillStyle=pat; c.fill(p.path,"evenodd");
+    }
+    // country outline: dark casing, then each country's own colour just inside its border
+    c.lineWidth=Math.max(1.6,2.2*Math.min(1,scale*2))/scale; c.strokeStyle="rgba(6,8,14,0.85)";
+    for(const [oid,path] of NP){ const n=nations[oid]; if(n&&n.alive) c.stroke(path); }
+    if(forCache){
+      c.lineWidth=3.6/scale;
+      for(const [oid,path] of NP){ const n=nations[oid]; if(!n||!n.alive) continue;
+        c.strokeStyle=light(displayColor(n),0.35); G.edge(c,path,path); }
+      c.lineWidth=1.1/scale; c.strokeStyle="rgba(6,8,14,0.9)";
+      for(const [oid,path] of NP){ const n=nations[oid]; if(n&&n.alive) c.stroke(path); }
+    }
+    // borders between any two countries at war
+    const me=state.player;
+    c.lineWidth=3/scale; c.strokeStyle="rgba(205,52,40,0.85)";
+    for(const [a,b] of G.warPairs()){
+      if(a===me||b===me) continue;   // the player's own front is drawn live (pulsing)
+      const A=NP.get(a), B=NP.get(b); if(!A||!B) continue;
+      G.edge(c,A,B); G.edge(c,B,A);
+    }
+  }
+  const _pl=paintLand;
+  paintLand=function(c,scale,forCache){
+    if(G.cb){ const f=G.cb; G.cb=null; return f(); }   // globe painting borrows paintLand's colour context (war map)
+    const sel=state.selected; state.selected=-1;      // selected country is outlined later, not brightened
+    try{ _pl.apply(this,arguments); } finally{ state.selected=sel; }
+    try{ ownershipLayer(c,scale,!!forCache); }catch(e){ if(!G.warned){G.warned=1;console.warn("ownership layer",e);} }
+  };
+  // live layer drawn every frame on top of the (cached) map: your front, capture flashes, selected outline
+  G.live=function(c,scale,tnow){
+    track();
+    const NP=state.nationPaths; const me=state.player;
+    const pulse=0.5+0.5*Math.sin(tnow/260);
+    if(NP&&me>=0&&NP.get(me)){
+      const P=NP.get(me);
+      const foes=G.warPairs().filter(([a,b])=>a===me||b===me).map(([a,b])=>a===me?b:a);
+      if(foes.length){
+        for(const f of foes){ const F=NP.get(f); if(!F) continue;
+          c.lineWidth=7/scale; c.strokeStyle="rgba(20,4,4,0.75)"; G.edge(c,F,P); G.edge(c,P,F);
+          c.lineWidth=4.2/scale; c.strokeStyle=`rgba(255,${60+pulse*60|0},${40+pulse*30|0},${0.8+pulse*0.2})`; G.edge(c,F,P); G.edge(c,P,F);
+        }
+      }
+    }
+    // provinces that just changed hands: white flash pulses for ~2.4s
+    for(const [i,t0] of G.chg){
+      const age=tnow-t0; if(age>2400){ G.chg.delete(i); continue; }
+      const p=provinces[i]; if(!p||!p.path) continue;
+      const a=(1-age/2400)*(0.35+0.35*Math.abs(Math.sin(age/140)));
+      c.fillStyle=`rgba(255,250,220,${a})`; c.fill(p.path,"evenodd");
+      c.lineWidth=3/scale; c.strokeStyle=`rgba(255,255,255,${Math.min(1,a*2)})`; c.stroke(p.path);
+    }
+    // selected foreign country: bright animated outline, no fill
+    const s=state.selected;
+    if(NP&&s>=0&&s!==me&&NP.get(s)&&nations[s]&&nations[s].alive){
+      const path=NP.get(s);
+      c.save(); c.lineWidth=4/scale; c.strokeStyle="rgba(0,0,0,0.6)"; c.stroke(path);
+      c.lineWidth=2.4/scale; c.strokeStyle="#ffffff"; c.setLineDash([9/scale,6/scale]); c.lineDashOffset=-(tnow/40)/scale; c.stroke(path);
+      c.strokeStyle="rgba(120,220,255,0.95)"; c.lineDashOffset=-(tnow/40)/scale+9/scale; c.setLineDash([6/scale,9/scale]); c.stroke(path);
+      c.restore();
+    }
+  };
+  G.liveGlobe=function(c,tnow){
+    track();
+    const GP=G.gpaths; if(!GP) return; const me=state.player;
+    const pulse=0.5+0.5*Math.sin(tnow/260);
+    const P=GP.get(me);
+    if(P&&me>=0){
+      for(const [a,b] of G.warPairs()){ if(a!==me&&b!==me) continue; const F=GP.get(a===me?b:a); if(!F) continue;
+        c.lineWidth=6; c.strokeStyle="rgba(20,4,4,0.75)"; G.edge(c,F,P); G.edge(c,P,F);
+        c.lineWidth=3.6; c.strokeStyle=`rgba(255,${60+pulse*60|0},${40+pulse*30|0},${0.8+pulse*0.2})`; G.edge(c,F,P); G.edge(c,P,F); }
+    }
+    for(const [i,t0] of G.chg){ const age=tnow-t0; if(age>2400) continue; const p=provinces[i]; if(!p||!p._gVis||!p._gPath) continue;
+      const a=(1-age/2400)*(0.35+0.35*Math.abs(Math.sin(age/140)));
+      c.fillStyle=`rgba(255,250,220,${a})`; c.fill(p._gPath,"evenodd"); c.lineWidth=2.5; c.strokeStyle=`rgba(255,255,255,${Math.min(1,a*2)})`; c.stroke(p._gPath); }
+    const s=state.selected;
+    if(s>=0&&s!==me&&GP.get(s)){ const path=GP.get(s);
+      c.save(); c.lineWidth=4; c.strokeStyle="rgba(0,0,0,0.6)"; c.stroke(path);
+      c.lineWidth=2.4; c.strokeStyle="#ffffff"; c.setLineDash([9,6]); c.lineDashOffset=-tnow/40; c.stroke(path);
+      c.strokeStyle="rgba(120,220,255,0.95)"; c.setLineDash([6,9]); c.lineDashOffset=-tnow/40+9; c.stroke(path); c.restore(); }
+  };
+  // any war starting/ending anywhere changes red borders and stripes: repaint the cached map then
+  let wsig="";
+  setInterval(()=>{ try{ if(state.phase!=="play") return; let s=""; for(const n of nations) if(n.alive&&n.wars&&n.wars.length) s+=n.id+":"+n.wars.join(".")+";";
+    if(s!==wsig){ const first=!wsig; wsig=s; if(!first&&typeof invalidateLand==="function") invalidateLand(); } }catch(e){} },700);
+  if(window.CROWNFALL) window.CROWNFALL.gfxOwnership=()=>({occupied:provinces.filter(p=>G.occupied(p)).map(p=>p.name),fronts:G.warPairs().length,recent:G.chg.size});
+})();
+/* ===== gfx v1.8: tidier map. Same as game.js draw() except: ownership live layer, port dots only on
+   your coast (or when zoomed far in), and country/province names that never overlap (big countries win,
+   small ones appear as you zoom in). firefight's camera lock is kept. ===== */
+(function(){
+  if(typeof draw!=="function") return;
+  function draw18(){
+    const {cssW:w,cssH:h,scale,ox,oy,dpr}=view;
+    if(!w)return;
+    drawMapBase();
+    const tnow=performance.now();
+    ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+    try{ GFX18.live(ctx,scale,tnow); }catch(e){ if(!GFX18.w2){GFX18.w2=1;console.warn("live layer",e);} }
+    ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+    if(state.selectedProv>=0&&state.selectedProv!==state.attackTarget){const sp=provinces[state.selectedProv];if(sp&&sp.owner!==state.player){ctx.lineWidth=2.2/scale;ctx.strokeStyle="rgba(255,210,120,0.9)";ctx.stroke(sp.path);}}
+    // world-space view box for culling
+    const vx0=-ox/scale-40, vy0=-oy/scale-40, vx1=(w-ox)/scale+40, vy1=(h-oy)/scale+40;
+    const onScr=p=>p.cx>vx0&&p.cx<vx1&&p.cy>vy0&&p.cy<vy1;
+    if(scale>=0.22){
+      const all=scale>=1.6;
+      ctx.fillStyle="rgba(90,200,220,0.85)"; ctx.strokeStyle="rgba(10,30,40,0.7)"; ctx.lineWidth=0.8/scale;
+      for(const p of provinces){
+        if(!p.coastal||!onScr(p))continue;
+        if(!all&&p.owner!==state.player)continue;
+        const s=Math.max(2.2,3.4/scale);
+        ctx.beginPath(); ctx.arc(p.cx, p.cy+Math.max(4,6/scale), s, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      }
+    }
+    if(state.invasions){
+      for(const inv of state.invasions){
+        const p=provinces[inv.pid], att=nations[inv.att];
+        if(!p||!att)continue;
+        ctx.lineWidth=2.8/scale; ctx.strokeStyle="rgba(80,200,255,0.9)";
+        ctx.setLineDash([6/scale,5/scale]); ctx.stroke(p.path); ctx.setLineDash([]);
+        const bw=Math.max(12,20/scale), bh=Math.max(2.5,4/scale);
+        ctx.fillStyle="rgba(0,0,0,0.55)"; ctx.fillRect(p.cx-bw/2,p.cy-14/scale,bw,bh);
+        ctx.fillStyle="#5ec8e8"; ctx.fillRect(p.cx-bw/2,p.cy-14/scale,bw*clamp((inv.progress||0)/100,0,1),bh);
+      }
+    }
+    // push arrows across war borders
+    const pulse=0.5+0.5*Math.sin(tnow/280);
+    ctx.lineCap="round";
+    ctx.fillStyle=`rgba(255,200,160,${0.65+pulse*0.3})`;
+    for(const p of provinces){
+      for(const j of p.neighbors){
+        if(j<=p.id)continue;
+        const q=provinces[j];
+        if(q.owner===p.owner||!atWar(p.owner,q.owner))continue;
+        const mx=(p.cx+q.cx)/2,my=(p.cy+q.cy)/2;
+        if(mx<vx0||mx>vx1||my<vy0||my>vy1)continue;
+        const ang=Math.atan2(q.cy-p.cy,q.cx-p.cx);
+        const dir=(p.capture[String(q.owner)]||0)>(q.capture[String(p.owner)]||0)?ang:ang+Math.PI;
+        const len=11+Math.sin(tnow/200+p.id)*3;
+        ctx.beginPath();
+        ctx.moveTo(mx+Math.cos(dir)*len, my+Math.sin(dir)*len);
+        ctx.lineTo(mx+Math.cos(dir+2.5)*len*0.55, my+Math.sin(dir+2.5)*len*0.55);
+        ctx.lineTo(mx+Math.cos(dir-2.5)*len*0.55, my+Math.sin(dir-2.5)*len*0.55);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    for(const p of provinces){
+      let max=0,who=null;
+      for(const k in p.capture)if(p.capture[k]>max){max=p.capture[k];who=+k;}
+      if(max>4&&who!=null&&onScr(p)){
+        const bw=Math.max(10,18/scale), bh=Math.max(2,3.5/scale);
+        ctx.fillStyle="rgba(0,0,0,0.55)"; ctx.fillRect(p.cx-bw/2,p.cy+8/scale,bw,bh);
+        ctx.fillStyle=nations[who]?nations[who].color:"#fff";
+        ctx.fillRect(p.cx-bw/2,p.cy+8/scale,bw*clamp(max/100,0,1),bh);
+      }
+    }
+    if(scale>=0.28) for(const p of provinces){
+      if(!p.capital||!onScr(p))continue;
+      const nat=nations[p.owner]; if(!nat||!nat.alive)continue;
+      const s=Math.max(3.5,5.5/scale);
+      ctx.fillStyle="#f6e3b0"; ctx.strokeStyle="rgba(20,16,8,.85)"; ctx.lineWidth=1/scale;
+      ctx.beginPath(); ctx.moveTo(p.cx,p.cy-s*1.25); ctx.lineTo(p.cx+s,p.cy); ctx.lineTo(p.cx,p.cy+s*1.25); ctx.lineTo(p.cx-s,p.cy); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    drawLabels18(w,h,scale,ox,oy,dpr);
+    drawUnitsAndBattles();
+    drawParticles();
+    drawMinimap();
+  }
+  // ---- labels: computed once per camera/map change, then just painted ----
+  const LC={key:"",list:[]};
+  function landBox(p){ let bw=p.bb.x1-p.bb.x0, bh=p.bb.y1-p.bb.y0; if(bw>WW*0.4) bw=Math.min(140,Math.max(40,bh*1.4)); return Math.max(20,bw*bh); }
+  function layout(w,h,scale,ox,oy){
+    const me=state.player, groups=new Map();
+    for(const p of provinces){ let g=groups.get(p.owner); if(!g){ const n=nations[p.owner]; g={pts:[],n,id:p.owner}; groups.set(p.owner,g);} g.pts.push(p); }
+    const cands=[];
+    for(const g of groups.values()){
+      const n=g.n; if(!n||!n.alive||!g.pts.length) continue;
+      const core=g.pts.find(p=>p.capital)||g.pts.slice().sort((a,b)=>landBox(b)-landBox(a))[0];
+      let xs=0,ys=0,mass=0,area=0;
+      for(const p of g.pts){
+        let dx=Math.abs(p.cx-core.cx); if(dx>WW/2) dx=WW-dx;
+        const dy=Math.abs(p.cy-core.cy); if(dx*dx+dy*dy>900*900) continue;
+        const a=landBox(p); xs+=p.cx*a; ys+=p.cy*a; mass+=a; area+=a*scale*scale;
+      }
+      if(!mass) continue;
+      const sx=xs/mass*scale+ox, sy=ys/mass*scale+oy;
+      if(sx<-80||sy<-40||sx>w+80||sy>h+40) continue;
+      const mine=g.id===me, foe=me>=0&&atWar(me,g.id);
+      const minA=scale<0.2?5200:scale<0.4?2600:1400;   // zoomed out: only bigger countries get a name
+      if(!mine&&!foe&&area<minA) continue;
+      cands.push({g,sx,sy,area,mine,foe,pri:(mine?1e12:foe?1e11:0)+area});
+    }
+    cands.sort((a,b)=>b.pri-a.pri);
+    const placed=[], out=[];
+    const hit=r=>placed.some(q=>r.x<q.x+q.w&&r.x+r.w>q.x&&r.y<q.y+q.h&&r.y+r.h>q.y);
+    const maxN=Math.max(8,Math.round(w*h/26000));
+    ctx.save(); ctx.setTransform(1,0,0,1,0,0);
+    for(const c of cands){
+      if(out.length>=maxN) break;
+      const fs=clamp(Math.sqrt(c.area)/18, c.mine||c.foe?10:8.5, 18);
+      ctx.font=`700 ${fs}px Georgia,serif`;
+      const name=c.g.n.name, tw=ctx.measureText(name).width;
+      const sx=clamp(c.sx,tw/2+8,w-tw/2-8), sy=clamp(c.sy,fs+4,h-fs-6);
+      const showArmy=fs>=11&&(c.mine||c.foe);
+      const pw=tw+10, ph=fs+4+(showArmy?fs*0.75:0);
+      const r={x:sx-pw/2-3,y:sy-(fs+4)/2-8-3,w:pw+6,h:ph+6};
+      if(!c.mine&&hit(r)) continue;
+      placed.push(r);
+      out.push({name,sx,sy,fs,pw,ph:fs+4,army:showArmy?fmt(c.g.n.army):null,foe:c.foe});
+    }
+    // province names when zoomed in: only where they fit and don't collide
+    if(scale>0.55){
+      const fs=clamp(10*scale,9,13); ctx.font=`600 ${fs}px "Segoe UI",sans-serif`;
+      for(const p of provinces){
+        const sw=(p.bb.x1-p.bb.x0)*scale, sh=(p.bb.y1-p.bb.y0)*scale;
+        if(sw<70||sh<40) continue;
+        if(p.name===(nations[p.owner]&&nations[p.owner].name)) continue;
+        const sx=p.cx*scale+ox, sy=p.cy*scale+oy+10;
+        if(sx<0||sy<0||sx>w||sy>h) continue;
+        const tw=ctx.measureText(p.name).width; const r={x:sx-tw/2-2,y:sy-fs/2-2,w:tw+4,h:fs+4};
+        if(hit(r)) continue; placed.push(r);
+        out.push({prov:true,name:p.name,sx,sy,fs});
+      }
+    }
+    ctx.restore();
+    return {out,rects:placed};
+  }
+  function drawLabels18(w,h,scale,ox,oy,dpr){
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    const key=[scale.toFixed(3),ox.toFixed(0),oy.toFixed(0),w,h,state.mapVer||0,state.player,state.tick|0].join("|");
+    const now=performance.now();
+    if(key!==LC.key){
+      const sameZoom=LC.scale!=null&&Math.abs(LC.scale-scale)<1e-4&&LC.mv===(state.mapVer||0);
+      if(!sameZoom||now-LC.t>150){ const L=layout(w,h,scale,ox,oy); LC.list=L.out; LC.ox=ox; LC.oy=oy; LC.t=now; LC.scale=scale; LC.mv=state.mapVer||0; }
+      LC.key=key;
+    }
+    const sdx=ox-(LC.ox||ox), sdy=oy-(LC.oy||oy);
+    if(sdx||sdy){ ctx.setTransform(dpr,0,0,dpr,dpr*sdx,dpr*sdy); }
+    state._natLabelRects=[];
+    for(const L of LC.list){
+      if(L.prov){ ctx.font=`600 ${L.fs}px "Segoe UI",sans-serif`; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.6)"; ctx.strokeText(L.name,L.sx,L.sy); ctx.fillStyle="rgba(255,255,255,0.85)"; ctx.fillText(L.name,L.sx,L.sy); continue; }
+      ctx.font=`700 ${L.fs}px Georgia,serif`;
+      ctx.fillStyle=L.foe?"rgba(60,8,8,0.6)":"rgba(8,12,20,0.5)";
+      ctx.fillRect(L.sx-L.pw/2,L.sy-L.ph/2-8,L.pw,L.ph);
+      state._natLabelRects.push({x:L.sx-L.pw/2+sdx,y:L.sy-L.ph/2-8+sdy,w:L.pw,h:L.ph});
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.55)"; ctx.strokeText(L.name,L.sx,L.sy-8);
+      ctx.fillStyle="rgba(255,255,255,0.96)"; ctx.fillText(L.name,L.sx,L.sy-8);
+      if(L.army){ ctx.font=`600 ${Math.max(9,L.fs*0.7)}px "Segoe UI",sans-serif`; ctx.fillStyle="rgba(246,227,176,0.92)"; ctx.fillText(L.army,L.sx,L.sy+L.fs*0.55-6); }
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  draw=function(){
+    if(state._camLock){ const L=state._camLock; view.scale=view.ts=L.s; view.ox=view.tox=L.ox; view.oy=view.toy=L.oy; if(typeof applyTx==="function") applyTx(); }
+    if(state.globeOn&&typeof drawGlobeFrame==="function"){ drawGlobeFrame(); return; }
+    draw18();
+  };
+  draw._ffLock=true;
+  if(window.CROWNFALL) window.CROWNFALL.draw=draw;
+})();
+/* ===== gfx v1.8: globe names that don't pile up (you and enemies first, then bigger countries) ===== */
+(function(){
+  if(typeof drawGlobeOverlays!=="function") return;
+  drawGlobeOverlays=function(){
+    const {cssW:w,cssH:h,dpr}=view;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    for(const p of provinces){
+      if(!p._gScr||!p._gScr.vis||p._gScr.z<0.2)continue;
+      let max=0,who=null;
+      for(const k in (p.capture||{})) if(p.capture[k]>max){max=p.capture[k];who=+k;}
+      if(max>4&&who!=null){
+        const bw=18,bh=3.5,x=p._gScr.x,y=p._gScr.y+8;
+        ctx.fillStyle="rgba(0,0,0,0.55)"; ctx.fillRect(x-bw/2,y,bw,bh);
+        ctx.fillStyle=nations[who]?nations[who].color:"#fff";
+        ctx.fillRect(x-bw/2,y,bw*clamp(max/100,0,1),bh);
+      }
+    }
+    if(state.invasions){
+      for(const inv of state.invasions){
+        const p=provinces[inv.pid]; if(!p||!p._gPath)continue;
+        ctx.lineWidth=2.4; ctx.strokeStyle="rgba(80,200,255,0.9)";
+        ctx.setLineDash([6,5]); ctx.stroke(p._gPath); ctx.setLineDash([]);
+      }
+    }
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    const me=state.player, c=[];
+    const seen=new Set();
+    for(const p of provinces){
+      if(!p.capital||!p._gScr||!p._gScr.vis||p._gScr.z<0.28)continue;
+      const nat=nations[p.owner]; if(!nat||!nat.alive||seen.has(p.owner))continue;
+      seen.add(p.owner);
+      const sx=p._gScr.x, sy=p._gScr.y;
+      if(sx<-40||sy<-20||sx>w+40||sy>h+20)continue;
+      const mine=nat.id===me, foe=me>=0&&atWar(me,nat.id);
+      c.push({nat,sx,sy,z:p._gScr.z,pri:(mine?1e15:foe?1e14:0)+(nat.gdp||nat.baseGdp||0)});
+    }
+    c.sort((a,b)=>b.pri-a.pri);
+    const placed=[], maxN=Math.max(10,Math.round(w*h/24000));
+    for(const L of c){
+      if(placed.length>=maxN) break;
+      const fs=clamp(10+L.z*4,9,16);
+      ctx.font=`700 ${fs}px Georgia,serif`;
+      const tw=ctx.measureText(L.nat.name).width;
+      const r={x:L.sx-tw/2-4,y:L.sy-8-fs/2-3,w:tw+8,h:fs+6};
+      if(L.pri<1e14&&placed.some(q=>r.x<q.x+q.w&&r.x+r.w>q.x&&r.y<q.y+q.h&&r.y+r.h>q.y)) continue;
+      placed.push(r);
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.6)"; ctx.strokeText(L.nat.name,L.sx,L.sy-8);
+      ctx.fillStyle="rgba(255,255,255,0.96)"; ctx.fillText(L.nat.name,L.sx,L.sy-8);
+    }
+  };
+})();
+/* ===== gfx v1.8: map panning is a copy, not a repaint. The land is cached with a margin around
+   the screen, so dragging the map just shifts the cached picture; it is only repainted when you zoom,
+   the map changes, or you drag past the margin. Ocean is a cheap per-frame gradient. ===== */
+(function(){
+  if(typeof drawMapBase!=="function"||typeof paintLand!=="function") return;
+  let lver=0;
+  if(typeof invalidateLand==="function"){ const f=invalidateLand; invalidateLand=function(){ lver++; return f.apply(this,arguments); }; }
+  const MC={cv:null,key:"",ox:0,oy:0,m:0};
+  window.__CF_MSTAT={repaint:0,direct:0,blit:0};
+  drawMapBase=function(){
+    const {cssW:w,cssH:h,scale,ox,oy,dpr}=view;
+    if(!w||scale==null||ox==null||oy==null) return;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    paintOcean(ctx,w,h);
+    const zooming=Math.abs((view.ts==null?scale:view.ts)-scale)>1e-3;
+    const camStill=!zooming&&Math.abs((view.tox==null?ox:view.tox)-ox)<0.2&&Math.abs((view.toy==null?oy:view.toy)-oy)<0.2;
+    const m=Math.round(Math.min(240,Math.max(120,Math.max(w,h)*0.2)));
+    const base=[scale.toFixed(4),w|0,h|0,dpr,state.mapVer||0,lver,m].join("|");
+    const ok=MC.cv&&MC.key===base&&Math.abs(ox-MC.ox)<=m-2&&Math.abs(oy-MC.oy)<=m-2;
+    if(!ok&&zooming){
+      ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+      paintLand(ctx,scale,false); __CF_MSTAT.direct++;
+    } else {
+      if(!ok){
+        const W=Math.max(1,Math.ceil((w+2*m)*dpr)), H=Math.max(1,Math.ceil((h+2*m)*dpr));
+        if(!MC.cv||MC.cv.width!==W||MC.cv.height!==H){ MC.cv=document.createElement("canvas"); MC.cv.width=W; MC.cv.height=H; }
+        const c=MC.cv.getContext("2d");
+        c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H);
+        c.setTransform(dpr*scale,0,0,dpr*scale,dpr*(ox+m),dpr*(oy+m));
+        paintLand(c,scale,true);
+        MC.key=base; MC.ox=ox; MC.oy=oy; MC.m=m; __CF_MSTAT.repaint++;
+      } else __CF_MSTAT.blit++;
+      ctx.setTransform(1,0,0,1,0,0);
+      ctx.drawImage(MC.cv, Math.round((ox-MC.ox-MC.m)*dpr), Math.round((oy-MC.oy-MC.m)*dpr));
+    }
+    const tnow=performance.now();
+    ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+    for(const p of provinces){ if(p.flash>0){ ctx.fillStyle=`rgba(255,245,210,${Math.min(0.55,p.flash*0.55)})`; ctx.fill(p.path,"evenodd"); } }
+    if(state.hover>=0&&provinces[state.hover]){ ctx.fillStyle="rgba(255,255,255,0.08)"; ctx.fill(provinces[state.hover].path,"evenodd"); }
+    const key=[Number(scale).toFixed(3),Number(ox).toFixed(1),Number(oy).toFixed(1),state.mapVer||0,w|0,h|0].join("|");
+    if(typeof paintPlayerGlowCached==="function") paintPlayerGlowCached(ctx,scale,tnow,key,camStill);
+    ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+    if(state.hover>=0&&provinces[state.hover]){ctx.lineWidth=2/scale;ctx.strokeStyle="rgba(255,255,255,0.9)";ctx.stroke(provinces[state.hover].path);}
+    if(state.attackTarget>=0){const tp=provinces[state.attackTarget];if(tp){ctx.lineWidth=3/scale;ctx.strokeStyle="rgba(255,80,60,0.95)";ctx.stroke(tp.path);}}
+    for(const p of provinces){ if(p.flash>0) p.flash=Math.max(0,p.flash-0.03); }
   };
 })();
 
@@ -15030,6 +15561,22 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   const _nc=newCampaign; newCampaign=function(){ const len=state&&state.turnLen; const r=_nc.apply(this,arguments); state.turnMode=pref(); state.turnLen=len||1; state.turnLeft=0; state.turnNo=1; return r; };
   if(window.CROWNFALL){ window.CROWNFALL.endTurn=endTurn; window.CROWNFALL.setTurnMode=v=>{state.turnMode=!!v;savePref(!!v);updateSpeed();}; window.CROWNFALL.turnState=()=>({mode:on(),len:state.turnLen,no:state.turnNo,left:state.turnLeft}); }
   try{ ensure(); updateSpeed(); }catch(e){}
+})();
+
+// ---- logic: no new gunfire while the game is paused (between turns, alerts, menus) ----
+(function(){
+  function quiet(fn){
+    return function(dt){
+      if(!state || !state.paused) return fn.apply(this, arguments);
+      // let shots already in the air finish and fade, but spawn nothing new
+      const U=state.units, B=state.battles;
+      state.units=[]; state.battles=[];
+      try{ return fn.apply(this, arguments); }
+      finally{ state.units=U; state.battles=B; }
+    };
+  }
+  if(typeof tickFirefight==="function") tickFirefight=quiet(tickFirefight);
+  if(typeof tickBattleFX==="function") tickBattleFX=quiet(tickBattleFX);
 })();
 
 
