@@ -16663,9 +16663,9 @@ const GFX25=(function(){
   const STEPS=[
     {t:"Pick your country", d:"Click a country, then press <b>Play as</b>.", goal:"Choose a country", ok:()=>state.phase==="play"},
     {t:"It's turn-based", d:"You get <b>one action</b> per turn: build, recruit, attack or move. After it, the other countries move and your next turn starts by itself.", next:true},
-    {t:"Build a military base", d:"<b>Drag a Military Base</b> from the bottom bar onto your land.", goal:"Place a Military Base", ok:hasBase},
+    {t:"Build a military base", d:"Open the <b>Shop</b> tab on the right and drag a <b>Military Base</b> card onto your land.", goal:"Place a Military Base", ok:hasBase},
     {t:"Train troops", d:"Click your base and buy <b>Riflemen</b>.", goal:"Buy any unit", ok:()=>!!state._tutBought},
-    {t:"Grow your economy", d:"<b>Drag a Factory</b> from the bottom bar onto your land for more money.", goal:"Place a building", ok:()=>!!state._tutBuilt},
+    {t:"Grow your economy", d:"In the <b>Shop</b> tab, drag a <b>Factory</b> onto your land for more money.", goal:"Place a building", ok:()=>!!state._tutBuilt},
     {t:"Trade", d:"Open the <b>Trade</b> tab on the right.", goal:"Open the Trade tab", ok:()=>state.tab==="trade"},
     {t:"Skip a turn", d:"Nothing to do? Press the green <b>End Turn</b> to pass and let the others move.", goal:"End a turn", ok:()=>!!state._tutEnded},
     {t:"Armies and war", d:"Click troops, then <b>right-click</b> to move or attack. The box at the top left always tells you what to do next.", next:true, last:true}
@@ -16705,6 +16705,7 @@ const GFX25=(function(){
 /* ===== v2.5: Tutorial map (game) — small guided practice war: Belgium vs Luxembourg ===== */
 (function(){
   const NORMAL=TUT_STEPS.slice();
+  { const st=document.createElement("style"); st.textContent="body.tmapOn #camHint,body.tmapOn #moveHint,body.tmapOn #actBar{display:none!important}"; document.head.appendChild(st); }
   const byName=nm=>{const n=nations.find(x=>x.name===nm);return n?n.id:-1;};
   const provOf=nm=>{const p=provinces.find(x=>x.name===nm);return p?p.id:-1;};
   let ME=-1, FOE=-1, FOEP=-1, doneShown=false;
@@ -16712,10 +16713,10 @@ const GFX25=(function(){
   const hasBase=()=>(state.bases||[]).some(b=>b.owner===state.player&&b.kind==="mil")||!!state._tutBase;
   const STEPS=[
     {t:"Tutorial map", d:"You are <b>Belgium</b>. Your goal: take <b>Luxembourg</b>, your small neighbour to the south-east. No other country will bother you here.", next:true},
-    {t:"Build a military base", d:"<b>Drag a Military Base</b> from the bottom bar onto Belgium. That's your action for this turn.", goal:"Place a Military Base", ok:hasBase},
-    {t:"Train troops", d:"Click your base and buy <b>Riflemen</b>. Buy a couple of them over your next turns.", goal:"Buy a unit", ok:()=>!!state._tutBought},
+    {t:"Build a military base", d:"Open the <b>Shop</b> tab on the right and drag a <b>Military Base</b> card onto Belgium. That's your action for this turn.", goal:"Place a Military Base", ok:hasBase},
+    {t:"Train troops", d:"You have no army yet. Click your base and buy <b>Riflemen</b>.", goal:"Buy a unit", ok:()=>!!state._tutBought},
     {t:"Declare war", d:"Click <b>Luxembourg</b> on the map, open the <b>Diplo</b> tab and press <b>Declare war</b>.", goal:"Be at war with Luxembourg", ok:()=>FOE>=0&&atWar(state.player,FOE)},
-    {t:"Attack", d:"Click your troops, then <b>right-click Luxembourg</b>. Hovering over it shows your chance to win. If you lose, recruit more and try again.", goal:"Capture Luxembourg", ok:()=>FOEP>=0&&provinces[FOEP].owner===state.player},
+    {t:"Attack", d:"Click your troops, then <b>right-click Luxembourg</b>. Hovering over it shows your chance to win. A capital takes <b>2 wins</b>, so attack again on your next turn.", goal:"Capture Luxembourg", ok:()=>FOEP>=0&&provinces[FOEP].owner===state.player},
     {t:"You did it!", d:"That's the whole game: build, recruit, declare war, attack. Press <b>Done</b>, then start a real game from the menu.", next:true, last:true}
   ];
   function useSteps(list){ TUT_STEPS.length=0; list.forEach(s=>TUT_STEPS.push(s)); }
@@ -16739,7 +16740,7 @@ const GFX25=(function(){
     document.getElementById("tmapReal").onclick=()=>{ m.style.display="none"; exit(); $("title").style.display="flex"; if($("tCont"))$("tCont").disabled=!hasSave(); };
     document.getElementById("tmapStay").onclick=()=>{ m.style.display="none"; };
   }
-  function exit(){ state._tmap=false; state.tutorial=false; useSteps(NORMAL); }
+  function exit(){ document.body.classList.remove("tmapOn"); state._tmap=false; state.tutorial=false; useSteps(NORMAL); }
   function startTutorialMap(){
     try{ensureAudio();SFX.click();}catch(e){}
     ME=byName("Belgium"); FOE=byName("Luxembourg"); FOEP=provOf("Luxembourg");
@@ -16751,6 +16752,9 @@ const GFX25=(function(){
     startAs(ME);
     const me=nations[ME], foe=nations[FOE];
     me.money=(me.money||0)+3000; foe.money=0;
+    state.units=(state.units||[]).filter(u=>u.owner!==ME); me.army=0; state.selectedUnits=[];
+    try{ if(typeof recountArmy==="function") recountArmy(me); }catch(e){}
+    document.body.classList.add("tmapOn");
     try{localStorage.removeItem(TIPKEY);}catch(e){}
     state.tipsOn=true; state._tutBought=state._tutBuilt=state._tutEnded=state._tutBase=false;
     useSteps(STEPS); state.tutStep=0; renderTutorial();
@@ -17111,6 +17115,23 @@ const GFX25=(function(){
     let a=0,d=militia; for(const u of us)a+=unitPower(u,dT,true); for(const u of defs)d+=unitPower(u,aT,false);
     return a/((d*softMod(dp))+1);
   }
+  // when a whole stack leaves a front-line region to take the next one, a quarter of it stays behind
+  // so fronts hold and the enemy has to fight for that region instead of walking into it
+  function leaveGarrison(attId,mv,pid){
+    const from={}; for(const u of mv)(from[u.pid]=from[u.pid]||[]).push(u);
+    for(const k in from){
+      const fp=provinces[k]; if(!fp||fp.owner!==attId||+k===pid)continue;
+      const staying=unitsAt(+k,attId).filter(u=>!mv.includes(u)&&u.type!=="air");
+      if(staying.length)continue;
+      const front=moveAdj(fp).some(j=>{const q=provinces[j]; return !!(q&&j!==pid&&q.owner>=0&&q.owner!==attId&&atWar(attId,q.owner));});
+      if(!front)continue;
+      const tot=from[k].reduce((s,u)=>s+u.str,0); if(tot<400)continue;
+      const keep=tot*0.25;
+      for(const u of from[k]) u.str-=keep*u.str/tot;
+      const big=from[k].reduce((a,b)=>b.str>a.str?b:a);
+      spawnUnit(attId,+k,keep,big.type,{manual:big.manual});
+    }
+  }
   function fight(attId,us,pid){
     const dp=provinces[pid], att=nations[attId], defN=nations[dp.owner];
     const {defs,militia}=defenseOf(dp);
@@ -17128,14 +17149,14 @@ const GFX25=(function(){
     const win=atk>def;
     let captured=false;
     if(win){
-      const last=nProvs(dp.owner).length<=1;
+      const last=nProvs(dp.owner).length<=1&&!state.tutorial; // tutorial: one win takes it
       dp._aw=dp._aw||{}; const k=String(attId); dp._aw[k]=(dp._aw[k]||0)+1;
       if(!last||dp._aw[k]>=2){
         dp._aw={};
         state._actCap=true;
         try{ retreatDefenders(dp,defN,att); applyCap(dp,att,defN,false); } finally{ state._actCap=false; }
         captured=dp.owner===attId;
-        if(captured) moveUnitsTo(us.filter(u=>u.str>0),pid);
+        if(captured){ const mv=us.filter(u=>u.str>0); leaveGarrison(attId,mv,pid); moveUnitsTo(mv,pid); }
       } else {
         for(const u of defs)u.str*=0.8;
       }
@@ -17170,7 +17191,7 @@ const GFX25=(function(){
     let w=0; const N=400; for(let i=0;i<N;i++){ if(a*(0.8+Math.random()*0.4)>d*(0.8+Math.random()*0.4))w++; }
     const chance=Math.round(w/N*100);
     const atkMen=us.reduce((s,u)=>s+u.str,0), defMen=defs.reduce((s,u)=>s+u.str,0);
-    const last=nProvs(dp.owner).length<=1;
+    const last=nProvs(dp.owner).length<=1&&!state.tutorial;
     return {chance,att:Math.round(a),def:Math.round(d),attack:Math.round(a),defense:Math.round(d),atkMen:Math.round(atkMen),defMen:Math.round(defMen),militia:Math.round(militia),fortMul:+mod.toFixed(2),needsTwoWins:last,
       label:chance>=70?"likely win":chance>=40?"even fight":chance>=15?"risky":"likely loss",
       text:"Attack "+fm(a)+" vs defense "+fm(d)+" ("+fm(defMen)+" troops + militia"+(mod>1.05?", fort x"+mod.toFixed(1):"")+"): "+chance+"% to win"+(last?", capital needs 2 wins":"")};
@@ -17283,8 +17304,12 @@ const GFX25=(function(){
       }
     }
     for(const j in byTarget){
-      const t=byTarget[j], r=estimate(t.us,provinces[j]);
-      if(r>need&&(!best||r>best.r))best={r,from:t.from,to:+j,us:t.us};
+      const t=byTarget[j], q=provinces[j], r=estimate(t.us,q);
+      if(r<=need)continue;
+      // go for the enemy army when the edge is clear (that is what ends wars), and for its own lost land
+      const army=unitsAt(+j,P).reduce((s,u)=>s+u.str,0);
+      const sc=Math.min(r,3)+(army>0&&r>1.3?1.2:0)+(q.nid===n.id?0.6:0);
+      if(!best||sc>best.sc)best={r,sc,from:t.from,to:+j,us:t.us};
     }
     if(best){ n._waited=0; const res=fight(n.id,best.us,best.to); return {kind:"attack",from:best.from,to:best.to,result:res}; }
     // 2) pick a target and a staging province next to it; gather armies there
