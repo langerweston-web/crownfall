@@ -5,7 +5,7 @@ const ResEdit = require("resedit");
 
 const exePath = process.argv[2] || path.join(__dirname, "dist", "win-unpacked", "Crownfall.exe");
 const icoPath = process.argv[3] || path.join(__dirname, "icon.ico");
-const version4 = "2.3.0.0";
+const version4 = "2.3.1.0";
 const [maj, min, pat, bld] = version4.split(".").map((n) => parseInt(n, 10));
 
 const exe = ResEdit.NtExecutable.from(fs.readFileSync(exePath), { ignoreCert: true });

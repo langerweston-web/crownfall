@@ -14568,7 +14568,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   window.CF_banner=function(text,sub,ms){ ban.querySelector(".t").textContent=text||""; ban.querySelector(".s").textContent=sub||"";
     ban.classList.add("on"); clearTimeout(banT); banT=setTimeout(()=>ban.classList.remove("on"),ms||1500); };
   CF_on("turnStart",d=>{ const M=(typeof MONTHS!=="undefined"&&MONTHS[d.month])||"";
-    if(d.isPlayer){ ban.classList.remove("ai"); window.CF_banner("Turn "+d.turn+" · Your move", (M?M+" ":"")+d.year+" · do one thing, or End Turn to pass"); }
+    if(d.isPlayer){ ban.classList.remove("ai"); window.CF_banner("Turn "+d.turn+" · Your move", (M?M+" ":"")+d.year+" · do one thing"); }
     else { ban.classList.add("ai"); window.CF_banner(d.nationName+"'s turn","Enemy move",750); } });
 
   // ---------- automatic emits ----------
@@ -14638,6 +14638,27 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
 #title .card .tag{color:#c9b27a;letter-spacing:.42em}
 #title .card .tag::before,#title .card .tag::after{content:"";display:inline-block;width:38px;height:1px;vertical-align:middle;margin:0 12px;background:linear-gradient(90deg,rgba(231,197,106,0),rgba(231,197,106,.7))}
 #title .card .tag::after{background:linear-gradient(90deg,rgba(231,197,106,.7),rgba(231,197,106,0))}
+`;
+  document.head.appendChild(st);
+})();
+
+/* ===== gfx v2.4 (graphics): bottom-left layout, CSS only (no DOM changes).
+   Left column, bottom to top: dock icons (#dockicons) -> "What happened" log (#actLog, height capped)
+   -> tutorial card (#tutor). The turn bar (#actBar) is centred in the band between the log and the
+   minimap, so the three never overlap. ===== */
+(function(){
+  const st=document.createElement("style"); st.id="cfLayout24";
+  st.textContent=`
+#mapwrap{--cfLogW:240px;--cfLogB:58px;--cfLogH:128px;--cfMiniW:150px}
+@media (max-width:1100px){#mapwrap{--cfLogW:200px}}
+#mapwrap #actLog{left:12px!important;bottom:var(--cfLogB)!important;width:var(--cfLogW)!important;max-width:var(--cfLogW)!important;box-sizing:border-box;max-height:var(--cfLogH);overflow:hidden}
+#mapwrap #actBar{left:calc(var(--cfLogW) + 24px)!important;right:calc(var(--cfMiniW) + 12px)!important;transform:none!important;margin:0 auto;width:max-content;
+  max-width:calc(100% - var(--cfLogW) - var(--cfMiniW) - 36px)!important;box-sizing:border-box}
+@media (max-width:1100px){#mapwrap #actBar{font-size:12px;padding:6px 10px}}
+#mapwrap #tutor{left:12px!important;right:auto!important;bottom:var(--cfLogB)!important;box-sizing:border-box;max-width:min(280px,calc(100% - 24px));max-height:calc(100% - var(--cfLogB) - 70px);overflow:auto}
+#mapwrap #camHint{top:calc(16% + 78px)!important;bottom:auto!important;transition:opacity .25s}
+#mapwrap:has(#cfTurnBanner.on) #camHint{opacity:0!important}   /* one-off camera hint: under the top chips, clear of the bottom HUD */
+#mapwrap:has(#actLog[style*="block"]) #tutor{bottom:calc(var(--cfLogB) + var(--cfLogH) + 10px)!important;max-height:calc(100% - var(--cfLogB) - var(--cfLogH) - 80px)}
 `;
   document.head.appendChild(st);
 })();
@@ -16659,6 +16680,14 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const site=border[0]||myP.find(p=>p.capital)||myP[0];
     if(site){ const got=raise(n,site,Math.max(2000,gdpOf(n)*0.15)); if(got){ n._waited=(n._waited||0)+0.5; return {kind:"recruit",from:site.id,to:site.id,result:{str:got}}; } }
     n._waited=(n._waited||0)+1;
+    // cut off from you by sea with no way to fight back: after a few turns it asks for peace
+    const reach=myP.some(p=>moveAdj(p,n.id).some(j=>provinces[j]&&provinces[j].owner===P));
+    if(!reach&&n._waited>=3&&typeof makePeace==="function"){
+      makePeace(P,n.id);
+      notify(n.name+" has no way to reach you and made peace. You keep what you took.","peace","important");
+      n._waited=0;
+      return {kind:"peace",from:-1,to:-1,result:{text:"made peace"}};
+    }
     return {kind:"hold",from:-1,to:-1};
   }
   function actors(){ const P=state.player, me=nations[P]; if(!me)return []; return me.wars.filter(id=>nations[id]&&nations[id].alive&&!human(id)); }
@@ -16923,6 +16952,24 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   }
   setInterval(upd,150);
   if(window.CROWNFALL) window.CROWNFALL.previewAttack=(ids,pid)=>{state.selectedUnits=ids;state.hover=pid;upd();return document.getElementById("oddsTip").innerText;};
+})();
+// v2.3.1: keep tutorial card, action bar and move log clear of each other and the bottom build bar (graphics' CSS was removed)
+(function(){
+  const vis=e=>e&&e.offsetParent&&getComputedStyle(e).display!=="none"&&e.offsetWidth>0;
+  const hit=(a,b)=>!(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom);
+  function lift(el,obs){
+    if(!vis(el))return; let bot=14; el.style.bottom=bot+"px";
+    for(let k=0;k<6;k++){
+      const r=el.getBoundingClientRect(); let moved=false;
+      for(const o of obs){ if(!vis(o)||o===el)continue; const q=o.getBoundingClientRect(); if(hit(r,q)){ bot+=r.bottom-q.top+8; el.style.bottom=bot+"px"; moved=true; break; } }
+      if(!moved)break;
+    }
+  }
+  setInterval(()=>{
+    const $$=id=>document.getElementById(id);
+    const bar=$$("actBar"), log=$$("actLog"), tut=$$("tutor"), ab=$$("actionBar"), di=$$("dockicons");
+    lift(tut,[ab,di]); lift(bar,[ab,di,tut]); lift(log,[ab,di,tut,bar]);
+  },350);
 })();
 
 })();
