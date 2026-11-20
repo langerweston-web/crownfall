@@ -15771,6 +15771,66 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   };
   const _nc=newCampaign; newCampaign=function(){ const r=_nc.apply(this,arguments); turnItems=[]; rep={tick:-1,items:[]}; box.style.display="none"; return r; };
   if(window.CROWNFALL) window.CROWNFALL.battleReport=()=>({items:rep.items.slice(),shown:box.style.display==="block"});
+
+  // ---- AI answers a war: raise troops at once, and march in when it has the edge ----
+  function sideStr(id){let s=0;for(const u of (state.units||[]))if(u.owner===id&&u.str>0&&u.type!=="air")s+=u.str;return s;}
+  function borderProv(n,foe){
+    const ps=provinces.filter(p=>p.owner===n.id); if(!ps.length)return null;
+    return ps.find(p=>moveAdj(p).some(j=>provinces[j]&&provinces[j].owner===foe))||ps.find(p=>p.capital)||ps[0];
+  }
+  const _dw=declareWar;
+  declareWar=function(a,b){
+    const r=_dw.apply(this,arguments);
+    try{
+      for(const [me,foe] of [[a,b],[b,a]]){
+        const n=nations[me]; if(!n||!n.alive||isHuman(me)||!atWar(me,foe))continue;
+        const mine=sideStr(me), theirs=sideStr(foe);
+        if(mine>=theirs*0.6)continue;
+        const p=borderProv(n,foe); if(!p)continue;
+        const got=draft(n,p,Math.max(2000,theirs*0.6-mine));
+        if(got&&isHuman(foe)) notify(n.name+" mobilized "+fmt(got)+" troops in "+p.name+".","war","info");
+      }
+    }catch(e){}
+    return r;
+  };
+  function natStrong(n,t){
+    const tp=provinces[t]; if(!tp)return 0;
+    const defs=unitsAt(t).filter(u=>u.owner===tp.owner||allied(u.owner,tp.owner)).reduce((s,u)=>s+u.str,0);
+    const mil=Math.sqrt(Math.max(1000,tp.pop||0))*0.65*(tp.dev||1);
+    return defs+mil;
+  }
+  const _af=autoFrontFor;
+  autoFrontFor=function(n){
+    const r=_af.apply(this,arguments);
+    try{
+      if(!n||!n.alive||!n.wars||!n.wars.length)return r;
+      const human=n.id===state.player;
+      if(human&&!state.autoFront)return r;
+      const groups={};
+      for(const u of unitsOf(n.id)){
+        if(u.str<=0||u.type==="air")continue;
+        if(human&&(u.manual||-40)>=state.tick-4)continue;
+        const t=u.assault; if(t==null||t<0||t===u.pid)continue;
+        const tp=provinces[t], here=provinces[u.pid];
+        if(!tp||!here||tp.owner===n.id||!atWar(n.id,tp.owner))continue;
+        if(!moveAdj(here).includes(t))continue;
+        (groups[t]=groups[t]||[]).push(u);
+      }
+      for(const k in groups){
+        const t=+k, us=groups[k];
+        const mine=us.reduce((s,u)=>s+u.str,0);
+        if(mine<natStrong(n,t)*1.4||!canEnterProv(n.id,t))continue;
+        for(const u of us){
+          if(u.dest===t&&u.wps&&u.wps.length)continue;
+          u.dest=t;
+          if(typeof ensureUnitPos==="function")ensureUnitPos(u);
+          if(typeof buildTravel==="function")buildTravel(u,t);
+        }
+      }
+    }catch(e){}
+    return r;
+  };
+
 })();
 
 /* ===== war_ops (logic): war map colours, so you can see who owns what during a war ===== */
@@ -15932,6 +15992,16 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
 (function(){
   setInterval(()=>{ const t=document.getElementById("tutor"), a=document.getElementById("advisor");
     if(t&&a&&t.style.display!=="none"&&t.offsetParent) a.style.visibility="hidden"; else if(a) a.style.visibility=""; },300);
+})();
+// v1.9: keep Next-step box clear of the Battle report; hide 1x/2x/4x speed in Turns mode
+(function(){
+  function lay(){
+    const a=document.getElementById("advisor"), r=document.getElementById("battleReport");
+    if(a){ const show=r&&r.style.display==="block"; a.style.top=show?(r.offsetTop+r.offsetHeight+8)+"px":"56px"; }
+    const tm=!!state.turnMode;
+    for(const id of ["b1","b2","b4"]){ const b=document.getElementById(id); if(b) b.style.display=tm?"none":""; }
+  }
+  setInterval(lay,300);
 })();
 
 })();
