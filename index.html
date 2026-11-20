@@ -14855,12 +14855,12 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const now=performance.now();
     const W=Math.max(1,w*dpr|0), H=Math.max(1,h*dpr|0);
     if(moving){
-      ctx.setTransform(dpr,0,0,dpr,0,0); paintDisc(ctx,w,h,true); gc.key="";
+      ctx.setTransform(dpr,0,0,dpr,0,0); paintDisc(ctx,w,h,true); gc.key=""; (window.__CF_GSTAT=window.__CF_GSTAT||{rebuild:0,moving:0}).moving++;
     } else {
       if(!gc.cv||gc.cv.width!==W||gc.cv.height!==H){ gc.cv=document.createElement("canvas"); gc.cv.width=W; gc.cv.height=H; gc.key=""; }
       if(gc.key!==key || now-gc.t>1500){   // also refresh every 1.5s so colour/ownership changes show up
         const c=gc.cv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H);
-        c.setTransform(dpr,0,0,dpr,0,0); paintDisc(c,w,h,false); gc.key=key; gc.t=now;
+        c.setTransform(dpr,0,0,dpr,0,0); paintDisc(c,w,h,false); gc.key=key; gc.t=now; (window.__CF_GSTAT=window.__CF_GSTAT||{rebuild:0,moving:0}).rebuild++;
       }
       ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(gc.cv,0,0);
     }
@@ -14882,6 +14882,76 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     drawUnitsGlobe();
     drawParticlesGlobe();
     drawMinimap();
+  };
+})();
+/* ===== gfx_perf_ops: unit shadows. Every figure built a new radial gradient every frame
+   (thousands per frame with a few hundred units, on the flat map and the globe). Now one shadow
+   image is drawn once and stamped, which looks the same. */
+(function(){
+  if(typeof Unit3D==="undefined") return;
+  const K=6, W=17*K, H=6*K;
+  const sp=document.createElement("canvas"); sp.width=W; sp.height=H;
+  const c=sp.getContext("2d");
+  const cx=W/2, cy=H/2;
+  const g=c.createRadialGradient(cx,cy,0,cx,cy,10*K);
+  g.addColorStop(0,"rgba(0,0,0,0.38)"); g.addColorStop(1,"rgba(0,0,0,0)");
+  c.fillStyle=g; c.beginPath(); c.ellipse(cx,cy,8.5*K,2.8*K,0,0,Math.PI*2); c.fill();
+  Unit3D.drawShadow=function(ctx,x,y,s){
+    const w=W/K*s, h=H/K*s;
+    if(w<1.5) return;
+    ctx.drawImage(sp, x-w/2, y+3-h/2, w, h);
+  };
+})();
+/* ===== gfx_perf_ops: sprite cache for the no-WebGL fallback. When the browser has no WebGL
+   (blocked GPU, some laptops, Opera GX limiters) every triangle of every model was skinned,
+   sorted and filled on the CPU each frame: ~1.4 s per frame with 400 units. Now each model is
+   drawn once per (type, colour, facing, pose, size) into a small image and reused. */
+(function(){
+  if(typeof Unit3D==="undefined"||typeof Unit3D.drawMesh!=="function") return;
+  const raw=Unit3D.drawMesh;
+  const cache=new Map(); const bounds=new Map();
+  const TAU=Math.PI*2;
+  function bnd(typ){
+    let b=bounds.get(typ); if(b) return b;
+    if(typeof UnitMesh!=="undefined") UnitMesh.init();
+    const mesh=UnitMesh.meshes&&(UnitMesh.meshes[typ]||UnitMesh.meshes.rifle);
+    if(!mesh||!mesh.length) return null;
+    const st=UnitMesh.stride||HQ_STRIDE;
+    let R=0.5,y0=0,y1=1;
+    for(let o=0;o<mesh.length;o+=st){ R=Math.max(R,Math.hypot(mesh[o],mesh[o+2])); y0=Math.min(y0,mesh[o+1]); y1=Math.max(y1,mesh[o+1]); }
+    R+=0.4; y1+=0.5; y0-=0.2;   // room for limb swing and bob
+    b={R,y0,y1}; bounds.set(typ,b); return b;
+  }
+  Unit3D.drawMesh=function(ctx, typ, px, py, scl, rot, bob, col, alpha, phase, anim){
+    const useGL=typeof UnitGL!=="undefined"&&UnitGL.ok;
+    if(useGL || !(scl>0)) return raw.apply(this,arguments);
+    const b=bnd(typ); if(!b) return;
+    const dpr=Math.min(2,(typeof view!=="undefined"&&view.dpr)||1);
+    const sb=Math.pow(2,Math.round(Math.log2(scl)*4)/4);                 // size bucket (19% steps)
+    const rb=Math.round((((rot||0)%TAU)+TAU)%TAU/TAU*16)%16;              // 16 facings
+    const pb=Math.round((((phase||0)%TAU)+TAU)%TAU/TAU*8)%8;              // 8 walk poses
+    const ab=Math.round(Math.max(0,Math.min(1,anim||0))*4);              // aim pose
+    const bb=Math.round((bob||0)*20);
+    const key=typ+"|"+col+"|"+rb+"|"+pb+"|"+ab+"|"+bb+"|"+sb+"|"+dpr;
+    let e=cache.get(key);
+    if(!e){
+      // supersample small models so the dark outline doesn't swallow them
+      const ss=Math.max(1,Math.min(4,14/(sb*dpr)));
+      const D=dpr*ss, S=sb*D;
+      const w=Math.ceil(2*b.R*S)+6, h=Math.ceil((b.y1-b.y0+b.R*0.7)*S)+6;
+      const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+      const ox=w/2, oy=3+(b.y1+b.R*0.35)*S;
+      const c=cv.getContext("2d");
+      raw.call(this, c, typ, ox, oy, S, rb/16*TAU, bb/20, col, 1, pb/8*TAU, ab/4);
+      e={cv, ox:ox/D, oy:oy/D, w:w/D, h:h/D, sb};
+      if(cache.size>2500) cache.clear();
+      cache.set(key,e);
+    }
+    const k=scl/e.sb;
+    const a0=ctx.globalAlpha;
+    if(alpha!=null&&alpha!==1) ctx.globalAlpha=a0*alpha;
+    ctx.drawImage(e.cv, px-e.ox*k, py-e.oy*k, e.w*k, e.h*k);
+    ctx.globalAlpha=a0;
   };
 })();
 
@@ -14974,14 +15044,14 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   const _pbs=placeBase; placeBase=function(nid){ const r=_pbs.apply(this,arguments); if(r&&nid===state.player)state._tutBase=true; return r; };
   const hasBase=()=>state._tutBase||(state.bases||[]).some(b=>b.owner===state.player&&b.kind==="mil");
   const STEPS=[
-    {t:"Pick your country", d:"Click any country on the map, then press <b>Play as</b>. Big countries are easier, small ones are a challenge.", goal:"Choose a country", ok:()=>state.phase==="play"},
-    {t:"It's turn-based", d:"Time is frozen while you plan. Make your moves, then press the green <b>End Turn</b> button (top right, or Space) and the month plays out while every other country moves too. Prefer real-time? Use the Turns / Real-time button next to it.", next:true},
-    {t:"Build a military base", d:"Open the build bar at the bottom and <b>drag a Military Base</b> onto your own land. Drop it exactly where you want it.", goal:"Place a Military Base", ok:hasBase},
-    {t:"Train troops", d:"Click your base (or open the <b>Shop</b> tab) and buy <b>Riflemen</b>. Training takes a turn or two.", goal:"Buy any unit", ok:()=>!!state._tutBought},
-    {t:"Grow your economy", d:"Drag a <b>Factory</b> (or any building) from the build bar onto a province. Buildings pay off every month.", goal:"Place a building", ok:()=>!!state._tutBuilt},
-    {t:"Trade", d:"Open the <b>Trade</b> tab to sign monthly trade deals and buy steel or oil. You can also press <b>Trade with</b> on any country in Diplo.", goal:"Open the Trade tab", ok:()=>state.tab==="trade"},
-    {t:"End your turn", d:"Press the green <b>End Turn</b> button and watch the month play out. Your money, training and research all move forward.", goal:"End a turn", ok:()=>!!state._tutEnded},
-    {t:"Armies and war", d:"Click your troops, then <b>right-click</b> where they should go. Select a neighbour and press <b>Declare War</b> in Diplo to attack. Press <b>H</b> any time for all the hotkeys. Good luck!", next:true, last:true}
+    {t:"Pick your country", d:"Click a country, then press <b>Play as</b>.", goal:"Choose a country", ok:()=>state.phase==="play"},
+    {t:"It's turn-based", d:"Time waits for you. Make your moves, then press the green <b>End Turn</b> (top right).", next:true},
+    {t:"Build a military base", d:"<b>Drag a Military Base</b> from the bottom bar onto your land.", goal:"Place a Military Base", ok:hasBase},
+    {t:"Train troops", d:"Click your base and buy <b>Riflemen</b>.", goal:"Buy any unit", ok:()=>!!state._tutBought},
+    {t:"Grow your economy", d:"<b>Drag a Factory</b> from the bottom bar onto your land for more money.", goal:"Place a building", ok:()=>!!state._tutBuilt},
+    {t:"Trade", d:"Open the <b>Trade</b> tab on the right.", goal:"Open the Trade tab", ok:()=>state.tab==="trade"},
+    {t:"End your turn", d:"Press the green <b>End Turn</b> and watch the month play out.", goal:"End a turn", ok:()=>!!state._tutEnded},
+    {t:"Armies and war", d:"Click troops, then <b>right-click</b> to move or attack. The box at the top left always tells you what to do next.", next:true, last:true}
   ];
   TUT_STEPS.length=0; STEPS.forEach(s=>TUT_STEPS.push(s));
   renderTutorial=function(){
@@ -15013,6 +15083,308 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const b=document.createElement("button"); b.id="bTutor"; b.textContent="?"; b.title="Restart the tutorial"; b.onclick=e=>{e.stopPropagation();restartTutorial();}; end.parentNode.appendChild(b); }
   addBtn(); setTimeout(addBtn,500);
   try{ if(window.CROWNFALL){ CROWNFALL.restartTutorial=restartTutorial; } }catch(e){}
+})();
+
+/* ===== war_ops (logic): faster, clearer battles + a battle report after each turn ===== */
+(function(){
+  const LOSS_K=2.4, CAP_K=1.3;   // battles were ~1-2%/month losses and 12-30 months per province: too slow to feel
+  const _tfb=tickFieldBattles;
+  tickFieldBattles=function(){
+    const before=new Map(); for(const u of (state.units||[])) if(u&&u.str>0) before.set(u,u.str);
+    const capB=new Map(); for(const p of provinces) if(p.capture){ const c={}; for(const k in p.capture)c[k]=p.capture[k]; capB.set(p.id,c); }
+    const r=_tfb.apply(this,arguments);
+    // amplify casualties of this month's fighting
+    let changed=false;
+    for(const [u,s] of before){ if(u.str>0&&u.str<s){ u.str=Math.max(0,u.str-(s-u.str)*(LOSS_K-1)); changed=true; } }
+    if(changed){ state.units=(state.units||[]).filter(u=>u.str>=120); for(const n of nations) if(n.alive) recountArmy(n); }
+    // amplify capture progress gains
+    for(const b of (state.battles||[])){
+      const p=provinces[b.pid]; if(!p||!p.capture)continue;
+      const k=String(b.att), was=(capB.get(p.id)||{})[k]||0, now=p.capture[k]||0;
+      if(now>was){ p.capture[k]=Math.min(99.5, now+(now-was)*(CAP_K-1)); b.progress=Math.min(100,p.capture[k]); }
+      b.casA*=LOSS_K; b.casD*=LOSS_K;
+    }
+    emergencyDefense();
+    recordReport();
+    return r;
+  };
+
+  // ---- countries defend themselves: conquest takes several breakthroughs, invaded AIs raise troops ----
+  const gdpOf=n=>Math.max(1,(n&&(n.gdp||n.baseGdp))||1);
+  function stagesNeeded(att,def){
+    const size=Math.sqrt(gdpOf(def)/gdpOf(att));
+    const provs=(typeof nProvs==="function"?nProvs(def.id).length:2);
+    return provs<=1 ? Math.max(2,Math.min(5,Math.round(1+size*1.5))) : Math.max(1,Math.min(3,Math.round(size)));
+  }
+  const isHuman=id=>id===state.player||(typeof mpIsHuman==="function"&&mpIsHuman(id));
+  function draft(def,p,want){
+    if(!def||!def.alive||isHuman(def.id)||want<500)return 0;
+    const d=def._draft||(def._draft={t:state.tick,used:0});
+    if(state.tick-d.t>=12){d.t=state.tick;d.used=0;}
+    const cap=Math.max(2500,gdpOf(def)*0.45);
+    const str=Math.round(Math.min(want,cap-d.used,Math.max(1500,gdpOf(def)*0.2)));
+    if(str<500)return 0;
+    spawnUnit(def.id,p.id,str,"rifle",{supplied:true}); d.used+=str;
+    def.money=Math.max(0,(def.money||0)-str*0.04);
+    recountArmy(def); return str;
+  }
+  const _ac=applyCap;
+  applyCap=function(p,att,def,fromInvasion){
+    if(!p||!att||!def||p.owner!==def.id) return _ac.apply(this,arguments);
+    const need=stagesNeeded(att,def);
+    p._cq=p._cq||{}; const k=String(att.id); p._cq[k]=(p._cq[k]||0)+1;
+    if(p._cq[k]<need){
+      p.capture={};
+      const got=draft(def,p,Math.max(3000,(def.army||0)*0.25));
+      const msg=att.name+" broke through "+def.name+"'s lines in "+p.name+" ("+p._cq[k]+"/"+need+")"+(got?" — "+def.name+" rushed "+fmt(got)+" fresh troops to the front":"")+".";
+      log("war",msg);
+      if(att.id===state.player||def.id===state.player) notify(msg,"war","important");
+      return;
+    }
+    p._cq={};
+    return _ac.apply(this,arguments);
+  };
+
+  if(typeof retreatDefenders==="function"){
+    const _rd=retreatDefenders;
+    retreatDefenders=function(p,def,att){
+      if(p&&def&&att&&p.owner===def.id){ const need=stagesNeeded(att,def), cur=((p._cq&&p._cq[String(att.id)])||0)+1;
+        if(cur<need){ for(const u of unitsAt(p.id,def.id)) u.str*=0.85; return; } } // line breaks, army holds
+      return _rd.apply(this,arguments);
+    };
+  }
+  if(typeof advanceInto==="function"){
+    const _ai=advanceInto;
+    advanceInto=function(p,attId){ if(p&&p.owner!==attId)return; return _ai.apply(this,arguments); };
+  }
+  function emergencyDefense(){
+    for(const b of (state.battles||[])){
+      const def=nations[b.def], p=provinces[b.pid]; if(!def||!p||isHuman(def.id))continue;
+      const own=(typeof unitsAt==="function"?unitsAt(b.pid,def.id):[]).reduce((s,u)=>s+u.str,0);
+      if((b.progress||0)>25||own<b.aStr*0.4) draft(def,p,b.aStr*0.7-own);
+    }
+  }
+  // ---- battle report ----
+  let rep={tick:-1,items:[]};
+  function recordReport(){
+    const me=state.player; if(me==null||me<0)return;
+    if(rep.tick!==state.tick){ rep={tick:state.tick,items:[]}; }
+    for(const b of (state.battles||[])){
+      if(b.att!==me&&b.def!==me)continue;
+      const att=b.att===me, foe=nations[att?b.def:b.att]; const p=provinces[b.pid];
+      const need=(nations[b.att]&&nations[b.def])?stagesNeeded(nations[b.att],nations[b.def]):1, stg=Math.min(need,((p&&p._cq&&p._cq[String(b.att)])||0)+1);
+      rep.items.push({stg,need,pid:b.pid, name:p?p.name:"?", att, foe:foe?foe.name:"?", prog:Math.round(b.progress||0),
+        myLoss:att?b.casA:b.casD, foeLoss:att?b.casD:b.casA, winning:att?b.delta>0:b.delta<=0});
+    }
+  }
+  const box=document.createElement("div"); box.id="battleReport";
+  box.style.cssText="position:absolute;left:12px;top:64px;z-index:20;display:none;width:300px;max-height:46vh;overflow:auto;background:rgba(14,16,22,.94);border:1px solid #c9a24a;border-radius:10px;padding:10px 12px;color:#eee;font:12.5px/1.4 system-ui;box-shadow:0 8px 24px rgba(0,0,0,.5)";
+  (document.getElementById("mapwrap")||document.body).appendChild(box);
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  const f=v=>typeof fmt==="function"?fmt(Math.round(v)):Math.round(v);
+  function goTo(pid){
+    const p=provinces[pid]; if(!p)return;
+    state.selectedProv=pid;
+    if(state.globeOn&&typeof globeLookAt==="function"){ globeLookAt(p.cx,p.cy,false); if(typeof globe!=="undefined")globe.dirty=true; return; }
+    if(typeof view!=="undefined"&&view){ const s=view.ts||view.scale; view.tox=(view.cssW||800)/2-p.cx*s; view.toy=(view.cssH||500)/2-p.cy*s; }
+    if(typeof bumpMap==="function")bumpMap();
+  }
+  function show(){
+    if(state.phase!=="play"||!rep.items.length){ box.style.display="none"; return; }
+    // merge by province (multi-month turns)
+    const m=new Map();
+    for(const it of rep.items){ const o=m.get(it.pid); if(o){o.myLoss+=it.myLoss;o.foeLoss+=it.foeLoss;o.prog=it.prog;o.winning=it.winning;} else m.set(it.pid,Object.assign({},it)); }
+    const list=[...m.values()].sort((a,b)=>(b.myLoss+b.foeLoss)-(a.myLoss+a.foeLoss)).slice(0,8);
+    const myL=list.reduce((s,i)=>s+i.myLoss,0), foeL=list.reduce((s,i)=>s+i.foeLoss,0);
+    box.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b style="color:#e7c56a;font-size:14px">⚔ Battle report</b><span id="brX" style="cursor:pointer;opacity:.7;padding:0 4px">✕</span></div>`+
+      `<div style="opacity:.85;margin-bottom:6px">You lost <b style="color:#ff8a80">${f(myL)}</b> troops · enemy lost <b style="color:#9be89b">${f(foeL)}</b></div>`+
+      list.map(i=>{ const col=i.winning?"#6fcf75":"#e2504a";
+        const same=i.name===i.foe; const what=i.att?`Attacking <b>${esc(i.name)}</b>${same?"":" ("+esc(i.foe)+")"}`:`Defending <b>${esc(i.name)}</b> from ${esc(i.foe)}`;
+        const bar=i.att?i.prog:100-i.prog;
+        return `<div class="brRow" data-pid="${i.pid}" style="cursor:pointer;padding:5px 6px;margin:3px 0;border-radius:6px;background:rgba(255,255,255,.05)">`+
+          `<div>${what} <span style="float:right;color:${col};font-weight:700">${i.winning?"Winning":"Losing"}</span></div>`+
+          `<div style="height:5px;background:#333;border-radius:3px;margin:4px 0"><div style="height:100%;width:${Math.max(2,bar)}%;background:${col};border-radius:3px"></div></div>`+
+          `<div style="opacity:.75;font-size:11.5px">${i.need>1?"Line "+i.stg+"/"+i.need+" · ":""}${i.att?"Captured "+i.prog+"%":"Held "+(100-i.prog)+"%"} · losses ${f(i.myLoss)} vs ${f(i.foeLoss)}</div></div>`; }).join("")+
+      `<div style="opacity:.6;font-size:11px;margin-top:4px">Click a battle to jump there. Send more troops to battles you're losing.</div>`;
+    box.style.display="block";
+    box.querySelector("#brX").onclick=()=>{ box.style.display="none"; };
+    box.querySelectorAll(".brRow").forEach(r=>r.onclick=()=>goTo(+r.dataset.pid));
+  }
+  // show at the start of each player turn (turn mode) or every 3 months in real-time
+  let turnItems=[], lastShown=-1;
+  const _gt=gameTick;
+  gameTick=function(){
+    const r=_gt.apply(this,arguments);
+    if(rep.tick===state.tick) turnItems=turnItems.concat(rep.items);
+    const turnMode=state.turnMode!==false;
+    if(state.phase==="play"&&((turnMode&&state.paused)||(!turnMode&&state.tick-lastShown>=3))){
+      rep.items=turnItems; turnItems=[]; lastShown=state.tick; show();
+    }
+    return r;
+  };
+  const _nc=newCampaign; newCampaign=function(){ const r=_nc.apply(this,arguments); turnItems=[]; rep={tick:-1,items:[]}; box.style.display="none"; return r; };
+  if(window.CROWNFALL) window.CROWNFALL.battleReport=()=>({items:rep.items.slice(),shown:box.style.display==="block"});
+})();
+
+/* ===== war_ops (logic): war map colours, so you can see who owns what during a war ===== */
+(function(){
+  const KEY="crownfall-warmap"; // auto | on | off
+  let mode="auto"; try{ mode=localStorage.getItem(KEY)||"auto"; }catch(e){}
+  const me=()=>state.player;
+  const active=()=>{ if(state.phase!=="play"||me()==null||me()<0||!nations[me()])return false;
+    if(mode==="on")return true; if(mode==="off")return false; return (nations[me()].wars||[]).length>0; };
+  const mix=(hex,to,k)=>{ const a=hexRgb(hex),b=hexRgb(to); const h=v=>Math.round(v).toString(16).padStart(2,"0"); return "#"+h(a.r+(b.r-a.r)*k)+h(a.g+(b.g-a.g)*k)+h(a.b+(b.b-a.b)*k); };
+  function warColor(n,base){
+    const p=me(); if(!n)return base;
+    if(n.id===p)return "#3fae5c";
+    if(typeof atWar==="function"&&atWar(p,n.id))return "#d64541";
+    if(typeof allied==="function"&&allied(p,n.id))return "#4f8fd6";
+    return mix(base,"#7d828a",0.72);
+  }
+  let painting=false;
+  const _dc=displayColor;
+  displayColor=function(n){ const c=_dc.apply(this,arguments); return (painting&&active())?warColor(n,c):c; };
+  const _pl=paintLand;
+  paintLand=function(){ painting=true; try{ return _pl.apply(this,arguments); } finally{ painting=false; } };
+  // legend + toggle
+  const leg=document.createElement("div"); leg.id="warLegend";
+  leg.style.cssText="position:absolute;left:50%;bottom:108px;transform:translateX(-50%);z-index:15;display:none;background:rgba(14,16,22,.9);border:1px solid #555;border-radius:8px;padding:4px 10px;color:#eee;font:12px system-ui;white-space:nowrap;pointer-events:none";
+  const dot=c=>`<span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c};margin:0 4px -1px 10px"></span>`;
+  leg.innerHTML=`<b>War map</b>${dot("#3fae5c")}You${dot("#4f8fd6")}Allies${dot("#d64541")}Enemies${dot("#7d828a")}Others`;
+  (document.getElementById("mapwrap")||document.body).appendChild(leg);
+  function btn(){
+    const seg=document.querySelector("#tr .seg"); if(!seg)return null;
+    let b=document.getElementById("bWarMap");
+    if(!b){ b=document.createElement("button"); b.id="bWarMap"; b.title="War map: colour you, allies and enemies (Auto turns on during a war)";
+      b.onclick=e=>{ e.stopPropagation(); mode=mode==="auto"?"on":mode==="on"?"off":"auto"; try{localStorage.setItem(KEY,mode);}catch(e){} key=""; tick(); };
+      seg.insertBefore(b,seg.firstChild); }
+    b.textContent="War map: "+(mode==="auto"?"Auto":mode==="on"?"On":"Off"); b.classList.toggle("on",active());
+    return b;
+  }
+  let key="";
+  function tick(){
+    btn();
+    const a=active(), p=me();
+    const k=a+"|"+mode+"|"+(a&&nations[p]?(nations[p].wars||[]).join(",")+"/"+(nations[p].allies||[]).join(","):"");
+    leg.style.display=a?"block":"none";
+    if(k!==key){ key=k; if(typeof bumpMap==="function")bumpMap(); if(typeof globe!=="undefined"&&globe)globe.dirty=true; }
+  }
+  setInterval(()=>{ try{tick();}catch(e){} },500);
+  if(window.CROWNFALL) window.CROWNFALL.warMap=v=>{ if(v)mode=v; key=""; tick(); return {mode,active:active()}; };
+})();
+
+
+/* ===== v1.8: advisor box, always shows your next move (game) ===== */
+(function(){
+  const st=document.createElement("style");
+  st.textContent=`#advisor{position:absolute;left:12px;top:56px;z-index:8;width:236px;max-width:calc(50% - 210px);box-sizing:border-box;background:rgba(14,24,40,.94);border:1px solid var(--gold2);border-radius:12px;padding:9px 12px;font-size:12.5px;line-height:1.4;box-shadow:var(--shadow);cursor:pointer;display:none;pointer-events:auto}
+#advisor:hover{border-color:var(--gold);background:rgba(24,36,58,.97)}
+#advisor .ah{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);opacity:.85}
+#advisor .at{font-weight:700;margin-top:2px}#advisor .ad{opacity:.85;margin-top:2px}
+#advisor.urgent{border-color:#e25b4a;box-shadow:0 0 0 2px rgba(226,91,74,.35),var(--shadow)}#advisor.urgent .ah{color:#ff8a7a}
+#advisor .ax{position:absolute;right:8px;top:5px;opacity:.5;font-size:12px}#advisor .ax:hover{opacity:1}
+.cfPulse{animation:cfPulse 1s ease-in-out 3}@keyframes cfPulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 4px rgba(231,197,106,.8)}}`;
+  document.head.appendChild(st);
+  const box=document.createElement("div"); box.id="advisor";
+  (document.getElementById("mapwrap")||document.body).appendChild(box);
+  let hideUntil=0, cur=null;
+  const P=()=>state.player, me=()=>nations[state.player];
+  const myUnits=()=>(state.units||[]).filter(u=>u.owner===P());
+  function tab(t){ state.tab=t; document.querySelectorAll("#tabs button").forEach(b=>b.classList.toggle("on",b.dataset.t===t)); renderPanel(true); }
+  function pulse(el){ if(!el)return; el.classList.remove("cfPulse"); void el.offsetWidth; el.classList.add("cfPulse"); }
+  function panTo(x,y,zoomMin){
+    const r=$("mapwrap").getBoundingClientRect();
+    if(state.globeOn&&typeof globeLookAt==="function"){ globeLookAt(x,y,true); return; }
+    const s=Math.max(view.scale, zoomMin||view.scale); view.ts=Math.min(s, view.maxS||s);
+    view.tox=r.width/2-x*view.ts; view.toy=r.height/2-y*view.ts;
+  }
+  // track monthly money change
+  let lastMoney=null, net=0;
+  const _gt=gameTick; gameTick=function(){ const r=_gt.apply(this,arguments); const n=me(); if(n){ if(lastMoney!=null) net=n.money-lastMoney; lastMoney=n.money; } return r; };
+  function pick(){
+    const n=me(); if(!n||state.phase!=="play")return null;
+    const units=myUnits(), wars=n.wars||[];
+    // 1. enemies on your land
+    const inv=(state.units||[]).filter(u=>wars.includes(u.owner)&&provinces[u.pid]&&provinces[u.pid].owner===P());
+    if(inv.length){
+      const byP={}; inv.forEach(u=>byP[u.pid]=(byP[u.pid]||0)+1);
+      const pid=+Object.keys(byP).sort((a,b)=>byP[b]-byP[a])[0], p=provinces[pid], foe=nations[inv[0].owner];
+      return {u:true,h:"Under attack",t:`${foe?foe.name:"Enemy"} troops are in ${p.name}`,d:`${inv.length} enemy unit${inv.length>1?"s":""} on your land. Click to go there, then select your troops and right-click ${p.name}.`,go:()=>{panTo(p.cx,p.cy,2.2); state.selectedProv=pid;}};
+    }
+    // 2. money
+    if(n.money<0||(net<0&&n.money+net*4<0)) return {u:true,h:"Money",t:n.money<0?"You're in debt":"You'll run out of money soon",d:`You're ${net<0?"losing "+fmt(-net)+" a month":"in the red"}. Raise taxes or the Economy share in your budget, or build factories.`,go:()=>tab("nation")};
+    // 3. base
+    const bases=(state.bases||[]).filter(b=>b.owner===P());
+    if(!bases.some(b=>b.kind==="mil")) return {h:"Next step",t:"Build a Military Base",d:"Drag a Military Base from the bar at the bottom onto your land. Troops are trained there.",go:()=>pulse($("actionBar"))};
+    // 4. troops
+    const training=(n.trainQ||[]).length+((window.__cfTrainQueue||[]).length);
+    if(units.length<3&&!training){ const b=bases.find(b=>b.kind==="mil"); return {h:"Next step",t:"Train troops",d:"Click to open the Shop for your base and buy Riflemen. You need an army to defend and attack.",go:()=>{ if(b)state.selectedBase=b.id; tab("shop"); }}; }
+    // 5. research
+    if(!(n.rq||[]).length&&!(n.rqueue||[]).length) return {h:"Next step",t:"Pick something to research",d:"Nothing is being researched. Click to open Tech and choose an upgrade.",go:()=>tab("tech")};
+    // 6. economy
+    const blds=(state.buildings||[]).filter(b=>b.owner===P());
+    if(blds.length<2&&n.money>600) return {h:"Next step",t:"Build a Factory",d:"Drag a Factory from the bar at the bottom onto one of your provinces. It earns money every month.",go:()=>pulse($("actionBar"))};
+    // 7. idle army at war
+    const idle=units.filter(u=>u.dest==null||u.dest<0);
+    if(wars.length&&idle.length>=3){
+      const c=idle.reduce((a,u)=>{const p=provinces[u.pid]; a.x+=p.cx; a.y+=p.cy; return a;},{x:0,y:0});
+      const foe=nations[wars[0]];
+      return {h:"War",t:`${idle.length} of your units are standing still`,d:`You're at war with ${foe?foe.name:"an enemy"}. Click to select them, then right-click an enemy province to attack.`,go:()=>{ state.selectedUnits=idle.map(u=>u.id); panTo(c.x/idle.length,c.y/idle.length,1.6); }};
+    }
+    // 8. at peace with an army: suggest a target
+    if(!wars.length&&units.length>=6){
+      const cnt={}; (state.units||[]).forEach(u=>cnt[u.owner]=(cnt[u.owner]||0)+1);
+      const nb=(typeof neighNats==="function"?neighNats(P()):[]).filter(id=>nations[id]&&nations[id].alive);
+      nb.sort((a,b)=>(cnt[a]||0)-(cnt[b]||0));
+      const t=nations[nb[0]];
+      if(t&&(cnt[t.id]||0)<units.length) return {h:"Idea",t:`${t.name} looks weak`,d:`They have ${cnt[t.id]||0} units and you have ${units.length}. Click to open Diplo, where you can declare war or trade with them.`,go:()=>{ state.selected=t.id; tab("diplo"); }};
+    }
+    return {h:"All set",t:typeof CROWNFALL!=="undefined"&&CROWNFALL.isTurnMode&&CROWNFALL.isTurnMode()===false?"Things are running":"Press End Turn",d:"Nothing urgent. Build, trade or plan your next war, then end the turn.",go:()=>pulse($("bTurn")||$("bEndTurn"))};
+  }
+  function render(){
+    if(state.phase!=="play"||performance.now()<hideUntil){ box.style.display="none"; return; }
+    const a=pick(); cur=a; if(!a){ box.style.display="none"; return; }
+    box.className=a.u?"urgent":"";
+    const html=`<span class="ax" title="Hide for a minute">✕</span><div class="ah">${a.h}</div><div class="at">${a.t}</div><div class="ad">${a.d}</div>`;
+    if(box._h!==html){ box.innerHTML=html; box._h=html; }
+    box.style.display="block";
+  }
+  box.addEventListener("click",e=>{ e.stopPropagation();
+    if(e.target.classList.contains("ax")){ hideUntil=performance.now()+60000; box.style.display="none"; return; }
+    if(cur&&cur.go){ try{cur.go(); if(typeof SFX!=="undefined"&&SFX.click)SFX.click();}catch(err){} }
+  });
+  box.addEventListener("mousedown",e=>e.stopPropagation());
+  setInterval(render,500);
+  try{ if(window.CROWNFALL) CROWNFALL.advisor=()=>cur&&{h:cur.h,t:cur.t}; }catch(e){}
+})();
+
+/* title screen: keep the basics, fold the rest under Advanced (game) */
+(function(){
+  const st=document.createElement("style");
+  st.textContent=`#tAdv{margin:8px auto 0;max-width:520px;text-align:center}#tAdv>summary{cursor:pointer;font-size:12px;opacity:.75;list-style:none;padding:4px}#tAdv>summary:hover{opacity:1}#tAdv[open]>summary{margin-bottom:6px}`;
+  document.head.appendChild(st);
+  let tries=0;
+  function fold(){
+    const nw=document.getElementById("tNew"); if(!nw){ if(tries++<40)setTimeout(fold,250); return; }
+    if(document.getElementById("tAdv"))return;
+    const rowOf=el=>el&&el.closest(".notifyrow,.row");
+    const rows=[document.getElementById("tNotify"),rowOf(document.getElementById("tUnits")),rowOf(document.getElementById("tModel")),rowOf(document.getElementById("tPerf")),rowOf(document.getElementById("tEdge")),rowOf(document.getElementById("tAbstain"))].filter(Boolean);
+    if(!document.getElementById("tMode")&&tries++<12){ setTimeout(fold,250); return; }
+    const det=document.createElement("details"); det.id="tAdv";
+    det.innerHTML="<summary>⚙ Advanced settings ▸</summary>";
+    const tut=rowOf(document.getElementById("tTut"));
+    (tut||rowOf(nw)).after(det);
+    rows.forEach(r=>{ if(r.contains(nw))return; det.appendChild(r); });
+    const cn=document.getElementById("tCompat"); if(cn) det.appendChild(cn);
+    const tt=document.getElementById("tTut"); if(tt){ const l=tt.closest("label"); if(l&&l.lastChild&&l.lastChild.nodeType===3) l.lastChild.textContent=" Show me how to play (tutorial)"; }
+  }
+  fold();
+})();
+
+/* one guide at a time: hide the advisor while the tutorial box is open */
+(function(){
+  setInterval(()=>{ const t=document.getElementById("tutor"), a=document.getElementById("advisor");
+    if(t&&a&&t.style.display!=="none"&&t.offsetParent) a.style.visibility="hidden"; else if(a) a.style.visibility=""; },300);
 })();
 
 })();
