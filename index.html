@@ -14642,26 +14642,10 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   document.head.appendChild(st);
 })();
 
-/* ===== gfx v2.4 (graphics): bottom-left layout, CSS only (no DOM changes).
-   Left column, bottom to top: dock icons (#dockicons) -> "What happened" log (#actLog, height capped)
-   -> tutorial card (#tutor). The turn bar (#actBar) is centred in the band between the log and the
-   minimap, so the three never overlap. ===== */
-(function(){
-  const st=document.createElement("style"); st.id="cfLayout24";
-  st.textContent=`
-#mapwrap{--cfLogW:240px;--cfLogB:58px;--cfLogH:128px;--cfMiniW:150px}
-@media (max-width:1100px){#mapwrap{--cfLogW:200px}}
-#mapwrap #actLog{left:12px!important;bottom:var(--cfLogB)!important;width:var(--cfLogW)!important;max-width:var(--cfLogW)!important;box-sizing:border-box;max-height:var(--cfLogH);overflow:hidden}
-#mapwrap #actBar{left:calc(var(--cfLogW) + 24px)!important;right:calc(var(--cfMiniW) + 12px)!important;transform:none!important;margin:0 auto;width:max-content;
-  max-width:calc(100% - var(--cfLogW) - var(--cfMiniW) - 36px)!important;box-sizing:border-box}
-@media (max-width:1100px){#mapwrap #actBar{font-size:12px;padding:6px 10px}}
-#mapwrap #tutor{left:12px!important;right:auto!important;bottom:var(--cfLogB)!important;box-sizing:border-box;max-width:min(280px,calc(100% - 24px));max-height:calc(100% - var(--cfLogB) - 70px);overflow:auto}
-#mapwrap #camHint{top:calc(16% + 78px)!important;bottom:auto!important;transition:opacity .25s}
-#mapwrap:has(#cfTurnBanner.on) #camHint{opacity:0!important}   /* one-off camera hint: under the top chips, clear of the bottom HUD */
-#mapwrap:has(#actLog[style*="block"]) #tutor{bottom:calc(var(--cfLogB) + var(--cfLogH) + 10px)!important;max-height:calc(100% - var(--cfLogB) - var(--cfLogH) - 80px)}
-`;
-  document.head.appendChild(st);
-})();
+/* ===== gfx v2.4b (graphics): hide the one-off camera hint while the turn banner shows (bottom-left layout is game's) ===== */
+(function(){ const st=document.createElement("style"); st.id="cfHint24";
+  st.textContent=`#mapwrap:has(#cfTurnBanner.on) #camHint{opacity:0!important;transition:opacity .25s}`;
+  document.head.appendChild(st); })();
 
 /* ===== v1.6 balance (logic): longer peace, starter garrison, fair AI ramp (alerts live in alert_ops.js) ===== */
 (function(){
@@ -16499,7 +16483,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     log("war",txt);
     if(attId===state.player||defN.id===state.player) notify(txt,"war",defN.id===state.player&&captured?"important":"info");
     if(typeof checkFallen==="function")checkFallen();
-    if(typeof bumpMap==="function")bumpMap();
+    if(captured&&typeof bumpMap==="function")bumpMap(); // only redraw the map when a border actually changed
     return res;
   }
 
@@ -16600,7 +16584,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   gate("placeBuilding",(nid)=>nid,{silentIdx:3,fail:null,pid:(n,p)=>p,what:(r,a)=>bname(a[2]),text:(r,a)=>"began a "+bname(a[2])});
   gate("upgradeBuilding",(id)=>{const b=bld(id);return b?b.owner:-1;},{silentIdx:1,fail:false,pid:(id)=>{const b=bld(id);return b?b.pid:-1;},what:()=>"Upgrade",text:(r,a)=>{const b=bld(a[0]);return "upgraded a "+(b?bname(b.kind):"building");}});
   gate("buildFort",(pid,nid)=>nid,{silentIdx:99,fail:false,pid:(p)=>p,what:()=>"Fort",text:()=>"began fortifications"});
-  function finishPlayer(){ const a=act(); a.done=true; refresh(); setTimeout(aiPhase,700); }
+  function finishPlayer(){ const a=act(); a.done=true; refresh(); setTimeout(aiPhase,450); }
 
   // ---- AI turns ----
   function raise(n,p,want){
@@ -16709,7 +16693,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
       if(r.kind==="move") log("war",n.name+" moved troops to "+(provinces[r.to]?provinces[r.to].name:"?")+".");
       if(r.kind==="hold") log("war",n.name+" held its lines.");
       emit(Object.assign({nation:id},r));
-      setTimeout(next,r.kind==="hold"?250:900);
+      setTimeout(next,r.kind==="hold"?150:600);
     };
     next();
   }
@@ -16893,6 +16877,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     if(o.kind==="move") return `➜ ${who} moved ${from?from+" → ":""}${to}`;
     if(o.kind==="recruit") return `＋ ${who} recruited${to?" in "+to:""}`;
     if(o.kind==="build") return `🏗 ${who} ${(o.result&&o.result.text)||o.text||"built"}${to&&!((o.result&&o.result.text)||o.text)?" in "+to:""}`;
+    if(o.kind==="peace") return `🕊 ${who} made peace${(o.result&&o.result.text)?" — "+o.result.text:""}`;
     return `⏸ ${who} held`;
   }
   function onAct(o){
@@ -16953,7 +16938,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   setInterval(upd,150);
   if(window.CROWNFALL) window.CROWNFALL.previewAttack=(ids,pid)=>{state.selectedUnits=ids;state.hover=pid;upd();return document.getElementById("oddsTip").innerText;};
 })();
-// v2.3.1: keep tutorial card, action bar and move log clear of each other and the bottom build bar (graphics' CSS was removed)
+// v2.4: bottom-left layout (game owns it) - keep tutorial card, action bar and move log clear of each other and the build bar
 (function(){
   const vis=e=>e&&e.offsetParent&&getComputedStyle(e).display!=="none"&&e.offsetWidth>0;
   const hit=(a,b)=>!(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom);
@@ -16970,6 +16955,8 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const bar=$$("actBar"), log=$$("actLog"), tut=$$("tutor"), ab=$$("actionBar"), di=$$("dockicons");
     lift(tut,[ab,di]); lift(bar,[ab,di,tut]); lift(log,[ab,di,tut,bar]);
   },350);
+  // lag: live background blur behind panels is re-computed every frame; use solid glass instead
+  const st=document.createElement("style"); st.textContent="*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}"; document.head.appendChild(st);
 })();
 
 })();
