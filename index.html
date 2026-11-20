@@ -2821,21 +2821,51 @@ function paintPlayerGlow(c,scale,tnow){
 }
 
 const _landCache={cv:null,key:"",ok:false};
+// v1.7.1 perf: the gold border glow uses a blur, which is slow to redraw every frame.
+// Render it once per camera position into its own canvas and only fade it in and out.
+const _glowCache={cv:null,key:""};
+function paintPlayerGlowCached(c,scale,tnow,key,camStill){
+  if(state.player<0) return;
+  const {cssW:w,cssH:h,ox,oy,dpr}=view;
+  if(!camStill || !state.nationPaths || !state.nationPaths.has(state.player)){
+    // camera moving: cheap stroke without blur
+    if(state.nationPaths&&state.nationPaths.has(state.player)){
+      c.lineWidth=2.2/scale; c.strokeStyle="rgba(236,201,112,0.9)"; c.stroke(state.nationPaths.get(state.player));
+    } else paintPlayerGlow(c,scale,tnow);
+    return;
+  }
+  const gk=key+"|"+state.player+"|"+(state.mapVer||0);
+  const W=Math.max(1,w*dpr|0), H=Math.max(1,h*dpr|0);
+  if(!_glowCache.cv||_glowCache.cv.width!==W||_glowCache.cv.height!==H){ _glowCache.cv=document.createElement("canvas"); _glowCache.cv.width=W; _glowCache.cv.height=H; _glowCache.key=""; }
+  if(_glowCache.key!==gk){
+    const g=_glowCache.cv.getContext("2d");
+    g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,W,H);
+    g.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+    const path=state.nationPaths.get(state.player);
+    g.save(); g.shadowColor="rgba(236,201,112,0.9)"; g.shadowBlur=Math.max(6,10*Math.sqrt(scale)*dpr);
+    g.lineWidth=3.2/scale; g.strokeStyle="rgba(236,201,112,1)"; g.stroke(path); g.restore();
+    g.lineWidth=1.4/scale; g.strokeStyle="rgba(255,236,170,0.65)"; g.stroke(path);
+    _glowCache.key=gk;
+  }
+  const pulse=0.55+0.45*Math.sin((tnow||0)/320);
+  c.save(); c.setTransform(1,0,0,1,0,0); c.globalAlpha=0.8+0.2*pulse; c.drawImage(_glowCache.cv,0,0); c.restore();
+}
 function invalidateLand(){_landCache.ok=false; state.mapDirty=true;}
 function drawMapBase(){
   const {cssW:w,cssH:h,scale,ox,oy,dpr}=view;
   if(!w || scale==null || ox==null || oy==null)return;
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  paintOcean(ctx,w,h);
-  const flashing=provinces.some(p=>p.flash>0);
+  const flashing=false; // v1.7.1 perf: battle flashes are drawn on top of the cached map, so they no longer force a full repaint
   const key=[Number(scale).toFixed(3),Number(ox).toFixed(1),Number(oy).toFixed(1),state.mapVer||0,w|0,h|0].join("|");
   const camStill=Math.abs((view.ts||scale)-scale)<1e-3 && Math.abs((view.tox||ox)-ox)<0.2;
   if(_landCache.ok && _landCache.key===key && !flashing){
     ctx.drawImage(_landCache.cv,0,0,w,h);
-  } else {
+  } else if(!camStill){
+    paintOcean(ctx,w,h);
     ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
     paintLand(ctx,scale,false);
-    if(camStill && !flashing){
+  } else {
+    {
       if(!_landCache.cv||_landCache.cv.width!==Math.max(1,w*dpr)||_landCache.cv.height!==Math.max(1,h*dpr)){
         _landCache.cv=document.createElement("canvas");
         _landCache.cv.width=Math.max(1,w*dpr); _landCache.cv.height=Math.max(1,h*dpr);
@@ -2848,6 +2878,8 @@ function drawMapBase(){
       paintLand(c,scale,true);
       _landCache.key=key; _landCache.ok=true;
     }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.drawImage(_landCache.cv,0,0,w,h);   // paint once into the cache, then copy it (was painted twice)
   }
   const tnow=performance.now();
   ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
@@ -2865,7 +2897,7 @@ function drawMapBase(){
       ctx.fillStyle="rgba(255,255,255,0.08)"; ctx.fill(p.path,"evenodd");
     }
   }
-  paintPlayerGlow(ctx,scale,tnow);
+  paintPlayerGlowCached(ctx,scale,tnow,key,camStill);
   if(state.hover>=0&&provinces[state.hover]){ctx.lineWidth=2/scale;ctx.strokeStyle="rgba(255,255,255,0.9)";ctx.stroke(provinces[state.hover].path);}
   if(state.attackTarget>=0){const tp=provinces[state.attackTarget];if(tp){ctx.lineWidth=3/scale;ctx.strokeStyle="rgba(255,80,60,0.95)";ctx.stroke(tp.path);}}
   for(const p of provinces){if(p.flash>0)p.flash=Math.max(0,p.flash-0.03);}
@@ -3202,6 +3234,7 @@ function draw(){
     if(!groups.has(p.owner))groups.set(p.owner,{pts:[],name:nations[p.owner]&&nations[p.owner].name,alive:nations[p.owner]&&nations[p.owner].alive,army:nations[p.owner]&&nations[p.owner].army,id:p.owner});
     groups.get(p.owner).pts.push(p);
   }
+  state._natLabelRects=[];
   for(const g2 of groups.values()){
     if(!g2.alive||!g2.pts.length)continue;
     const core=g2.pts.find(p=>p.capital)||g2.pts.slice().sort((a,b)=>landBox(b)-landBox(a))[0];
@@ -3229,6 +3262,7 @@ function draw(){
     ctx.fillStyle="rgba(8,12,20,0.42)";
     const pw=tw+10, ph=fs+4;
     ctx.fillRect(sx-pw/2,sy-ph/2-8,pw,ph);
+    state._natLabelRects.push({x:sx-pw/2,y:sy-ph/2-8,w:pw,h:ph});
     ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.55)"; ctx.strokeText(g2.name,sx,sy-8);
     ctx.fillStyle="rgba(255,255,255,0.96)";
     ctx.fillText(g2.name,sx,sy-8);
@@ -6350,7 +6384,7 @@ var UnitGL={
         wrap.insertBefore(this.canv, $("tip")||null);
       }
       this.canv.style.pointerEvents="none";
-      const opt={alpha:true,antialias:true,depth:true,premultipliedAlpha:false,preserveDrawingBuffer:true,powerPreference:"high-performance"};
+      const opt={alpha:true,antialias:true,depth:true,premultipliedAlpha:false,preserveDrawingBuffer:false,powerPreference:"high-performance"};
       let gl=null, is2=false, how="";
       try{ gl=this.canv.getContext("webgl2",opt); if(gl){is2=true; how="webgl2";} }catch(e){ how="webgl2 threw: "+(e&&e.message||e); }
       if(!gl){
@@ -6537,15 +6571,16 @@ function collectUnitFigures(now){
       const p=provinces[g[0].pid], owner=g[0].owner;
       const c=scrOf(p.cx,p.cy); if(!c||!c.vis) continue;
       let ax=c.x, ay=c.y+4, dx=0, dy=1;
+      if(typeof hqLabelDodge==="function"){ const d=hqLabelDodge(ax,ay); ay=d.y; }
       const b=(state.bases||[]).find(x=>x.pid===p.id&&x.owner===owner);
       if(b && typeof baseWorldPos==="function"){
         const w=baseWorldPos(b), bs=scrOf(w.x,w.y);
-        if(bs&&bs.vis){ ax=bs.x; ay=bs.y; dx=bs.x-c.x; dy=bs.y-c.y; const L=Math.hypot(dx,dy); if(L>2){dx/=L;dy/=L;} else {dx=0;dy=1;} }
+        if(bs&&bs.vis){ if(typeof hqLabelDodge==="function"){ const d=hqLabelDodge(bs.x,bs.y); bs.x=d.x; bs.y=d.y; } ax=bs.x; ay=bs.y; dx=bs.x-c.x; dy=bs.y-c.y; const L=Math.hypot(dx,dy); if(L>2){dx/=L;dy/=L;} else {dx=0;dy=1;} }
       }
-      const step=Math.max(14*figS, 9);            // spacing between figures, in screen pixels
+      const step=Math.max(34*figS, 12);           // spacing between units, in screen pixels
       let i=0, row=0;
       while(i<g.length){
-        const n=3+row*2, R=step*(1.3+row*0.95), spread=Math.min(1.25, 0.42*(n-1));
+        const n=3+row*2, R=step*(1.15+row*0.9), spread=Math.min(1.3, 0.36*(n-1));
         for(let j=0;j<n&&i<g.length;j++,i++){
           const ang=Math.atan2(dy,dx)+(n>1?(j/(n-1)-0.5)*2*spread:0);
           fan[g[i].id]={x:ax+Math.cos(ang)*R, y:ay+Math.sin(ang)*R*0.8+10};
@@ -6578,7 +6613,7 @@ function collectUnitFigures(now){
     const kickX= -Math.cos(face)*recoil*5 + ((u.id||0)%3-1)*flinch*1.4;
     const kickY= -Math.sin(face)*recoil*3;
     for(let i=0;i<nFigs;i++){
-      const ox=(i-(nFigs-1)/2)*12*figS + kickX;
+      const ox=(i-(nFigs-1)/2)*(fan[u.id]?6.5:12)*figS + kickX;
       const oy=(i%2)*4*figS + kickY + flinch*2;
       let bob=0, fly=0, yaw=rot;
       if(u._firing||u.aimId!=null) yaw=face*0.25 + (recoil?-0.2:0);
@@ -12733,25 +12768,45 @@ function allBuildingModelKinds(){
 
 /* v1.7 graphics: every building gets a nation-colored trim around its footprint and a flag on a pole. */
 function hqNationize(arr, opts){
+  // v1.7.1: buildings are built like the ships: the building is toned to naval grey and sits on a
+  // layered grey "hull" plinth with a thick nation-color band (like a waterline stripe), a deck rail and a flag.
   opts=opts||{};
   let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9,z0=1e9,z1=-1e9;
   for(let i=0;i<arr.length;i+=HQ_STRIDE){ const x=arr[i],y=arr[i+1],z=arr[i+2];
     if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; if(z<z0)z0=z; if(z>z1)z1=z; }
   if(!(x1>x0)) return arr;
-  const m=new HQMesh(); const N="#888888";
-  const span=Math.max(x1-x0,z1-z0), t=Math.max(0.05, span*0.035), h=Math.max(0.05, span*0.03);
-  if(opts.trim!==false){
-    m.box(x0-t,y0,z1, x1+t,y0+h,z1+t, N,1.0,0); m.box(x0-t,y0,z0-t, x1+t,y0+h,z0, N,1.0,0);
-    m.box(x0-t,y0,z0, x0,y0+h,z1, N,1.0,0);     m.box(x1,y0,z0, x1+t,y0+h,z1, N,1.0,0);
+  const span=Math.max(x1-x0,z1-z0);
+  const ph=span*0.16;                       // plinth height
+  const out=arr.slice();
+  const GREY=[0.56,0.60,0.64];
+  for(let i=0;i<out.length;i+=HQ_STRIDE){
+    out[i+1]+=ph;                           // lift the building onto its hull
+    if(out[i+9]<0.5){                       // tone colors toward naval grey, keep some identity
+      for(let j=0;j<3;j++){ const c=out[i+6+j]; out[i+6+j]=c*0.45+GREY[j]*0.55; }
+    }
   }
+  const m=new HQMesh(); const N="#888888";
+  const t=span*0.05;
+  // lower hull: wider, dark grey, with the thick nation band
+  m.box(x0-t*1.6,y0,z0-t*1.6, x1+t*1.6,y0+ph*0.55,z1+t*1.6, PAL.metalD,0,0);
+  m.box(x0-t*1.75,y0+ph*0.08,z0-t*1.75, x1+t*1.75,y0+ph*0.52,z1+t*1.75, N,1.0,0);
+  // upper deck: lighter grey step
+  m.box(x0-t*0.8,y0+ph*0.55,z0-t*0.8, x1+t*0.8,y0+ph,z1+t*0.8, PAL.metal,0,0);
+  // deck rail posts along the front and back edges
+  const rh=ph*0.35, rr=Math.max(0.015,span*0.008);
+  for(let k=0;k<=6;k++){ const x=x0-t*0.6+(x1-x0+t*1.2)*k/6;
+    m.box(x-rr,y0+ph,z1+t*0.5-rr, x+rr,y0+ph+rh,z1+t*0.5+rr, PAL.metalL,0,0);
+    m.box(x-rr,y0+ph,z0-t*0.5-rr, x+rr,y0+ph+rh,z0-t*0.5+rr, PAL.metalL,0,0); }
+  m.box(x0-t*0.6,y0+ph+rh-rr,z1+t*0.5-rr, x1+t*0.6,y0+ph+rh+rr,z1+t*0.5+rr, PAL.metalL,0,0);
+  m.box(x0-t*0.6,y0+ph+rh-rr,z0-t*0.5-rr, x1+t*0.6,y0+ph+rh+rr,z0-t*0.5+rr, PAL.metalL,0,0);
   if(opts.flag!==false){
-    const px=x0+t*2, pz=z0+t*2, top=Math.max(y1+span*0.18, y0+span*0.55);
-    const r=Math.max(0.025, span*0.012), fw=span*0.26, fh=span*0.15;
-    m.cyl(px,y0,top,pz, r, 5, "#c8c8c8",0,0);
+    const px=x0+t, pz=z0+t, top=Math.max(y1+ph+span*0.2, y0+span*0.7);
+    const r=Math.max(0.025, span*0.012), fw=span*0.28, fh=span*0.16;
+    m.cyl(px,y0+ph,top,pz, r, 5, "#c8c8c8",0,0);
     m.box(px+r,top-fh,pz-r*0.6, px+r+fw,top,pz+r*0.6, N,1.0,0);
     m.box(px-r*1.6,top,pz-r*1.6, px+r*1.6,top+r*3,pz+r*1.6, "#d8b43c",0,0);
   }
-  return arr.concat(m.data());
+  return out.concat(m.data());
 }
 function buildAllBuildingMeshes(){
   const out={};
@@ -13038,6 +13093,14 @@ function installHQDraw(){
   }
 }
 
+/* v1.7.1: keep bases (and the troops parked by them) off the big country-name labels. */
+function hqLabelDodge(x,y,pad){
+  pad=pad||10;
+  for(const r of (state._natLabelRects||[])){
+    if(x>r.x-pad && x<r.x+r.w+pad && y>r.y-pad*1.5 && y<r.y+r.h+pad*2.2) return {x, y:r.y+r.h+pad*2.2};
+  }
+  return {x,y};
+}
 function collectBaseFigures(now){
   const out=[];
   if(!state.bases)return out;
@@ -13055,6 +13118,7 @@ function collectBaseFigures(now){
     const _bw=baseWorldPos(b), wx=_bw.x, wy=_bw.y;
     const scr=typeof scrOf==="function"?scrOf(wx,wy):{x:wx,y:wy,vis:true};
     if(!scr||!scr.vis)continue;
+    { const d=hqLabelDodge(scr.x,scr.y); scr.x=d.x; scr.y=d.y; }
     if(scr.x<-50||scr.y<-50||scr.x>view.cssW+50||scr.y>view.cssH+50)continue;
     const nat=nations[b.owner];
     const col=nat?colOf(nat):"#888";
@@ -14045,6 +14109,41 @@ installCompat();
 })();
 try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||[]).map(b=>({kind:b.kind,owner:b.owner,wx:b.wx,wy:b.wy})),buildings:(state.buildings||[]).map(b=>({kind:b.kind,owner:b.owner,wx:b.wx,wy:b.wy}))}); } }catch(e){}
 
+// v1.6.4 perf: cache coastal-port lookups (was a full province scan per call, many calls per frame)
+(function(){
+  if(typeof hasPort!=="function")return;
+  let _pc=new Map(), _pt=0;
+  function refresh(){ const t=performance.now(); if(t-_pt>400){ _pc=new Map(); _pt=t; } }
+  hasPort=function(n){
+    if(!n||!n.alive)return false; refresh();
+    let v=_pc.get(n.id); if(v!==undefined)return v;
+    v=false; for(const p of provinces){ if(p.owner===n.id&&p.coastal){v=true;break;} }
+    _pc.set(n.id,v); return v;
+  };
+  // cache default building positions (placed ones use wx/wy directly)
+  if(typeof bldgWorldPos==="function"){
+    const _bw=bldgWorldPos;
+    bldgWorldPos=function(b){
+      if(b&&b.wx!=null&&b.wy!=null) return {x:b.wx,y:b.wy};
+      if(b&&b._wp&&b._wpPid===b.pid) return b._wp;
+      const w=_bw(b); if(b){ b._wp=w; b._wpPid=b.pid; } return w;
+    };
+  }
+})();
+
+// v1.6.4: leaving the globe returns to the flat camera you had (it used to zoom out to the whole world, drawing every unit and label)
+(function(){
+  if(typeof toggleGlobe!=="function")return;
+  const _tg=toggleGlobe; let saved=null;
+  toggleGlobe=function(force){
+    const was=!!state.globeOn, on=force==null?!was:!!force;
+    if(on&&!was) saved={s:view.scale,x:view.ox,y:view.oy};
+    const r=_tg.apply(this,arguments);
+    if(!on&&was&&saved){ view.ts=view.scale=saved.s; view.tox=view.ox=saved.x; view.toy=view.oy=saved.y; applyTx(); if(typeof bumpMap==="function")bumpMap(); }
+    return r;
+  };
+})();
+
 /* ===== v1.6 graphics: title fit, distinct neighbor colors, live hover card ===== */
 (function installV16Graphics(){
   // 1) Title and other overlays: never clip the top. Cards scroll on short screens and stay centered when they fit.
@@ -14479,7 +14578,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     if(!A||!A.alive) return {ok:false,why:"That country is gone."};
     if(atWar(aiId,state.player)) return {ok:false,why:"You can't trade with an enemy."};
     if(give===get) return {ok:false,why:"Pick two different goods."};
-    if(!(gq>0)||!(gq2>0)) return {ok:false,why:"Enter amounts above zero."};
+    if(!(gq>0)||!(gq2>0)) return {ok:false,why:gq2>0?"Offer an amount above zero.":nations[aiId].name+" has none of that to spare. Ask for something else."};
     if(stock(P,give)<gq) return {ok:false,why:"You don't have "+fmt(gq)+" "+give+"."};
     if(stock(A,get)<gq2) return {ok:false,why:A.name+" only has "+fmt(stock(A,get))+" "+get+"."};
     if(get!=="credits" && stock(A,get)-gq2<10) return {ok:false,why:A.name+" can't spare that much "+get+"."};
@@ -14502,6 +14601,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     renderPanel(true);
   }
   function openTradeWith(id){
+    if(T().partner!==id){ T().form=null; T().lastSwap=null; }
     T().partner=id; state.tab="trade";
     document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x.dataset.t==="trade"));
     renderPanel(true);
@@ -14511,16 +14611,20 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     if(pid==null||!alive(pid)||pid===P.id) pid=(state.selected>=0&&state.selected!==P.id&&alive(state.selected))?state.selected:null;
     if(pid==null) return `<div class="res"><h4>Swap goods</h4><div class="empty">Click a country on the map, or press Trade on its Diplo page, to swap goods with it.</div></div>`;
     const o=nations[pid], f=t.form||{give:"credits",gq:1000,get:"steel",gq2:15};
+    const spare=g=>g==="credits"?Math.floor(o.money||0):Math.max(0,Math.floor((o[g]||0)-10));
+    if(f.gq2>spare(f.get)) f.gq2=spare(f.get);
+    if(!t.form){ f.gq=Math.max(1,Math.ceil(f.gq2*unitVal(f.get)*Math.max(1,needMul(o,f.get))*(1.15-rel(pid,state.player)/300)/(unitVal(f.give)*needMul(o,f.give)))); t.form=f; }
     const opt=(sel)=>GOODS.map(g=>`<option value="${g}"${g===sel?" selected":""}>${g}</option>`).join("");
     const v=swapVerdict(pid,f.give,f.gq,f.get,f.gq2);
-    const hint=v.ok?`<span style="color:var(--green)">${o.name} would likely accept.</span>`:`<span style="color:var(--red)">${v.why}</span>`;
+    const none=f.gq2<=0?`<span style="color:var(--red)">${o.name} has no ${f.get} to spare. Ask for something else.</span>`:null;
+    const hint=none?none:v.ok?`<span style="color:var(--green)">${o.name} would likely accept.</span>`:`<span style="color:var(--red)">${v.why}</span>`;
     return `<div class="res"><h4>Swap goods with ${o.name}</h4>
       <div class="small" style="margin-bottom:6px">They have ${fmt(o.money||0)} cr, ${Math.floor(o.steel||0)} steel and ${Math.floor(o.oil||0)} oil. They pay more for what they're short on. Relations ${Math.round(rel(P.id,pid))}.</div>
       <div class="row" style="align-items:center;gap:6px;flex-wrap:wrap"><span>You give</span><input id="swGq" type="number" min="1" value="${f.gq}" style="width:80px"><select id="swGive">${opt(f.give)}</select>
       <span>for</span><input id="swGq2" type="number" min="1" value="${f.gq2}" style="width:80px"><select id="swGet">${opt(f.get)}</select></div>
       <div class="small" style="margin:6px 0">${hint}</div>
       <div class="row"><button class="btn green" id="swGo">Offer swap</button><button class="btn" id="swFair">Fair price</button></div>
-      ${t.lastSwap?`<div class="small" style="margin-top:6px">${t.lastSwap.msg}</div>`:""}</div>`;
+      ${t.lastSwap?`<div style="margin-top:8px;padding:6px 8px;border-radius:6px;font-weight:600;background:${t.lastSwap.ok?"rgba(60,160,90,.25)":"rgba(200,60,60,.28)"}">${t.lastSwap.ok?"✓ ":"✗ "}${t.lastSwap.msg}</div>`:""}</div>`;
   }
   function bindSwap(P){
     const t=T(); const pid=t.partner!=null&&alive(t.partner)&&t.partner!==P.id?t.partner:(state.selected>=0&&state.selected!==P.id?state.selected:null);
@@ -14529,6 +14633,8 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     ["swGive","swGet","swGq","swGq2"].forEach(id=>{const el=$(id); if(el) el.onchange=()=>{t.form=read(); t.lastSwap=null; renderPanel(true);};});
     $("swGo").onclick=()=>{const f=read(); t.form=f; doSwap(pid,f.give,f.gq,f.get,f.gq2);};
     $("swFair").onclick=()=>{const f=read(); const A=nations[pid];
+      const sp=f.get==="credits"?Math.floor(A.money||0):Math.max(0,Math.floor((A[f.get]||0)-10)); if(f.gq2>sp) f.gq2=sp;
+      if(f.gq2<=0){ t.form=f; t.lastSwap={ok:false,msg:A.name+" has no "+f.get+" to spare."}; renderPanel(true); return; }
       f.gq=Math.max(1,Math.ceil(f.gq2*unitVal(f.get)*Math.max(1,needMul(A,f.get))*(1.15-rel(pid,state.player)/300+(P.sanction>0?0.3:0))/(unitVal(f.give)*needMul(A,f.give))));
       t.form=f; t.lastSwap=null; renderPanel(true);};
   }
@@ -14616,6 +14722,297 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   }
   const C=window.CROWNFALL||(window.CROWNFALL={});
   C.trade={state:T, propose:proposePact, market:trade, bonus:pactBonus, swap:doSwap, verdict:swapVerdict, open:openTradeWith};
+})();
+
+/* ===== perf_ops (logic): cache enemy lists and port checks ===== */
+(function(){
+  let hc={t:-1,n:-1,arr:null,by:new Map()};
+  hostileUnits=function(u){
+    if(!u||u.str<=0)return [];
+    const units=state.units||[];
+    const now=performance.now();
+    if(hc.arr!==units||hc.n!==units.length||now-hc.t>15){
+      hc={t:now,n:units.length,arr:units,by:new Map()};
+    }
+    let list=hc.by.get(u.owner);
+    if(!list){
+      list=[];
+      for(const o of units){
+        if(!o||o.str<=0||o.owner===u.owner)continue;
+        if(typeof atWar==="function"&&atWar(u.owner,o.owner))list.push(o);
+      }
+      hc.by.set(u.owner,list);
+    }
+    const out=[];
+    for(const o of list)if(o.str>0&&o.id!==u.id)out.push(o);
+    return out;
+  };
+  const _hasPort=hasPort; let pc={k:null,m:new Map()};
+  hasPort=function(n){
+    if(!n||!n.alive)return false;
+    const k=state.tick+":"+(state.phase||"");
+    if(pc.k!==k)pc={k,m:new Map()};
+    if(pc.m.has(n.id))return pc.m.get(n.id);
+    const r=_hasPort(n); pc.m.set(n.id,r); return r;
+  };
+})();
+
+/* ===== gfx_perf_ops (graphics): per-tick caches for economy lookups + throttled autosave ===== */
+(function(){
+  let ver=0; const bump=()=>{ver++;};
+  const wrapBump=(get,set)=>{const f=get(); if(typeof f!=="function")return; set(function(){try{return f.apply(this,arguments);}finally{bump();}});};
+  if(typeof applyCap==="function") wrapBump(()=>applyCap,v=>applyCap=v);
+  if(typeof annexPuppet==="function") wrapBump(()=>annexPuppet,v=>annexPuppet=v);
+  if(typeof invalidateLand==="function") wrapBump(()=>invalidateLand,v=>invalidateLand=v);
+  let pKey="", own=new Map(), coast=new Map();
+  function provTables(){ const k=(state.tick|0)+"|"+ver+"|"+(state.mapVer||0);
+    if(k!==pKey){ own=new Map(); coast=new Map(); for(const p of provinces){ own.set(p.owner,(own.get(p.owner)||0)+1); if(p.coastal) coast.set(p.owner,(coast.get(p.owner)||0)+1);} pKey=k; } }
+  hasPort=function(n){ if(!n||!n.alive)return false; provTables(); return (coast.get(n.id)||0)>0; };
+  portCount=function(n){ if(!n)return 0; provTables(); return coast.get(n.id)||0; };
+  nCount=function(id){ provTables(); return own.get(id)||0; };
+  if(typeof readyKind==="function"){ let bKey="", tbl=new Map();
+    readyKind=function(n,kind){ if(!n)return 0; ensureBuildings(); const bs=state.buildings; const k=(state.tick|0)+"|"+ver+"|"+bs.length;
+      if(k!==bKey){ tbl=new Map(); for(const b of bs){ const kk=b.owner+"|"+b.kind; tbl.set(kk,(tbl.get(kk)||0)+bldgMul(b)); } bKey=k; }
+      return tbl.get(n.id+"|"+kind)||0; }; }
+  if(typeof techMul==="function"){ const orig=techMul; const cache=new Map();
+    techMul=function(n,key,base){ if(!n||!n.techs) return base==null?1:base;
+      let c=cache.get(n.id); const sig=state.tick|0; if(!c||c.sig!==sig){ c={sig,m:Object.create(null)}; cache.set(n.id,c); }
+      let v=c.m[key]; if(v===undefined){ v=orig(n,key,1); c.m[key]=v; } return (base==null?1:base)*v; }; }
+  // trade partners and neighbours: once per nation per tick
+  const perTick=(get,set)=>{const f=get(); if(typeof f!=="function")return; let key="",m=new Map();
+    set(function(a){ const k=(state.tick|0)+"|"+(state.phase||""); if(k!==key){key=k;m=new Map();}
+      const id=(a&&typeof a==="object")?a.id:a; let r=m.get(id); if(r===undefined){r=f.apply(this,arguments);m.set(id,r);} return Array.isArray(r)?r.slice():r; });};
+  if(typeof tradePartners==="function") perTick(()=>tradePartners,v=>tradePartners=v);
+  if(typeof neighNats==="function") perTick(()=>neighNats,v=>neighNats=v);
+  // autosave was a full JSON save every 3 ticks (a visible hitch); now at most every 20s, plus on leaving the page
+  if(typeof autosave==="function"){
+    const save=autosave; let lastSave=0;
+    autosave=function(force){ const t=performance.now(); if(force!==true && t-lastSave<20000) return; lastSave=t; return save(); };
+    const flush=()=>{ try{ save(); lastSave=performance.now(); }catch(e){} };
+    window.addEventListener("beforeunload",flush);
+    document.addEventListener("visibilitychange",()=>{ if(document.hidden) flush(); });
+  }
+})();
+/* ===== gfx_perf_ops: globe view. The globe repainted every province (and blurred every
+   player-province border separately) on every frame, even while paused (~2 fps with many units).
+   Now the globe disc is painted once into an offscreen canvas per camera position and reused;
+   battle flashes, hover and attack outlines are drawn on top. While the globe spins it skips the blur. */
+(function(){
+  if(typeof drawGlobeFrame!=="function") return;
+  let gver=0;
+  if(typeof invalidateLand==="function"){ const f=invalidateLand; invalidateLand=function(){ gver++; return f.apply(this,arguments); }; }
+  const gc={cv:null,key:"",t:0};
+  function paintDisc(c,w,h,moving){
+    const cx=w/2, cy=h/2+4, R=globe.r;
+    const bg=c.createLinearGradient(0,0,0,h); bg.addColorStop(0,"#050814"); bg.addColorStop(1,"#070d17");
+    c.fillStyle=bg; c.fillRect(0,0,w,h);
+    const glow=c.createRadialGradient(cx,cy,R*0.92,cx,cy,R*1.16);
+    glow.addColorStop(0,"rgba(110,190,255,0)"); glow.addColorStop(0.55,"rgba(80,170,255,0.08)");
+    glow.addColorStop(0.85,"rgba(120,200,255,0.28)"); glow.addColorStop(1,"rgba(10,20,40,0)");
+    c.fillStyle=glow; c.beginPath(); c.arc(cx,cy,R*1.16,0,Math.PI*2); c.fill();
+    const ox=cx-R*0.35, oy=cy-R*0.4;
+    const oc=c.createRadialGradient(ox,oy,R*0.1,cx,cy,R);
+    oc.addColorStop(0,"#3a8fb8"); oc.addColorStop(0.35,"#1c5d7e"); oc.addColorStop(0.7,"#0e3a55"); oc.addColorStop(1,"#071e30");
+    c.fillStyle=oc; c.beginPath(); c.arc(cx,cy,R,0,Math.PI*2); c.fill();
+    c.save(); c.beginPath(); c.arc(cx,cy,R,0,Math.PI*2); c.clip();
+    const shade=c.createLinearGradient(cx-R,cy,cx+R,cy);
+    shade.addColorStop(0,"rgba(0,0,0,0.28)"); shade.addColorStop(0.45,"rgba(0,0,0,0)"); shade.addColorStop(1,"rgba(255,240,210,0.08)");
+    c.fillStyle=shade; c.fillRect(cx-R,cy-R,R*2,R*2);
+    for(const p of provinces){
+      if(!p._gVis||!p._gPath)continue;
+      const nat=nations[p.owner]; if(!nat)continue;
+      const col=hexRgb(displayColor(nat));
+      let r=col.r,g=col.g,b=col.b;
+      const tt=typeof terrainTint==="function"?terrainTint(p,r,g,b):[r,g,b];
+      const lit=p._gLit||0.8;
+      r=clamp(tt[0]*lit,0,255); g=clamp(tt[1]*lit,0,255); b=clamp(tt[2]*lit,0,255);
+      if(p.nukeScar){r=lerp(r,40,0.45);g=lerp(g,40,0.45);b=lerp(b,36,0.4);}
+      c.fillStyle=rgb(r,g,b); c.fill(p._gPath,"evenodd");
+    }
+    c.lineJoin="round"; c.lineWidth=0.7;
+    for(const p of provinces){
+      if(!p._gVis||!p._gPath)continue;
+      const nat=nations[p.owner]; if(!nat)continue;
+      c.strokeStyle=shadeColor(displayColor(nat),0.45); c.stroke(p._gPath);
+    }
+    if(state.player>=0){
+      // one combined path, blurred once (was one blur per province)
+      const all=new Path2D();
+      for(const p of provinces) if(p.owner===state.player&&p._gVis&&p._gPath) all.addPath(p._gPath);
+      c.lineWidth=2.4; c.strokeStyle="rgba(236,201,112,0.95)";
+      if(!moving){ c.shadowColor="rgba(236,201,112,0.55)"; c.shadowBlur=8; }
+      c.stroke(all); c.shadowBlur=0;
+    }
+    c.restore();
+  }
+  drawGlobeFrame=function(){
+    const {cssW:w,cssH:h,dpr}=view;
+    if(!w)return;
+    if(!globe.r) globeFit();
+    const moving=!!globe.dirty;
+    if(globe.dirty) buildGlobePaths();
+    const key=[globe.lon.toFixed(3),globe.lat.toFixed(3),globe.r.toFixed(2),w|0,h|0,dpr,gver,state.mapVer||0,state.player].join("|");
+    const now=performance.now();
+    const W=Math.max(1,w*dpr|0), H=Math.max(1,h*dpr|0);
+    if(moving){
+      ctx.setTransform(dpr,0,0,dpr,0,0); paintDisc(ctx,w,h,true); gc.key="";
+    } else {
+      if(!gc.cv||gc.cv.width!==W||gc.cv.height!==H){ gc.cv=document.createElement("canvas"); gc.cv.width=W; gc.cv.height=H; gc.key=""; }
+      if(gc.key!==key || now-gc.t>1500){   // also refresh every 1.5s so colour/ownership changes show up
+        const c=gc.cv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H);
+        c.setTransform(dpr,0,0,dpr,0,0); paintDisc(c,w,h,false); gc.key=key; gc.t=now;
+      }
+      ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(gc.cv,0,0);
+    }
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    for(const p of provinces){
+      if(!(p.flash>0))continue;
+      if(p._gVis&&p._gPath){
+        const nat=nations[p.owner]; const col=hexRgb(displayColor(nat||{color:"#888"}));
+        const lit=p._gLit||0.8;
+        ctx.fillStyle=rgb(lerp(col.r*lit,255,p.flash*0.55),lerp(col.g*lit,255,p.flash*0.55),lerp(col.b*lit,210,p.flash*0.35));
+        ctx.fill(p._gPath,"evenodd");
+      }
+      p.flash=Math.max(0,p.flash-0.03);
+    }
+    const hover=state.hover>=0?provinces[state.hover]:null;
+    if(hover&&hover._gPath){ctx.lineWidth=2;ctx.strokeStyle="rgba(255,255,255,0.9)";ctx.stroke(hover._gPath);}
+    if(state.attackTarget>=0){const tp=provinces[state.attackTarget]; if(tp&&tp._gPath){ctx.lineWidth=3;ctx.strokeStyle="rgba(255,80,60,0.95)";ctx.stroke(tp._gPath);}}
+    drawGlobeOverlays();
+    drawUnitsGlobe();
+    drawParticlesGlobe();
+    drawMinimap();
+  };
+})();
+
+/* ===== turn_ops (logic): turn-based mode (default). End Turn plays N months, then pauses ===== */
+(function(){
+  const TMKEY="crownfall-turnmode";
+  const pref=()=>{ try{ return localStorage.getItem(TMKEY)!=="0"; }catch(e){ return true; } };
+  const savePref=v=>{ try{ localStorage.setItem(TMKEY,v?"1":"0"); }catch(e){} };
+  const isMP=()=>(typeof mpActive==="function"&&mpActive())||(typeof MP!=="undefined"&&MP&&MP.mode&&MP.mode!=="hotseat");
+  const on=()=>state.turnMode!==false&&!isMP();
+  function ensure(){ if(state.turnMode==null)state.turnMode=pref(); if(!state.turnLen)state.turnLen=1; if(state.turnLeft==null)state.turnLeft=0; if(!state.turnNo)state.turnNo=1; }
+  function endTurn(){
+    if(state.phase!=="play")return; ensure();
+    if(!on()){ state.paused=!state.paused; updateSpeed(); return; }
+    if(!state.paused&&state.turnLeft>0)return; // already playing
+    const wa=document.getElementById("warAlert"); if(wa&&wa.style.display==="block")return; // read the alert first
+    state.turnLeft=state.turnLen; state.paused=false; updateSpeed();
+  }
+  const _tick=gameTick;
+  gameTick=function(){
+    const before=state.tick;
+    const r=_tick.apply(this,arguments);
+    if(state.tick!==before&&on()&&state.phase==="play"){
+      ensure();
+      state.turnLeft=Math.max(0,(state.turnLeft||0)-1);
+      if(state.turnLeft<=0){ state.paused=true; state.accum=0; state.turnNo++; if(typeof updateSpeed==="function")updateSpeed(); }
+    }
+    return r;
+  };
+  const _ss=startAs;
+  startAs=function(){ const r=_ss.apply(this,arguments); ensure(); if(on()&&state.phase==="play"){ state.paused=true; state.turnLeft=0; state.turnNo=1; updateSpeed();
+      if(typeof notify==="function")notify("Turn-based: plan your moves, then press End Turn (Enter or Space) to play "+(state.turnLen>1?state.turnLen+" months":"one month")+".","info","important"); }
+    return r; };
+  // top-bar UI
+  function mk(){
+    const seg=document.querySelector("#tc .seg"); if(!seg||document.getElementById("bTurn"))return;
+    const b=document.createElement("button"); b.id="bTurn"; b.className="pause"; b.title="Play the next turn (Enter / Space)"; b.textContent="End Turn ▶";
+    b.style.cssText="font-weight:700;background:#2f6f3e;color:#fff";
+    b.onclick=e=>{e.stopPropagation();endTurn();}; seg.insertBefore(b,seg.firstChild);
+    const m=document.createElement("button"); m.id="bTurnMode"; m.title="Switch between turn-based and real-time";
+    m.onclick=e=>{ e.stopPropagation(); ensure(); if(isMP())return; state.turnMode=!state.turnMode; savePref(state.turnMode); if(window.__cfModeSync)window.__cfModeSync(); state.turnLeft=0; if(state.phase==="play")state.paused=true; updateSpeed(); };
+    seg.appendChild(m);
+    const l=document.createElement("button"); l.id="bTurnLen"; l.title="Months per turn";
+    l.onclick=e=>{ e.stopPropagation(); ensure(); const o=[1,3,6]; state.turnLen=o[(o.indexOf(state.turnLen)+1)%o.length]; updateSpeed(); };
+    seg.appendChild(l);
+  }
+  const _us=updateSpeed;
+  updateSpeed=function(){
+    const r=_us.apply(this,arguments); mk(); ensure();
+    if(state.paused&&state.turnLeft>0)state.turnLeft=0; // paused by an alert etc: the turn ends early
+    const t=on(), b=$("bTurn"), m=$("bTurnMode"), l=$("bTurnLen");
+    if(b){ b.style.display=t?"":"none"; const playing=!state.paused&&state.turnLeft>0; b.textContent=playing?"Playing…":"End Turn "+state.turnNo+" ▶"; b.disabled=playing; b.style.opacity=playing?0.6:1; }
+    if(m){ m.textContent=isMP()?"Real-time":(state.turnMode?"Turns":"Real-time"); m.classList.toggle("on",t); m.disabled=isMP(); }
+    if(l){ l.style.display=t?"":"none"; l.textContent=state.turnLen+" mo/turn"; }
+    const p=$("bPause"); if(p) p.style.display=t?"none":"";
+    return r;
+  };
+  // title screen: game mode choice
+  (function titleRow(){
+    const after=document.getElementById("tNotify"); if(!after||document.getElementById("tMode"))return;
+    const row=document.createElement("div"); row.className="notifyrow"; row.id="tMode";
+    row.innerHTML='<div class="lab">Game mode</div><button class="btn" data-m="1">Turn-based</button><button class="btn" data-m="0">Real-time</button>';
+    after.parentNode.insertBefore(row,after.nextSibling);
+    const sync=window.__cfModeSync=()=>row.querySelectorAll("button").forEach(x=>x.classList.toggle("on",(x.dataset.m==="1")===pref()));
+    row.querySelectorAll("button").forEach(x=>x.onclick=()=>{ savePref(x.dataset.m==="1"); state.turnMode=pref(); sync(); });
+    sync();
+  })();
+  const editing=()=>{ const a=document.activeElement; return a&&(a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT"||a.isContentEditable); };
+  document.addEventListener("keydown",e=>{
+    if(e.code!=="Enter"&&e.code!=="NumpadEnter"&&e.code!=="Space")return;
+    if(state.phase!=="play"||!on()||editing())return;
+    e.preventDefault(); e.stopImmediatePropagation(); endTurn();
+  },true);
+  const _snap=snapshot; snapshot=function(){ const s=_snap.apply(this,arguments); if(s){ s.turnMode=state.turnMode; s.turnLen=state.turnLen; s.turnNo=state.turnNo; } return s; };
+  const _ap=applySnap; applySnap=function(s){ const r=_ap.apply(this,arguments); if(s){ state.turnMode=s.turnMode!=null?s.turnMode:pref(); state.turnLen=s.turnLen||1; state.turnNo=s.turnNo||1; state.turnLeft=0; if(on()&&state.phase==="play")state.paused=true; } try{updateSpeed();}catch(e){} return r; };
+  const _nc=newCampaign; newCampaign=function(){ const len=state&&state.turnLen; const r=_nc.apply(this,arguments); state.turnMode=pref(); state.turnLen=len||1; state.turnLeft=0; state.turnNo=1; return r; };
+  if(window.CROWNFALL){ window.CROWNFALL.endTurn=endTurn; window.CROWNFALL.setTurnMode=v=>{state.turnMode=!!v;savePref(!!v);updateSpeed();}; window.CROWNFALL.turnState=()=>({mode:on(),len:state.turnLen,no:state.turnNo,left:state.turnLeft}); }
+  try{ ensure(); updateSpeed(); }catch(e){}
+})();
+
+
+/* ===== v1.6.4: goal-based tutorial (game) ===== */
+(function(){
+  const _st=document.createElement("style"); _st.textContent=".tutGoal{margin-top:6px;padding:5px 8px;border-radius:8px;background:rgba(231,197,106,.12);border:1px dashed var(--gold2)}"; document.head.appendChild(_st);
+  const _gt=gameTick; gameTick=function(){ const r=_gt.apply(this,arguments); if(state.phase==="play")state._tutEnded=true; return r; };
+  /* ---- goal-based tutorial ---- */
+  const me=()=>nations[state.player];
+  const _bu=buyUnit; buyUnit=function(n){ const r=_bu.apply(this,arguments); if(r&&n&&n.id===state.player)state._tutBought=true; return r; };
+  const _pb=placeBuilding; placeBuilding=function(nid){ const r=_pb.apply(this,arguments); if(r&&nid===state.player)state._tutBuilt=true; return r; };
+  const _pbs=placeBase; placeBase=function(nid){ const r=_pbs.apply(this,arguments); if(r&&nid===state.player)state._tutBase=true; return r; };
+  const hasBase=()=>state._tutBase||(state.bases||[]).some(b=>b.owner===state.player&&b.kind==="mil");
+  const STEPS=[
+    {t:"Pick your country", d:"Click any country on the map, then press <b>Play as</b>. Big countries are easier, small ones are a challenge.", goal:"Choose a country", ok:()=>state.phase==="play"},
+    {t:"It's turn-based", d:"Time is frozen while you plan. Make your moves, then press the green <b>End Turn</b> button (top right, or Space) and the month plays out while every other country moves too. Prefer real-time? Use the Turns / Real-time button next to it.", next:true},
+    {t:"Build a military base", d:"Open the build bar at the bottom and <b>drag a Military Base</b> onto your own land. Drop it exactly where you want it.", goal:"Place a Military Base", ok:hasBase},
+    {t:"Train troops", d:"Click your base (or open the <b>Shop</b> tab) and buy <b>Riflemen</b>. Training takes a turn or two.", goal:"Buy any unit", ok:()=>!!state._tutBought},
+    {t:"Grow your economy", d:"Drag a <b>Factory</b> (or any building) from the build bar onto a province. Buildings pay off every month.", goal:"Place a building", ok:()=>!!state._tutBuilt},
+    {t:"Trade", d:"Open the <b>Trade</b> tab to sign monthly trade deals and buy steel or oil. You can also press <b>Trade with</b> on any country in Diplo.", goal:"Open the Trade tab", ok:()=>state.tab==="trade"},
+    {t:"End your turn", d:"Press the green <b>End Turn</b> button and watch the month play out. Your money, training and research all move forward.", goal:"End a turn", ok:()=>!!state._tutEnded},
+    {t:"Armies and war", d:"Click your troops, then <b>right-click</b> where they should go. Select a neighbour and press <b>Declare War</b> in Diplo to attack. Press <b>H</b> any time for all the hotkeys. Good luck!", next:true, last:true}
+  ];
+  TUT_STEPS.length=0; STEPS.forEach(s=>TUT_STEPS.push(s));
+  renderTutorial=function(){
+    const box=$("tutor"); if(!box)return;
+    if(tutorialSeen()||!state.tipsOn||state.tutStep==null||state.tutStep>=TUT_STEPS.length){box.style.display="none";return;}
+    const i=state.tutStep, s=TUT_STEPS[i];
+    box.style.display="block"; box.style.pointerEvents="auto";
+    const goal=s.goal?`<div class="tutGoal">🎯 ${s.goal}${s.ok&&s.ok()?" ✅":""}</div>`:"";
+    box.innerHTML=`<b>${s.t} · ${i+1}/${TUT_STEPS.length}</b><div style="margin-top:6px">${s.d}</div>${goal}<div class="row">${s.next?`<button class="btn gold" id="tipN">${s.last?"Done":"Next"}</button>`:`<button class="btn" id="tipN">Skip step</button>`}<button class="btn" id="tipX">Close</button></div><button class="btn" id="tipNever" style="width:100%;margin-top:4px">Don't show again</button>`;
+    state._tutShown=i;
+    $("tipN").onclick=()=>advanceTutorial();
+    $("tipX").onclick=()=>endTutorial(false);
+    $("tipNever").onclick=()=>endTutorial(true);
+  };
+  function tutCheck(){
+    if(!state.tipsOn||state.tutStep==null||state.tutStep>=TUT_STEPS.length)return;
+    const s=TUT_STEPS[state.tutStep];
+    if(s&&s.ok&&s.ok()){ advanceTutorial(); return; }
+    const box=$("tutor"); if(box&&box.style.display==="none"&&state._tutShown!==state.tutStep) renderTutorial();
+  }
+  function restartTutorial(){
+    try{localStorage.removeItem(TIPKEY);}catch(e){}
+    state.tipsOn=true; state._tutBought=state._tutBuilt=state._tutEnded=false;
+    let i=state.phase==="play"?1:0;
+    state.tutStep=i; renderTutorial();
+  }
+  setInterval(tutCheck,250);
+  function addBtn(){ const end=document.getElementById("bTurn")||document.getElementById("bPause"); if(!end||document.getElementById("bTutor"))return;
+    const b=document.createElement("button"); b.id="bTutor"; b.textContent="?"; b.title="Restart the tutorial"; b.onclick=e=>{e.stopPropagation();restartTutorial();}; end.parentNode.appendChild(b); }
+  addBtn(); setTimeout(addBtn,500);
+  try{ if(window.CROWNFALL){ CROWNFALL.restartTutorial=restartTutorial; } }catch(e){}
 })();
 
 })();
