@@ -6519,10 +6519,46 @@ function collectUnitFigures(now){
   const close=typeof combatZoomedIn==="function"?combatZoomedIn(): (view&&view.scale>=0.4);
   const colOf=nat=>(typeof displayColor==="function"?displayColor(nat):nat&&nat.color)||"#888";
   // every unit is drawn on its own — never a single shared token for a stack
+  // v1.7: units parked in a province fan out in an arc beside their base (or below the
+  // province name) instead of piling onto the name label.
+  const fan={};
+  {
+    const groups={};
+    for(const u of (state.units||[])){
+      if(!u||u.str<=0) continue;
+      const p=provinces[u.pid]; if(!p) continue;
+      const moving=u.dest>=0&&u.dest!==u.pid&&!(u._hold);
+      if(moving||u.ax==null) continue;
+      if(Math.hypot(u.ax-p.cx,u.ay-p.cy)>3) continue;
+      const k=u.pid+":"+u.owner; (groups[k]=groups[k]||[]).push(u);
+    }
+    for(const k in groups){
+      const g=groups[k].sort((a,b)=>(a.id||0)-(b.id||0));
+      const p=provinces[g[0].pid], owner=g[0].owner;
+      const c=scrOf(p.cx,p.cy); if(!c||!c.vis) continue;
+      let ax=c.x, ay=c.y+4, dx=0, dy=1;
+      const b=(state.bases||[]).find(x=>x.pid===p.id&&x.owner===owner);
+      if(b && typeof baseWorldPos==="function"){
+        const w=baseWorldPos(b), bs=scrOf(w.x,w.y);
+        if(bs&&bs.vis){ ax=bs.x; ay=bs.y; dx=bs.x-c.x; dy=bs.y-c.y; const L=Math.hypot(dx,dy); if(L>2){dx/=L;dy/=L;} else {dx=0;dy=1;} }
+      }
+      const step=Math.max(14*figS, 9);            // spacing between figures, in screen pixels
+      let i=0, row=0;
+      while(i<g.length){
+        const n=3+row*2, R=step*(1.3+row*0.95), spread=Math.min(1.25, 0.42*(n-1));
+        for(let j=0;j<n&&i<g.length;j++,i++){
+          const ang=Math.atan2(dy,dx)+(n>1?(j/(n-1)-0.5)*2*spread:0);
+          fan[g[i].id]={x:ax+Math.cos(ang)*R, y:ay+Math.sin(ang)*R*0.8+10};
+        }
+        row++;
+      }
+    }
+  }
   for(const u of (state.units||[])){
     if(!u||u.str<=0)continue;
     const nat=nations[u.owner]; if(!nat)continue;
-    const p=scrOf(u.ax,u.ay); if(!p||!p.vis)continue;
+    let p=scrOf(u.ax,u.ay); if(!p||!p.vis)continue;
+    if(fan[u.id]) p={x:fan[u.id].x, y:fan[u.id].y, vis:true};
     if(p.x<-60||p.y<-60||p.x>view.cssW+60||p.y>view.cssH+60)continue;
     if(u._down>0.85 && (u.str||0)<=0) continue;
     const typ=typeof normType==="function"?normType(u.type):(u.type||"rifle");
