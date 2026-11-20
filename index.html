@@ -14370,6 +14370,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   },true);
 })();
 
+/* v2.5: the infinite box-shadow glow animation repainted the button every frame; the glow is static now. */
 /* ===== v1.8: polished End Turn button (logic's turn_ops controls; position and green kept) ===== */
 (function(){
   const st=document.createElement("style");
@@ -14377,7 +14378,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
 #tc .seg button#bTurn{background:linear-gradient(180deg,#46a85c,#2c7140)!important;color:#fff!important;font:800 14px "Segoe UI",sans-serif;
   padding:7px 20px;letter-spacing:.02em;text-shadow:0 1px 1px rgba(0,0,0,.45);
   box-shadow:inset 0 0 0 1px rgba(170,245,180,.55),inset 0 1px 0 rgba(255,255,255,.25),0 2px 12px rgba(60,200,100,.35);
-  transition:transform .08s,box-shadow .15s,filter .15s;animation:cfTurnGlow 2.4s ease-in-out infinite}
+  transition:transform .08s,box-shadow .15s,filter .15s}
 #tc .seg button#bTurn:hover:not(:disabled){filter:brightness(1.15);box-shadow:inset 0 0 0 1px rgba(200,255,205,.8),0 0 18px rgba(90,230,130,.6)}
 #tc .seg button#bTurn:active:not(:disabled){transform:translateY(1px) scale(.98)}
 #tc .seg button#bTurn:disabled{animation:none;filter:saturate(.5)}
@@ -14608,8 +14609,8 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
 (function(){
   const st=document.createElement("style"); st.id="cfGlass21";
   st.textContent=`
-:root{--glass:linear-gradient(180deg,rgba(22,31,48,.82),rgba(11,17,29,.86));--glassEdge:rgba(150,175,215,.16);--glassHi:inset 0 1px 0 rgba(255,255,255,.07);--glassSh:0 6px 22px rgba(0,0,0,.42),0 1px 3px rgba(0,0,0,.35)}
-.chip,.seg{background:var(--glass);border-color:var(--glassEdge);box-shadow:var(--glassSh),var(--glassHi);backdrop-filter:blur(7px) saturate(1.2);-webkit-backdrop-filter:blur(7px) saturate(1.2)}
+:root{--glass:linear-gradient(180deg,rgba(22,31,48,.93),rgba(11,17,29,.95));--glassEdge:rgba(150,175,215,.16);--glassHi:inset 0 1px 0 rgba(255,255,255,.07);--glassSh:0 6px 22px rgba(0,0,0,.42),0 1px 3px rgba(0,0,0,.35)}
+.chip,.seg{background:var(--glass);border-color:var(--glassEdge);box-shadow:var(--glassSh),var(--glassHi)}
 .brand{text-shadow:0 1px 0 rgba(0,0,0,.6),0 0 14px rgba(231,197,106,.25)}
 .seg button,.ib{transition:background .15s,color .15s}
 .seg button.on{background:linear-gradient(180deg,#f2d27c,#d9ae4c);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 1px 3px rgba(0,0,0,.35)}
@@ -14625,9 +14626,9 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
 .btn.red{background:linear-gradient(180deg,#b23a2d,#86261c);border-color:#c4473a}
 .btn.green{background:linear-gradient(180deg,#25875a,#196140);border-color:#2f9e69}
 .btn.blue{background:linear-gradient(180deg,#25609a,#1a4570);border-color:#3274b0}
-.toast{background:linear-gradient(180deg,rgba(22,31,48,.93),rgba(12,18,30,.95));border-color:var(--glassEdge);box-shadow:var(--glassSh),var(--glassHi);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-#actionBar,#tip,#econTip,#tutor,#unBanner{background:linear-gradient(180deg,rgba(22,31,48,.93),rgba(11,17,29,.95));border-color:var(--glassEdge);box-shadow:var(--glassSh),var(--glassHi);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px)}
-.card{background:linear-gradient(180deg,rgba(24,34,54,.94),rgba(11,17,29,.96));border-color:var(--glassEdge);box-shadow:0 24px 60px rgba(0,0,0,.55),var(--glassHi);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.toast{background:linear-gradient(180deg,rgba(22,31,48,.96),rgba(12,18,30,.97));border-color:var(--glassEdge);box-shadow:var(--glassSh),var(--glassHi)}
+#actionBar,#tip,#econTip,#tutor,#unBanner{background:linear-gradient(180deg,rgba(22,31,48,.96),rgba(11,17,29,.97));border-color:var(--glassEdge);box-shadow:var(--glassSh),var(--glassHi)}
+.card{background:linear-gradient(180deg,rgba(24,34,54,.97),rgba(11,17,29,.98));border-color:var(--glassEdge);box-shadow:0 24px 60px rgba(0,0,0,.55),var(--glassHi)}
 .card h1{text-shadow:0 2px 0 rgba(0,0,0,.45),0 0 26px rgba(231,197,106,.28)}
 #pbody::-webkit-scrollbar-thumb{background:rgba(150,175,215,.22);border-radius:6px}
 /* title screen */
@@ -15248,7 +15249,10 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
       ctx.setTransform(dpr,0,0,dpr,0,0); paintDisc(ctx,w,h,true); gc.key=""; (window.__CF_GSTAT=window.__CF_GSTAT||{rebuild:0,moving:0}).moving++;
     } else {
       if(!gc.cv||gc.cv.width!==W||gc.cv.height!==H){ gc.cv=document.createElement("canvas"); gc.cv.width=W; gc.cv.height=H; gc.key=""; }
-      if(gc.key!==key || now-gc.t>1500){   // also refresh every 1.5s so colour/ownership changes show up
+      // v2.5: was a full repaint every 1.5 s; now only when owners / colours / wars actually change (checked every 0.5 s)
+      if(now-gc.st>500||gc.st==null){ gc.st=now; let a=0; for(let i=0;i<provinces.length;i++) a=(a*31+provinces[i].owner*7+(provinces[i].nukeScar?3:0))|0;
+        let s=""+a; for(const n of nations){ if(n.alive){ s+=","+displayColor(n); if(n.wars&&n.wars.length) s+=":"+n.wars.join("."); } } gc.sig=s; }
+      if(gc.key!==key || gc.sig!==gc.psig){ gc.psig=gc.sig;
         const c=gc.cv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H);
         c.setTransform(dpr,0,0,dpr,0,0); paintDisc(c,w,h,false); gc.key=key; gc.t=now; (window.__CF_GSTAT=window.__CF_GSTAT||{rebuild:0,moving:0}).rebuild++;
       }
@@ -15439,7 +15443,7 @@ const GFX21=(function(){
     c.globalAlpha=0.6; c.drawImage(R.cv,0,0,R.WW,R.WH);
     let p=hpats.get(c); if(!p){ p=c.createPattern(X.hillTile(),"repeat"); hpats.set(c,p); }
     try{ p.setTransform(new DOMMatrix().scaleSelf(1.1,1.1)); }catch(e){}
-    const z=scale||1; c.globalAlpha=Math.max(0.25,Math.min(0.85,0.25+z*0.35)); c.fillStyle=p; c.fillRect(-1e5,-1e5,2e5,2e5);
+    const z=scale||1; if(!(typeof perfIsLite==="function"&&perfIsLite())){ c.globalAlpha=Math.max(0.25,Math.min(0.85,0.25+z*0.35)); c.fillStyle=p; c.fillRect(-1e5,-1e5,2e5,2e5); }   // v2.5: Low skips the hillshade tile
     c.restore(); };
   /* v2.2 perf: coastline-only paths (segments used by exactly one province), simplified per zoom.
      Stroking the full land path (every inner border too) with wide round strokes cost ~30 ms a pass. */
@@ -15468,7 +15472,7 @@ const GFX21=(function(){
     for(const e of T.values()){ if((e.tx+1)*TS<x0||e.tx*TS>x1||(e.ty+1)*TS<y0||e.ty*TS>y1) continue; P.addPath(e.P); }
     return P; };
   X.coast=(c,scale)=>{ const k=Math.max(0.12,Math.min(1,scale*1.4)), mg=80*k/scale; c.save(); c.lineJoin="round";
-    const far=scale<0.5, Lw=X.coastPath(scale,far?5:3,c,mg), Lf=far?Lw:X.coastPath(scale,0.8,c,mg);
+    const far=scale<0.5||(typeof perfIsLite==="function"&&perfIsLite()), Lw=X.coastPath(scale,far?5:3,c,mg), Lf=far?Lw:X.coastPath(scale,0.8,c,mg);
     // shallow teal shelf fading out to the deep navy (stacked strokes = cheap gradient), bright surf line
     for(const [w,a] of (far?[[60,0.14],[26,0.2]]:[[70,0.10],[48,0.12],[30,0.15],[16,0.18],[7,0.22]])){ c.lineWidth=w*k/scale; c.strokeStyle=`rgba(46,150,160,${a})`; c.stroke(w>20?Lw:Lf); }
     c.lineWidth=Math.max(1.2,2.6*k)/scale; c.strokeStyle="rgba(190,240,240,0.32)"; c.stroke(Lf); c.restore(); };
@@ -15572,11 +15576,12 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     }
     // v2.1: terrain texture, then a soft shadow just inside each border (only in the cached picture)
     try{ GFX21.drawRelief(c,null,scale); }catch(e){ if(!G.rw){G.rw=1;console.warn("relief",e);} }
-    GFX21.texture(c,scale,0.28);
+    const lite25=(typeof perfIsLite==="function"&&perfIsLite());
+    if(!lite25) GFX21.texture(c,scale,0.28);
     if(forCache){ // faint dotted province lines inside your own country
       const me=state.player; if(me>=0){ c.save(); c.setLineDash([2.2/scale,3/scale]); c.lineWidth=1/scale; c.strokeStyle="rgba(255,255,255,0.42)";
         for(const p of provinces) if(p.owner===me&&p.path) c.stroke(p.path); c.restore(); } }
-    if(forCache){ c.lineWidth=16/scale; c.strokeStyle="rgba(0,0,0,0.16)";
+    if(forCache&&!lite25){ c.lineWidth=16/scale; c.strokeStyle="rgba(0,0,0,0.16)";
       for(const [oid,path] of NP){ const n=nations[oid]; if(n&&n.alive) G.edge(c,path,path); } }
     // country outline: dark casing, then each country's own colour just inside its border
     c.lineWidth=Math.max(1.6,2.2*Math.min(1,scale*2))/scale; c.strokeStyle="rgba(6,8,14,0.85)";
@@ -15587,7 +15592,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
         c.strokeStyle=light(displayColor(n),0.35); G.edge(c,path,path); }
       // v2.2 bevel: light catches the north-west inner edge, shade on the south-east
       const o=1.3/scale; c.lineWidth=2.4/scale;
-      for(const [oid,path] of NP){ const n=nations[oid]; if(!n||!n.alive) continue;
+      if(!lite25) for(const [oid,path] of NP){ const n=nations[oid]; if(!n||!n.alive) continue;
         c.save(); c.clip(path,"evenodd");
         c.translate(o,o); c.strokeStyle="rgba(255,255,255,0.30)"; c.stroke(path);
         c.translate(-2*o,-2*o); c.strokeStyle="rgba(0,0,0,0.34)"; c.stroke(path); c.restore(); }
@@ -15960,6 +15965,245 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     if(state.attackTarget>=0){const tp=provinces[state.attackTarget];if(tp){ctx.lineWidth=3/scale;ctx.strokeStyle="rgba(255,80,60,0.95)";ctx.stroke(tp.path);}}
     for(const p of provinces){ if(p.flash>0) p.flash=Math.max(0,p.flash-0.03); }
   };
+})();
+/* ===== gfx v2.5 (graphics): lag pass =====
+   1) DPR cap: the map canvases render at most 1.5x (1x in Low), even on 4K / high-DPI screens.
+   2) Layered map cache: SEA (coast shelf, surf, waves) is baked per zoom level and never repainted for
+      ownership changes. LAND (colours, relief, borders) and the gold GLOW are separate layers; when a
+      province changes hands only its bounding box is repainted (clipped). An invalidate that changed
+      nothing on the map repaints nothing.
+   3) Zoom / pan never repaint per frame: the cached layers are drawn scaled/shifted (full detail, a bit
+      soft for a moment), with a low-res whole-world picture behind them for the edges. Repaints happen
+      once the camera has been still for 130 ms, LAND one frame and SEA the next (no single 40 ms hitch).
+   4) Idle: the main canvas (and WebGL units) only redraw when something changed; otherwise ~10 fps for
+      the slow pulses. Full rate while you interact, the camera moves, units walk, battles/particles run.
+   5) Low mode drops waves, the hillshade tile, soft-light texture, bevels and the shadow band, and uses
+      lower-resolution caches. ===== */
+const GFX25=(function(){
+  const X={stat:{land:0,landDirty:0,sea:0,over:0,skipInv:0,xform:0,drawn:0,skipped:0,landMs:0,seaMs:0,dirtyMs:0,overMs:0,maxMs:0}};
+  const lite=()=>{ try{ return typeof perfIsLite==="function"&&perfIsLite(); }catch(e){ return false; } };
+  X.lite=lite;
+  // ---- 1) DPR cap ----
+  try{
+    const d=Object.getOwnPropertyDescriptor(window,"devicePixelRatio")||Object.getOwnPropertyDescriptor(Window.prototype,"devicePixelRatio");
+    if(d&&d.get&&d.configurable!==false){
+      const real=()=>d.get.call(window)||1;
+      X.realDpr=real;
+      Object.defineProperty(window,"devicePixelRatio",{configurable:true,enumerable:true,get(){ return Math.min(real(), lite()?1:1.5); }});
+    }
+  }catch(e){}
+  const reDpr=()=>{ try{ if(typeof resize==="function") resize(); }catch(e){} try{ if(typeof UnitGL!=="undefined"&&UnitGL.ok&&UnitGL.resize) UnitGL.resize(); }catch(e){} };
+  if(typeof setPerf==="function"){ const sp=setPerf;
+    setPerf=function(){ const r=sp.apply(this,arguments); X.forceAll=true; reDpr(); return r; };
+    try{ if(window.CROWNFALL) window.CROWNFALL.setPerf=setPerf; }catch(e){} }
+  try{ if(typeof view!=="undefined"&&view.dpr&&view.dpr>window.devicePixelRatio+1e-6) setTimeout(reDpr,0); }catch(e){}
+
+  // ---- 2/3) layered map cache ----
+  let lv=0;
+  if(typeof invalidateLand==="function"){ const f=invalidateLand; invalidateLand=function(){ lv++; return f.apply(this,arguments); }; }
+  const SETTLE=130;
+  let camKey="", camT=0, budget=0;
+  const S={ land:{bands:4,front:null,back:null,spare:null,content:true},
+            glow:{bands:1,front:null,back:null,spare:null,content:true},
+            sea:{bands:2,front:null,back:null,spare:null,content:false} };
+  let over=null;
+  X.layers=S;
+  function mk(spare,g){
+    const W=Math.max(1,Math.ceil((g.w+2*g.m)*g.dpr*g.R)), H=Math.max(1,Math.ceil((g.h+2*g.m)*g.dpr*g.R));
+    let cv=spare&&spare.cv; if(!cv||cv.width!==W||cv.height!==H){ cv=document.createElement("canvas"); cv.width=W; cv.height=H; }
+    return {cv,w:g.w,h:g.h,m:g.m,R:g.R,dpr:g.dpr,scale:g.scale,ox:g.ox,oy:g.oy,ck:null,snap:null};
+  }
+  const k0=L=>L.dpr*L.R;
+  function setT(c,L){ const k=k0(L); c.setTransform(k*L.scale,0,0,k*L.scale,k*(L.ox+L.m),k*(L.oy+L.m)); }
+  const sameZoom=(L,g)=>!!L&&L.R===g.R&&L.dpr===g.dpr&&L.w===g.w&&L.h===g.h&&L.m===g.m&&Math.abs(L.scale-g.scale)<1e-4;
+  const inMargin=(L,g)=>Math.abs(g.ox-L.ox)<=g.m-2&&Math.abs(g.oy-L.oy)<=g.m-2;
+  // content snapshot: what the cached LAND / GLOW pictures depend on
+  let snapCk=null, snapCur=null;
+  function snapshot(ck){
+    if(snapCk===ck&&snapCur) return snapCur;
+    const G=GFX18, n=provinces.length, own=new Int32Array(n), occ=new Uint8Array(n); let nuke=0;
+    for(let i=0;i<n;i++){ const p=provinces[i]; own[i]=p.owner; try{ occ[i]=G.occupied(p)?1:0; }catch(e){} if(p.nukeScar) nuke+=i+1; }
+    let col="", war="";
+    for(const nt of nations){ if(!nt.alive){ col+="x,"; continue; } try{ col+=displayColor(nt)+","; }catch(e){ col+="?,"; } if(nt.wars&&nt.wars.length) war+=nt.id+":"+nt.wars.join(".")+";"; }
+    snapCur={own,occ,sig:col+"|"+war+"|"+nuke+"|"+state.player+"|"+lite()}; snapCk=ck; return snapCur;
+  }
+  function pxRects(L,ids,pad){
+    const k=k0(L), out=[]; let area=0;
+    for(const i of ids){ const p=provinces[i]; if(!p||!p.bb) continue;
+      let x0=(p.bb.x0*L.scale+L.ox+L.m)*k-pad, y0=(p.bb.y0*L.scale+L.oy+L.m)*k-pad, x1=(p.bb.x1*L.scale+L.ox+L.m)*k+pad, y1=(p.bb.y1*L.scale+L.oy+L.m)*k+pad;
+      x0=Math.max(0,Math.floor(x0)); y0=Math.max(0,Math.floor(y0)); x1=Math.min(L.cv.width,Math.ceil(x1)); y1=Math.min(L.cv.height,Math.ceil(y1));
+      if(x1>x0&&y1>y0){ out.push([x0,y0,x1-x0,y1-y0]); area+=(x1-x0)*(y1-y0); } }
+    out.area=area; return out;
+  }
+  const P={
+    land(c,L){ setT(c,L); paintLand(c,L.scale,true); },
+    glow(c,L){ if(state.player<0) return; if(state.mapDirty||!state.nationPaths) rebuildNationPaths();
+      const path=state.nationPaths&&state.nationPaths.get(state.player); if(!path) return; setT(c,L); const s=L.scale;
+      c.save(); c.shadowColor="rgba(236,201,112,0.9)"; c.shadowBlur=Math.max(6,10*Math.sqrt(s)*k0(L));
+      c.lineWidth=3.2/s; c.strokeStyle="rgba(236,201,112,1)"; c.stroke(path); c.restore();
+      c.lineWidth=1.4/s; c.strokeStyle="rgba(255,236,170,0.65)"; c.stroke(path); },
+    sea(c,L){ setT(c,L); if(!lite()&&L.scale>=0.3) try{ GFX21.waves(c,L.scale); }catch(e){}
+      c.save(); c.globalCompositeOperation="destination-over"; GFX21.coast(c,L.scale); c.restore(); },
+    over(c,L){ setT(c,L); paintLand(c,L.scale,true); c.save(); c.globalCompositeOperation="destination-over"; GFX21.coast(c,L.scale); c.restore(); }
+  };
+  function paintFull(kind,L){ const c=L.cv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,L.cv.width,L.cv.height); c.save(); try{ P[kind](c,L); } finally{ c.restore(); } }
+  function paintRects(kind,L,rects){ if(!rects.length) return; const c=L.cv.getContext("2d"); c.save(); c.setTransform(1,0,0,1,0,0); c.beginPath();
+    for(const r of rects){ c.clearRect(r[0],r[1],r[2],r[3]); c.rect(r[0],r[1],r[2],r[3]); } c.clip();
+    try{ P[kind](c,L); } finally{ c.restore(); } }
+  const stamp=(L,ck)=>{ L.ck=ck; L.snap=snapshot(ck); };
+  // bring a content layer up to date with the map: nothing, a few dirty boxes, or everything
+  function sync(kind,L,ck){
+    if(L.ck===ck) return;
+    const cur=snapshot(ck), old=L.snap;
+    const t0=performance.now();
+    if(!old||old.sig!==cur.sig||old.own.length!==cur.own.length){ paintFull(kind,L); X.stat.land++; }
+    else { const ids=[]; for(let i=0;i<cur.own.length;i++) if(cur.own[i]!==old.own[i]||cur.occ[i]!==old.occ[i]) ids.push(i);
+      if(!ids.length){ X.stat.skipInv++; }
+      else { const pad=kind==="glow"?Math.ceil(12+3.2*Math.max(6,10*Math.sqrt(L.scale)*k0(L))):Math.ceil(28*k0(L));
+        const rs=pxRects(L,ids,pad);
+        if(ids.length>40||rs.area>L.cv.width*L.cv.height*0.5){ paintFull(kind,L); X.stat.land++; }
+        else { paintRects(kind,L,rs); X.stat.landDirty++; X.stat.dirtyMs=performance.now()-t0; } } }
+    L.ck=ck; L.snap=cur;
+  }
+  // panned past the cached margin: scroll the picture and paint only the newly exposed strips
+  function shift(kind,L,ox,oy){
+    const k=k0(L), dx=Math.round((ox-L.ox)*k), dy=Math.round((oy-L.oy)*k), W=L.cv.width, H=L.cv.height;
+    if(!dx&&!dy) return;
+    if(Math.abs(dx)>=W*0.7||Math.abs(dy)>=H*0.7){ L.ox+=dx/k; L.oy+=dy/k; paintFull(kind,L); X.stat.shiftFull=(X.stat.shiftFull||0)+1; return; }
+    // ping-pong: copy into the layer's second canvas at the offset (one copy), then swap
+    let alt=L.alt; if(!alt||alt.width!==W||alt.height!==H){ alt=document.createElement("canvas"); alt.width=W; alt.height=H; }
+    const c=alt.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H); c.drawImage(L.cv,dx,dy);
+    L.alt=L.cv; L.cv=alt;
+    L.ox+=dx/k; L.oy+=dy/k;
+    const rs=[];
+    const pd=kind==="glow"?48:8;   // repaint a little past the seam (soft glow / anti-aliasing match exactly)
+    if(dx>0) rs.push([0,0,Math.min(W,dx+pd),H]); else if(dx<0) rs.push([Math.max(0,W+dx-pd),0,Math.min(W,pd-dx),H]);
+    if(dy>0) rs.push([0,0,W,Math.min(H,dy+pd)]); else if(dy<0) rs.push([0,Math.max(0,H+dy-pd),W,Math.min(H,pd-dy)]);
+    paintRects(kind,L,rs); X.stat.shift=(X.stat.shift||0)+1;
+  }
+  // keep one layer current: in place (sync / scroll), or a new zoom level built in bands over a few frames
+  function update(kind,g,settled,ck){
+    const s=S[kind];
+    if(s.front&&s.content) sync(kind,s.front,ck);
+    if(!s.front){ s.front=mk(s.spare,g); s.spare=null; paintFull(kind,s.front); if(s.content) stamp(s.front,ck); X.stat[kind==="sea"?"sea":"land"]++; return; }
+    if(sameZoom(s.front,g)){ s.back=null;   // scroll early (half the margin) when this frame has budget, so layers take turns
+      const off=Math.max(Math.abs(g.ox-s.front.ox),Math.abs(g.oy-s.front.oy));
+      if(off>g.m-2||(off>g.m*0.45&&budget>0)){ shift(kind,s.front,g.ox,g.oy); budget--; } return; }
+    if(!settled){ s.back=null; return; }
+    if(s.back&&!(sameZoom(s.back.L,g)&&inMargin(s.back.L,g))) s.back=null;
+    if(budget<=0) return;
+    if(!s.back){ const L=mk(s.spare,g); s.spare=null; if(s.content) stamp(L,ck);
+      const H=L.cv.height, n=s.bands, rows=[]; for(let i=0;i<n;i++){ const y0=Math.floor(H*i/n), y1=Math.floor(H*(i+1)/n); rows.push([0,y0,L.cv.width,y1-y0]); }
+      const c=L.cv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,L.cv.width,H); s.back={L,rows,i:0}; }
+    const B=s.back;
+    if(s.content&&B.L.ck!==ck){ stamp(B.L,ck); B.i=0; }
+    paintRects(kind,B.L,[B.rows[B.i]]); B.i++; budget--; X.stat.bands=(X.stat.bands||0)+1;
+    if(B.i>=B.rows.length){ s.spare=s.front; s.front=B.L; s.back=null; X.stat[kind==="sea"?"sea":"land"]++; }
+  }
+  function xf(L){ const {scale,ox,oy,dpr}=view; const k=dpr*scale/(k0(L)*L.scale);
+    return {k,tx:dpr*(ox-(L.ox+L.m)*scale/L.scale),ty:dpr*(oy-(L.oy+L.m)*scale/L.scale)}; }
+  function cov(L){ if(!L) return false; const {k,tx,ty}=xf(L); return tx<=0.5&&ty<=0.5&&tx+L.cv.width*k>=canvas.width-0.5&&ty+L.cv.height*k>=canvas.height-0.5; }
+  // draw a cached layer at the current camera (k=1 -> exact pixel copy)
+  function blit(L,alpha){
+    if(!L) return;
+    const {k,tx,ty}=xf(L);
+    ctx.save(); if(alpha!=null) ctx.globalAlpha=alpha;
+    if(Math.abs(k-1)<1e-6){ ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(L.cv,Math.round(tx),Math.round(ty)); }
+    else { ctx.setTransform(k,0,0,k,tx,ty); ctx.imageSmoothingEnabled=true; ctx.drawImage(L.cv,0,0); X.stat.xform++; }
+    ctx.restore();
+  }
+  // low-res whole-world picture, only drawn behind uncovered edges while zooming out or panning far
+  function overview(ck){
+    const s0=Math.min(0.2,1500/WW), t0=performance.now();
+    if(!over){ over=mk(null,{w:WW*s0,h:WH*s0,m:0,R:1,dpr:1,scale:s0,ox:0,oy:0}); paintFull("over",over); stamp(over,ck); }
+    else sync("over",over,ck);
+    X.stat.over++; X.stat.overMs=performance.now()-t0;
+  }
+  if(typeof drawMapBase==="function"&&typeof paintLand==="function"){
+    drawMapBase=function(){
+      const {cssW:w,cssH:h,scale,ox,oy,dpr}=view;
+      if(!w||scale==null||ox==null||oy==null) return;
+      const now=performance.now();
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      GFX21.ocean(ctx,w,h,dpr);
+      if(X.forceAll){ X.forceAll=false; for(const k in S){ S[k].front=S[k].back=S[k].spare=null; } over=null; }
+      const ck=lv+"|"+(state.mapVer||0);
+      const ckey=scale+"|"+ox+"|"+oy+"|"+w+"|"+h+"|"+dpr; if(ckey!==camKey){ camKey=ckey; camT=now; }
+      const atTarget=Math.abs((view.ts==null?scale:view.ts)-scale)<1e-3&&Math.abs((view.tox==null?ox:view.tox)-ox)<0.5&&Math.abs((view.toy==null?oy:view.toy)-oy)<0.5;
+      const settled=atTarget&&now-camT>=SETTLE;
+      const m=Math.round(Math.min(240,Math.max(120,Math.max(w,h)*0.2)));
+      const gL={w,h,m,R:lite()?0.75:1,dpr,scale,ox,oy}, gS={w,h,m,R:lite()?0.6:1,dpr,scale,ox,oy};
+      budget=1;
+      update("land",gL,settled,ck); update("glow",gL,settled,ck); update("sea",gS,settled,ck);
+      X.settled=settled&&!S.land.back&&!S.glow.back&&!S.sea.back;
+      const quiet=settled&&now-lastInput>900;
+      if(quiet&&(!over||over.ck!==ck)) overview(ck);
+      if(over&&!(cov(S.land.front)&&cov(S.sea.front))){ blit(over); X.stat.overUsed=(X.stat.overUsed||0)+1; }
+      blit(S.sea.front);
+      blit(S.land.front);
+      ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+      for(const p of provinces){ if(p.flash>0){ ctx.fillStyle=`rgba(255,245,210,${Math.min(0.55,p.flash*0.55)})`; ctx.fill(p.path,"evenodd"); } }
+      if(state.hover>=0&&provinces[state.hover]){ ctx.fillStyle="rgba(255,255,255,0.08)"; ctx.fill(provinces[state.hover].path,"evenodd"); }
+      if(state.player>=0&&S.glow.front){ const pulse=0.55+0.45*Math.sin(now/320); blit(S.glow.front,0.8+0.2*pulse); }
+      ctx.setTransform(dpr*scale,0,0,dpr*scale,dpr*ox,dpr*oy);
+      if(state.hover>=0&&provinces[state.hover]){ctx.lineWidth=2/scale;ctx.strokeStyle="rgba(255,255,255,0.9)";ctx.stroke(provinces[state.hover].path);}
+      if(state.attackTarget>=0){const tp=provinces[state.attackTarget];if(tp){ctx.lineWidth=3/scale;ctx.strokeStyle="rgba(255,80,60,0.95)";ctx.stroke(tp.path);}}
+      for(const p of provinces){ if(p.flash>0) p.flash=Math.max(0,p.flash-0.03); }
+      const dt=performance.now()-now; if(dt>X.stat.maxMs) X.stat.maxMs=dt;
+    };
+  }
+
+  // ---- 4) idle redraw skipping ----
+  let lastInput=0;
+  for(const ev of ["pointermove","pointerdown","pointerup","wheel","keydown","keyup","touchmove","touchstart"])
+    window.addEventListener(ev,()=>{ lastInput=performance.now(); },{capture:true,passive:true});
+  let lastDraw=0, lastSig="", lastW=0, lastH=0;
+  function busy(now){
+    if(now-lastInput<450) return "input";
+    if(state.phase==="play"&&!state.paused) return "running";
+    if(state._camLock) return "camLock";
+    const sc=view.scale;
+    if(view.ts!=null&&Math.abs(view.ts-sc)>1e-4) return "zoom";
+    if(view.tox!=null&&(Math.abs(view.tox-view.ox)>0.05||Math.abs(view.toy-view.oy)>0.05)) return "pan";
+    if(state.globeOn&&typeof globe!=="undefined"&&(globe.dirty||Math.abs(globe.tlon-globe.lon)>0.01||Math.abs(globe.tlat-globe.lat)>0.01||Math.abs(globe.tr-globe.r)>0.1)) return "globe";
+    if(state.particles&&state.particles.length) return "particles";
+    if(state.battles&&state.battles.length) return "battles";
+    const fx=state.combatFX; if(fx&&((fx.flashes&&fx.flashes.length)||(fx.tracers&&fx.tracers.length)||(fx.shells&&fx.shells.length)||(fx.smokes&&fx.smokes.length))) return "fx";
+    if(GFX18.chg&&GFX18.chg.size) return "captureFlash";
+    for(const p of provinces) if(p.flash>0) return "flash";
+    for(const u of (state.units||[])){ if(u.dest>=0&&u.dest!==u.pid) return "walk"; if(u._firing) return "fire"; }
+    if(state.boxSel||state.buildDrag) return "drag";
+    if(!state.globeOn&&X.settled===false) return "settle";
+    return "";
+  }
+  function sig(){
+    let s=view.scale+"|"+view.ox+"|"+view.oy+"|"+state.hover+"|"+state.selected+"|"+state.selectedProv+"|"+state.attackTarget+"|"+((state.selectedUnits||[]).length)+"|"+(state.mapVer||0)+"|"+lv+"|"+(state.tick|0)+"|"+(state.turnNo||0)+"|"+state.phase+"|"+!!state.globeOn+"|"+state.player;
+    if(state.globeOn&&typeof globe!=="undefined") s+="|"+globe.lon+"|"+globe.lat+"|"+globe.r;
+    let a=0,n=0; for(const u of (state.units||[])){ a+=(u.ax||0)*1.7+(u.ay||0)*0.3+(u.str||0)*0.01+(u.pid||0); n++; }
+    s+="|"+n+"|"+a.toFixed(2)+"|"+((state.buildings||[]).length)+"|"+((state.bases||[]).length);
+    return s;
+  }
+  X.idleFps=10;
+  if(typeof draw==="function"){
+    const _d=draw;
+    draw=function(){
+      const now=performance.now();
+      const cw=canvas.width, ch=canvas.height;
+      const why=busy(now); X.why=why;
+      let go=!!why||cw!==lastW||ch!==lastH||now-lastDraw>=1000/X.idleFps-4;
+      if(!go){ const s=sig(); if(s!==lastSig) go=true; }
+      if(!go){ X.stat.skipped++; return; }
+      lastDraw=now; lastW=cw; lastH=ch; X.stat.drawn++;
+      const r=_d.apply(this,arguments);
+      lastSig=sig();
+      return r;
+    };
+    draw._ffLock=_d._ffLock;
+    try{ if(window.CROWNFALL) window.CROWNFALL.draw=draw; }catch(e){}
+  }
+  X._dbg={paintFull,paintRects,S,shift};
+  try{ (window.CROWNFALL||(window.CROWNFALL={})).gfxPerf=()=>Object.assign({dpr:view.dpr,why:X.why,lite:lite()},X.stat); }catch(e){}
+  return X;
 })();
 
 /* ===== turn_ops (logic): turn-based mode (default). End Turn plays N months, then pauses ===== */
@@ -16418,16 +16662,20 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const x0=u.ax!=null?u.ax:p.cx, y0=u.ay!=null?u.ay:p.cy;
     anims.push({u,x0,y0,x1:p.cx,y1:p.cy,t0:performance.now()});
     u.tx=p.cx; u.ty=p.cy; u.facing=Math.atan2(p.cy-y0,p.cx-x0);
+    kick();
   }
-  (function loop(){
+  // runs only while something is sliding, then stops
+  let looping=false;
+  function kick(){ if(!looping){ looping=true; requestAnimationFrame(loop); } }
+  function loop(){
     const now=performance.now();
     for(let i=anims.length-1;i>=0;i--){
       const a=anims[i], t=Math.min(1,(now-a.t0)/650), e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
       a.u.ax=a.x0+(a.x1-a.x0)*e; a.u.ay=a.y0+(a.y1-a.y0)*e;
       if(t>=1)anims.splice(i,1);
     }
-    requestAnimationFrame(loop);
-  })();
+    if(anims.length)requestAnimationFrame(loop); else looping=false;
+  }
   function moveUnitsTo(us,pid){ for(const u of us){ u.fromPid=u.pid; u.pid=pid; u.dest=-1; u.wps=null; u.route=null; slide(u,pid); } }
 
   // ---- instant battle ----
