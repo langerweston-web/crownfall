@@ -6569,7 +6569,7 @@ function collectUnitFigures(now){
   if(state.bases){
     for(const b of state.bases){
       const pr=provinces[b.pid]; if(!pr)continue;
-      const c=scrOf(pr.cx,pr.cy); if(!c||!c.vis)continue;
+      const _sh=baseShift(b); const c=scrOf(pr.cx+_sh.dx,pr.cy+_sh.dy); if(!c||!c.vis)continue;
       const nat=nations[b.owner]; if(!nat)continue;
       const tier=typeof baseVisualTier==="function"?baseVisualTier(b):1;
       const x=c.x+(b.kind==="nav"?12:-14), y=c.y+(b.kind==="nav"?8:-20);
@@ -7336,12 +7336,20 @@ function dragBuildEnd(e){
   const d=state.buildDrag; state.buildDrag=null; state._buildHL=-1;
   showBuildGhost(0,0,false);
   if(!d||!d.valid||d.pid==null||d.pid<0)return;
+  let dropW=null;
+  if(!state.globeOn && typeof toWorld==="function"){
+    const r=canvas.getBoundingClientRect();
+    dropW=toWorld(e.clientX-r.left, e.clientY-r.top);
+  }
+  const setSpot=(o)=>{ if(o&&dropW){ o.wx=dropW.x; o.wy=dropW.y; } };
   if(d.kind==="mil"||d.kind==="nav"){
     const b=placeBase(state.player,d.pid,d.kind,false,false);
+    setSpot(b);
     if(b&&typeof mpSendCmd==="function") mpSendCmd({t:"base",kind:d.kind,pid:d.pid});
   } else if(typeof placeBuilding==="function"){
-    placeBuilding(state.player,d.pid,d.kind);
+    setSpot(placeBuilding(state.player,d.pid,d.kind));
   }
+  if(typeof bumpMap==="function") bumpMap();
   renderPanel(true); renderActionBar();
 }
 
@@ -7402,7 +7410,7 @@ function drawBaseFigs(){
   for(const b of state.bases){
     ensureBaseMods(b);
     const p=provinces[b.pid]; if(!p)continue;
-    const c=typeof scrOf==="function"?scrOf(p.cx,p.cy):{x:p.cx*view.scale+view.ox,y:p.cy*view.scale+view.oy,vis:true};
+    const _sh=baseShift(b); const c=typeof scrOf==="function"?scrOf(p.cx+_sh.dx,p.cy+_sh.dy):{x:p.cx*view.scale+view.ox,y:p.cy*view.scale+view.oy,vis:true};
     if(!c.vis)continue;
     if(c.x<-40||c.y<-40||c.x>view.cssW+40||c.y>view.cssH+40)continue;
     if(!show && b.owner!==state.player) continue;
@@ -10752,7 +10760,17 @@ function uploadBldgMeshesToGL(){
   }
 }
 function bldgMeshOf(kind){ return "bld_"+(kind||"factory"); }
+function baseWorldPos(b){
+  if(b&&b.wx!=null&&b.wy!=null) return {x:b.wx,y:b.wy};
+  const p=provinces[b.pid]; if(!p)return {x:0,y:0};
+  return {x:p.cx+(b.kind==="nav"?14:-16), y:p.cy+(b.kind==="nav"?10:-16)};
+}
+function baseShift(b){
+  const p=b&&provinces[b.pid]; if(!p||b.wx==null) return {dx:0,dy:0};
+  return {dx:b.wx-(p.cx+(b.kind==="nav"?14:-16)), dy:b.wy-(p.cy+(b.kind==="nav"?10:-16))};
+}
 function bldgWorldPos(b){
+  if(b&&b.wx!=null&&b.wy!=null) return {x:b.wx,y:b.wy};
   const p=provinces[b.pid]; if(!p)return {x:0,y:0};
   const slot=(b.id*17+((b.kind||"").length*9))%8;
   const ang=slot*(Math.PI/4)+0.3;
@@ -11907,7 +11925,7 @@ function meshHuman(kind){
     // lying along -Z, head toward -Z
     m.box(-0.16,0.02,-0.55, 0.16,0.20,0.35, cloth,0.12,0);
     m.box(-0.12,0.16,0.28, 0.12,0.36,0.62, PAL.skin,0, B.head);
-    m.cyl(0,0.18,0.42,0.55, 0.11,8, PAL.helmet,0.7, B.head);
+    m.cyl(0,0.18,0.42,0.55, 0.11,8, PAL.helmet,0.92, B.head);
     m.box(-0.05,0.10,-1.25, 0.05,0.18,0.50, PAL.gun,0, B.wep);
     m.box(-0.06,0.14,-0.10, 0.06,0.24,0.08, PAL.wood,0, B.wep);
     m.box(-0.22,0.00,0.20, -0.14,0.10,0.55, cloth,0.1, B.armL);
@@ -11937,10 +11955,10 @@ function meshHuman(kind){
   m.cyl(0,1.50,1.72,0, 0.12,8, PAL.skin,0,B.head);
   // helmet (or beret for SF, cap for some)
   if(kind==="sf"){
-    m.cyl(0,1.66,1.74,0, 0.13,8, "#1a2218",0.8,B.head);
+    m.cyl(0,1.66,1.74,0, 0.13,8, "#1a2218",0.95,B.head);
     m.box(-0.14,1.66,-0.04, 0.02,1.76,0.14, "#1a2218",0.8,B.head);
   } else {
-    m.cyl(0,1.62,1.76,0, 0.135,8, PAL.helmet,0.7,B.head);
+    m.cyl(0,1.62,1.76,0, 0.135,8, PAL.helmet,0.92,B.head);
     m.box(-0.14,1.62,-0.04, 0.14,1.68,0.16, PAL.helmet,0.55,B.head); // brim
     m.box(-0.04,1.64,0.12, 0.04,1.70,0.17, cloth,0.9,B.head); // nation flash
   }
@@ -11989,87 +12007,163 @@ function meshHuman(kind){
   return m.data();
 }
 
-function meshAAUnit(){
-  const m=new HQMesh();
-  m.box(-0.55,0.00,-0.40, 0.55,0.16,0.40, PAL.metalD,0.15,0);
-  m.cylX(-0.50,-0.20,0.14,0.28,0.14,8, PAL.boot,0,0);
-  m.cylX(-0.50,-0.20,0.14,-0.28,0.14,8, PAL.boot,0,0);
-  m.cylX( 0.20, 0.50,0.14,0.28,0.14,8, PAL.boot,0,0);
-  m.cylX( 0.20, 0.50,0.14,-0.28,0.14,8, PAL.boot,0,0);
-  m.box(-0.20,0.16,-0.18, 0.20,0.42,0.18, PAL.metal,0.4,0);
-  m.cyl(0,0.42,1.35,0, 0.06,8, PAL.metalL,0.2,7); // barrel bone 7 spin/elevate
-  m.box(-0.08,0.40,-0.08, 0.08,0.55,0.08, PAL.metalD,0,0);
-  return m.data();
-}
-function meshTank(){
-  const m=new HQMesh();
-  // hull
-  m.box(-0.70,0.22,-1.05, 0.70,0.62,1.00, "#3d4536",0.25,0);
-  m.box(-0.60,0.62,-0.70, 0.60,0.78,0.80, "#454e3c",0.3,0);
-  // tracks
-  m.box(-0.85,0.00,-1.10, -0.55,0.42,1.05, PAL.metalD,0,0);
-  m.box( 0.55,0.00,-1.10,  0.85,0.42,1.05, PAL.metalD,0,0);
-  for(let i=-3;i<=3;i++){
-    const z=i*0.26;
-    m.cylX(-0.86,-0.54, 0.16, z, 0.12, 8, PAL.metal,0,0);
-    m.cylX( 0.54, 0.86, 0.16, z, 0.12, 8, PAL.metal,0,0);
+/* v1.7 graphics: distinct land and air silhouettes, with clear nation-colored markings (acc=1 takes the nation color). */
+const NATC="#888888";
+function hqBeam(m,x0,y0,z0,x1,y1,z1,r,col,acc,bone){
+  // square-section prism between two points, for angled barrels and struts
+  const d=[x1-x0,y1-y0,z1-z0]; const L=Math.hypot(d[0],d[1],d[2])||1; d[0]/=L;d[1]/=L;d[2]/=L;
+  let u=Math.abs(d[1])<0.9?[0,1,0]:[1,0,0];
+  let a=[d[1]*u[2]-d[2]*u[1], d[2]*u[0]-d[0]*u[2], d[0]*u[1]-d[1]*u[0]]; let al=Math.hypot(...a); a=a.map(v=>v/al*r);
+  let b=[d[1]*a[2]-d[2]*a[1], d[2]*a[0]-d[0]*a[2], d[0]*a[1]-d[1]*a[0]]; let bl=Math.hypot(...b); b=b.map(v=>v/bl*r);
+  const P=(o,sa,sb)=>[o[0]+a[0]*sa+b[0]*sb,o[1]+a[1]*sa+b[1]*sb,o[2]+a[2]*sa+b[2]*sb];
+  const s=[x0,y0,z0], e=[x1,y1,z1];
+  const corners=[[1,1],[-1,1],[-1,-1],[1,-1]];
+  for(let i=0;i<4;i++){
+    const c0=corners[i], c1=corners[(i+1)%4];
+    const p0=P(s,...c0), p1=P(s,...c1), p2=P(e,...c1), p3=P(e,...c0);
+    const n=[a[0]*(c0[0]+c1[0])+b[0]*(c0[1]+c1[1]), a[1]*(c0[0]+c1[0])+b[1]*(c0[1]+c1[1]), a[2]*(c0[0]+c1[0])+b[2]*(c0[1]+c1[1])];
+    m.tri(...p0,...p1,...p2,...n,col,acc,bone); m.tri(...p0,...p2,...p3,...n,col,acc,bone);
   }
-  m.box(-0.86,0.30,-1.10, -0.54,0.40,1.05, "#2a2e28",0,0);
-  m.box( 0.54,0.30,-1.10,  0.86,0.40,1.05, "#2a2e28",0,0);
-  // turret + nation band
-  m.cyl(0,0.78,1.12,0.05, 0.42, 10, "#3a4334",0.2,0);
-  m.box(-0.42,0.92,-0.08, 0.42,1.04,0.08, clothNation(),0.85,0);
-  // barrel
-  m.cylZ(0,0.98,0.40,1.55, 0.07, 8, PAL.metalD,0,0);
-  m.cylZ(0,0.98,1.55,1.70, 0.09, 8, PAL.metal,0,0);
-  // hatch
-  m.cyl(-0.12,1.12,1.20,0.00, 0.10, 6, PAL.metal,0,0);
+  const ec=corners.map(c=>P(e,...c)); m.tri(...ec[0],...ec[1],...ec[2],...d,col,acc,bone); m.tri(...ec[0],...ec[2],...ec[3],...d,col,acc,bone);
+  return m;
+}
+function hqWing(m,pts,y,col,acc){
+  // flat polygon (fan) at height y, both faces
+  for(let i=1;i<pts.length-1;i++){
+    const A=pts[0],B=pts[i],C=pts[i+1];
+    m.tri(A[0],y,A[1], B[0],y,B[1], C[0],y,C[1], 0,1,0, col,acc,0);
+    m.tri(A[0],y-0.02,A[1], C[0],y-0.02,C[1], B[0],y-0.02,B[1], 0,-1,0, col,acc,0);
+  }
+  return m;
+}
+function hqTracks(m,hw,len,col){
+  m.box(-hw-0.30,0.00,-len, -hw,0.40,len, PAL.metalD,0,0);
+  m.box( hw,0.00,-len,  hw+0.30,0.40,len, PAL.metalD,0,0);
+  for(let i=-3;i<=3;i++){ const z=i*len/3.6;
+    m.cylX(-hw-0.31,-hw+0.01, 0.17, z, 0.13, 8, PAL.metal,0,0);
+    m.cylX( hw-0.01, hw+0.31, 0.17, z, 0.13, 8, PAL.metal,0,0); }
+  m.box(-hw-0.32,0.30,-len, -hw-0.02,0.42,len, col,1.0,0);   // nation-colored side skirt
+  m.box( hw+0.02,0.30,-len,  hw+0.32,0.42,len, col,1.0,0);
+}
+
+function meshTank(){
+  // main battle tank: low hull, sloped glacis, angular turret with bustle, long gun
+  const m=new HQMesh(); const body="#4a5338", bodyD="#3a4230";
+  hqTracks(m,0.55,1.10,NATC);
+  m.box(-0.58,0.30,-1.05, 0.58,0.66,0.80, body,0.15,0);
+  m.box(-0.56,0.30,0.80, 0.56,0.56,1.12, body,0.15,0);           // glacis step
+  m.box(-0.50,0.56,0.80, 0.50,0.62,0.98, bodyD,0.1,0);
+  // turret
+  m.box(-0.44,0.66,-0.55, 0.44,0.98,0.45, bodyD,0.2,0);
+  m.box(-0.36,0.66,0.45, 0.36,0.92,0.70, bodyD,0.2,0);             // wedge front
+  m.box(-0.38,0.68,-0.85, 0.38,0.94,-0.55, body,0.15,0);          // bustle
+  m.box(-0.45,0.86,-0.30, 0.45,1.00,0.20, NATC,1.0,0);             // nation stripe on turret
+  // gun
+  m.cylZ(0,0.84,0.70,2.05, 0.06, 8, PAL.metalD,0,0);
+  m.cylZ(0,0.84,1.30,1.50, 0.085, 8, PAL.metalD,0,0);             // fume extractor
+  m.cylZ(0,0.84,2.00,2.12, 0.075, 8, PAL.metal,0,0);
+  // hatches + antenna pennant
+  m.cyl(0.18,0.98,1.06,-0.10, 0.10, 6, PAL.metal,0,0);
+  m.cyl(-0.30,0.98,1.55,-0.70, 0.012, 4, PAL.metal,0,0);
+  m.box(-0.30,1.38,-0.70, -0.30+0.012,1.55,-0.92, NATC,1.0,0);
   return m.data();
-  function clothNation(){ return "#44503a"; }
 }
 function meshArt(){
+  // towed howitzer: split trails, two big wheels, gun shield, long barrel raised to fire
   const m=new HQMesh();
-  m.cylX(-0.55,0.55,0.22,0.00, 0.22, 8, PAL.boot,0,0);
-  m.box(-0.12,0.20,-0.30, 0.12,0.55,0.30, PAL.metalD,0.2,0);
-  m.box(-0.28,0.35,-0.20, 0.28,0.70,0.05, PAL.metal,0.25,0); // shield
-  m.cylZ(0,0.55,-0.15,1.70, 0.07, 8, PAL.metalD,0,0);
-  m.box(-0.10,0.20,0.10, 0.10,0.40,0.55, PAL.wood,0,0);
+  m.cylX(-0.62,-0.42,0.30,0.10, 0.30, 10, PAL.boot,0,0);
+  m.cylX( 0.42, 0.62,0.30,0.10, 0.30, 10, PAL.boot,0,0);
+  m.cylX(-0.43,-0.41,0.30,0.10, 0.14, 8, PAL.metal,0,0);
+  m.cylX( 0.41, 0.43,0.30,0.10, 0.14, 8, PAL.metal,0,0);
+  m.box(-0.42,0.24,-0.05, 0.42,0.38,0.25, "#4a5338",0.15,0);          // axle housing
+  hqBeam(m,-0.18,0.30,0.00, -0.55,0.04,-1.30, 0.06, "#4a5338",0.1,0); // trails
+  hqBeam(m, 0.18,0.30,0.00,  0.55,0.04,-1.30, 0.06, "#4a5338",0.1,0);
+  m.box(-0.62,0.00,-1.40, -0.44,0.10,-1.20, PAL.metalD,0,0);
+  m.box( 0.44,0.00,-1.40,  0.62,0.10,-1.20, PAL.metalD,0,0);
+  m.box(-0.45,0.38,0.22, 0.45,0.86,0.30, "#55603f",0.2,0);             // shield
+  m.box(-0.46,0.74,0.21, 0.46,0.86,0.31, NATC,1.0,0);                  // nation band on shield
+  m.box(-0.14,0.40,-0.30, 0.14,0.66,0.30, "#3a4230",0.1,0);            // cradle
+  hqBeam(m,0,0.56,-0.35, 0,1.30,1.75, 0.06, PAL.metalD,0,0);           // barrel, elevated
+  hqBeam(m,0,1.25,1.62, 0,1.36,1.92, 0.085, PAL.metal,0,0);            // muzzle brake
+  hqBeam(m,0,0.52,-0.20, 0,0.86,0.75, 0.09, "#3a4230",0.1,0);          // recoil sleeve
+  m.cyl(0.40,0.38,1.20,0.24, 0.012, 4, PAL.metal,0,0);
+  m.box(0.40,1.04,0.24, 0.412,1.20,0.02, NATC,1.0,0);   // nation flag, like the ships
+  return m.data();
+}
+function meshAAUnit(){
+  // tracked anti-air: tank chassis, boxy turret, twin cannons angled up, spinning radar
+  const m=new HQMesh(); const body="#4f5a42";
+  hqTracks(m,0.50,0.95,NATC);
+  m.box(-0.52,0.30,-0.95, 0.52,0.62,0.95, body,0.15,0);
+  m.box(-0.40,0.62,-0.50, 0.40,1.02,0.40, "#56614a",0.2,0);
+  m.box(-0.41,0.86,-0.51, 0.41,1.04,0.41, NATC,1.0,0);
+  hqBeam(m,-0.48,0.84,0.10, -0.48,1.55,0.95, 0.045, PAL.metalD,0,0);
+  hqBeam(m, 0.48,0.84,0.10,  0.48,1.55,0.95, 0.045, PAL.metalD,0,0);
+  m.box(-0.56,0.70,-0.05, -0.40,0.98,0.30, PAL.metalD,0,0);
+  m.box( 0.40,0.70,-0.05,  0.56,0.98,0.30, PAL.metalD,0,0);
+  m.cyl(0,1.02,1.14,0, 0.04, 5, PAL.metal,0,0);
+  m.box(-0.30,1.12,-0.04, 0.30,1.34,0.02, PAL.metalL,0,8);           // radar panel (bone 8 spins)
+  m.cyl(0.30,0.62,1.40,-0.80, 0.012, 4, PAL.metal,0,0);
+  m.box(0.30,1.24,-0.80, 0.312,1.40,-1.02, NATC,1.0,0);   // nation flag, like the ships
   return m.data();
 }
 function meshPlane(kind){
   const m=new HQMesh();
-  const bomber=kind==="bomb", trans=kind==="transport";
-  const fuseR=bomber||trans?0.18:0.14;
-  const fuseL=bomber?1.35:trans?1.20:1.05;
-  // fuselage along Z, nose +Z
-  m.cone(0,0.22,0.22, fuseL*0.15, fuseR*0.3, fuseR, 8, "#c8c4b8",0.15,0);
-  // approximate fuse as box + cyl
-  m.cylZ(0,0.22, -fuseL*0.55, fuseL*0.35, fuseR, 8, "#b8b4a8",0.2,0);
-  m.cone(0,0.22,0.22, -fuseL*0.85, fuseR, fuseR*0.2, 8, "#a8a498",0.15,0);
-  // cockpit
-  m.box(-0.10,0.30,0.05, 0.10,0.48,0.32, PAL.glass,0,0);
-  // wings
-  const wingW=bomber?1.55:trans?1.35:1.15;
-  const wingZ=bomber?0.05:-0.05;
-  m.box(-wingW,0.18,wingZ-0.22, wingW,0.26,wingZ+0.22, "#d0ccc0",0.15,0);
-  m.box(-wingW,0.16,wingZ-0.08, -wingW+0.15,0.28,wingZ+0.18, clothFlash(),0.85,0);
-  m.box( wingW-0.15,0.16,wingZ-0.08, wingW,0.28,wingZ+0.18, clothFlash(),0.85,0);
-  if(bomber){
-    m.cylZ(-0.7,0.14,-0.25,0.45, 0.10, 6, "#888480",0,0);
-    m.cylZ( 0.7,0.14,-0.25,0.45, 0.10, 6, "#888480",0,0);
+  if(kind==="air"){
+    // jet fighter: slim fuselage, pointed nose, delta wings, twin canted tails, roundels
+    const g="#9aa3ab";
+    m.cylZ(0,0.22,-1.00,0.75, 0.13, 8, g,0.05,0);
+        hqBeam(m,0,0.22,0.75, 0,0.22,1.05, 0.09, g,0.05,0); hqBeam(m,0,0.22,1.05, 0,0.22,1.30, 0.045, "#7c858c",0,0); // nose
+    m.box(-0.08,0.30,0.25, 0.08,0.42,0.70, "#3c5a6c",0,0);              // canopy
+    hqWing(m,[[0,0.45],[-1.05,-0.55],[-0.95,-0.85],[0,-0.80],[0.95,-0.85],[1.05,-0.55]],0.22,g,0.05);
+    m.box(-0.98,0.21,-0.75, -0.72,0.25,-0.55, NATC,1.0,0);              // wing roundels
+    m.box( 0.72,0.21,-0.75,  0.98,0.25,-0.55, NATC,1.0,0);
+    hqBeam(m,-0.18,0.28,-0.95, -0.32,0.72,-1.10, 0.05, g,0.05,0);      // twin tails
+    hqBeam(m, 0.18,0.28,-0.95,  0.32,0.72,-1.10, 0.05, g,0.05,0);
+    hqBeam(m,-0.30,0.62,-1.08, -0.33,0.74,-1.12, 0.06, NATC,1.0,0);
+    hqBeam(m, 0.30,0.62,-1.08,  0.33,0.74,-1.12, 0.06, NATC,1.0,0);
+    hqWing(m,[[0,-0.90],[-0.55,-1.15],[0,-1.10],[0.55,-1.15]],0.22,g,0.05); // tailplanes
+    m.cylZ(0,0.22,-1.12,-1.00, 0.10, 8, PAL.metalD,0,0);                // exhaust
+    return m.data();
   }
-  // tail
-  m.box(-0.04,0.22,-fuseL*0.85, 0.04,0.62,-fuseL*0.55, "#c8c4b8",0.15,0);
-  m.box(-0.40,0.48,-fuseL*0.82, 0.40,0.56,-fuseL*0.60, "#c8c4b8",0.15,0);
-  m.box(-0.04,0.50,-fuseL*0.78, 0.04,0.66,-fuseL*0.62, clothFlash(),0.9,0); // tail flash
-  // propeller at nose, bone 9 rotZ around origin shifted — build at nose and use bone 9
-  if(!bomber){
-    m.box(-0.42,0.18,fuseL*0.35, 0.42,0.26,fuseL*0.38, PAL.metalD,0,9);
-    m.box(-0.04,0.00,fuseL*0.35, 0.04,0.44,fuseL*0.38, PAL.wood,0,9);
+  if(kind==="bomb"){
+    // heavy bomber: long fuselage, big swept wings, four engine pods, tall single fin
+    const g="#6d757c";
+    m.cylZ(0,0.25,-1.40,1.20, 0.17, 8, g,0.05,0);
+    m.cylZ(0,0.25,1.20,1.40, 0.11, 8, g,0.05,0);
+    m.box(-0.10,0.36,0.85, 0.10,0.46,1.15, "#3c5a6c",0,0);
+    hqWing(m,[[0,0.45],[-1.80,-0.55],[-1.80,-0.80],[0,-0.10],[1.80,-0.80],[1.80,-0.55]],0.30,g,0.05);
+    for(const ex of [-1.20,-0.60,0.60,1.20]){
+      const ez=0.45-Math.abs(ex)*0.55;
+      m.cylZ(ex,0.20,ez-0.45,ez+0.15, 0.09, 6, "#4e555b",0,0);
+    }
+    m.box(-1.80,0.29,-0.80, -1.45,0.33,-0.48, NATC,1.0,0);
+    m.box( 1.45,0.29,-0.80,  1.80,0.33,-0.48, NATC,1.0,0);
+    hqBeam(m,0,0.30,-1.15, 0,1.05,-1.55, 0.05, g,0.05,0);              // fin
+    hqBeam(m,0,0.30,-1.05, 0,0.90,-1.40, 0.05, g,0.05,0);
+    hqBeam(m,0,0.82,-1.40, 0,1.02,-1.53, 0.07, NATC,1.0,0);            // fin flash
+    hqWing(m,[[0,-1.20],[-0.75,-1.55],[-0.70,-1.70],[0,-1.50],[0.70,-1.70],[0.75,-1.55]],0.28,g,0.05);
+    return m.data();
   }
+  // transport: fat fuselage, high straight wing on top, four turboprops, T-tail, nation stripe
+  const g="#8a8f78";
+  m.cylZ(0,0.30,-1.10,1.00, 0.24, 10, g,0.05,0);
+  m.cylZ(0,0.30,1.00,1.20, 0.17, 10, g,0.05,0);
+  hqBeam(m,0,0.30,-1.10, 0,0.55,-1.65, 0.12, g,0.05,0);                // upswept tail
+  m.box(-0.12,0.44,0.95, 0.12,0.52,1.12, "#3c5a6c",0,0);
+  m.box(-0.25,0.30,-0.40, 0.25,0.36,0.60, NATC,1.0,0);                  // fuselage stripe
+  hqWing(m,[[-1.75,0.30],[1.75,0.30],[1.75,-0.10],[-1.75,-0.10]],0.56,g,0.05);
+  for(const ex of [-1.15,-0.55,0.55,1.15]){
+    m.cylZ(ex,0.50,-0.05,0.55, 0.08, 6, "#5c6152",0,0);
+    m.cylZ(ex,0.50,0.55,0.58, 0.22, 8, "#2a2e32",0,0);                  // prop disc
+  }
+  m.box(-1.75,0.55,-0.10, -1.45,0.59,0.30, NATC,1.0,0);
+  m.box( 1.45,0.55,-0.10,  1.75,0.59,0.30, NATC,1.0,0);
+  hqBeam(m,0,0.62,-1.55, 0,1.10,-1.70, 0.05, g,0.05,0);                 // fin
+  hqWing(m,[[-0.65,-1.62],[0.65,-1.62],[0.65,-1.85],[-0.65,-1.85]],1.10,g,0.05); // T-tail
   return m.data();
-  function clothFlash(){ return "#3a4a6a"; }
 }
+
 function meshShip(kind){
   /* v1.6 graphics: every ship class has its own silhouette, with a nation-colored waterline band and flag. */
   const m=new HQMesh();
@@ -12601,6 +12695,28 @@ function allBuildingModelKinds(){
   return {civic, bases:["mil","nav"], mods};
 }
 
+/* v1.7 graphics: every building gets a nation-colored trim around its footprint and a flag on a pole. */
+function hqNationize(arr, opts){
+  opts=opts||{};
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9,z0=1e9,z1=-1e9;
+  for(let i=0;i<arr.length;i+=HQ_STRIDE){ const x=arr[i],y=arr[i+1],z=arr[i+2];
+    if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; if(z<z0)z0=z; if(z>z1)z1=z; }
+  if(!(x1>x0)) return arr;
+  const m=new HQMesh(); const N="#888888";
+  const span=Math.max(x1-x0,z1-z0), t=Math.max(0.05, span*0.035), h=Math.max(0.05, span*0.03);
+  if(opts.trim!==false){
+    m.box(x0-t,y0,z1, x1+t,y0+h,z1+t, N,1.0,0); m.box(x0-t,y0,z0-t, x1+t,y0+h,z0, N,1.0,0);
+    m.box(x0-t,y0,z0, x0,y0+h,z1, N,1.0,0);     m.box(x1,y0,z0, x1+t,y0+h,z1, N,1.0,0);
+  }
+  if(opts.flag!==false){
+    const px=x0+t*2, pz=z0+t*2, top=Math.max(y1+span*0.18, y0+span*0.55);
+    const r=Math.max(0.025, span*0.012), fw=span*0.26, fh=span*0.15;
+    m.cyl(px,y0,top,pz, r, 5, "#c8c8c8",0,0);
+    m.box(px+r,top-fh,pz-r*0.6, px+r+fw,top,pz+r*0.6, N,1.0,0);
+    m.box(px-r*1.6,top,pz-r*1.6, px+r*1.6,top+r*3,pz+r*1.6, "#d8b43c",0,0);
+  }
+  return arr.concat(m.data());
+}
 function buildAllBuildingMeshes(){
   const out={};
   const makers={
@@ -12622,6 +12738,9 @@ function buildAllBuildingMeshes(){
   out.bld_nav_L3 = meshNavBase(3);
   const mods=["barracks","depot","airfield","hospital","defenses","supply","radar","drydock","marines","coastal","subpens"];
   for(const id of mods) out["bld_mod_"+id]=meshMod(id);
+  for(const k of Object.keys(out)){
+    try{ out[k]=hqNationize(out[k], k.indexOf("bld_mod_")===0?{flag:false}:{}); }catch(e){}
+  }
   return out;
 }
 
@@ -12897,7 +13016,7 @@ function collectBaseFigures(now){
     if(!showAll && b.owner!==state.player) continue;
     const offX=b.kind==="nav"?10:-12, offY=b.kind==="nav"?8:-18;
     // place in world, not screen — use province + small offset in world units
-    const wx=p.cx+(b.kind==="nav"?14:-16), wy=p.cy+(b.kind==="nav"?10:-16);
+    const _bw=baseWorldPos(b), wx=_bw.x, wy=_bw.y;
     const scr=typeof scrOf==="function"?scrOf(wx,wy):{x:wx,y:wy,vis:true};
     if(!scr||!scr.vis)continue;
     if(scr.x<-50||scr.y<-50||scr.x>view.cssW+50||scr.y>view.cssH+50)continue;
@@ -12906,16 +13025,16 @@ function collectBaseFigures(now){
     const lv=b.level||1;
     const typ=b.kind==="nav" ? (lv>=3?"bld_nav_L3":lv>=2?"bld_nav_L2":"bld_nav")
                              : (lv>=3?"bld_mil_L3":lv>=2?"bld_mil_L2":"bld_mil");
-    const scl=18*figS*(1+(lv-1)*0.08);
+    const scl=11*figS*(1+(lv-1)*0.08); // v1.7: smaller bases
     const ghost=(b.buildLeft||0)>0 && !b.pendingModule && !b.pendingLevel;
     out.push({typ,x:scr.x,y:scr.y,scl,rot:0,bob:0,col,ghost,base:true,bid:b.id,phase:0,anim:0});
-    const rad=22*figS;
+    const rad=14*figS;
     state._baseHits.push({bid:b.id,x:scr.x-rad,y:scr.y-rad*1.5,w:rad*2,h:rad*2.2});
     // modules around the compound
     const mods=Object.keys(b.modules||{}).filter(k=>b.modules[k]);
     mods.forEach((mid,i)=>{
       const mul=(typeof modelSizeMul==="function"?modelSizeMul():0.275);
-      const ang=i*0.9, rr=(26+i*2)*mul;
+      const ang=i*0.9, rr=(16+i*1.5)*mul;
       const sx=scr.x+Math.cos(ang)*rr, sy=scr.y+8+Math.sin(ang)*rr*0.6;
       const mtyp="bld_mod_"+mid;
       out.push({typ:mtyp,x:sx,y:sy,scl:scl*0.55,rot:0,bob:0,col,ghost:false,base:true,bid:b.id,phase:t*(mid==="radar"?1.5:0),anim:0});
@@ -12944,14 +13063,14 @@ function installHQCollectors(){
       const nat=nations[b.owner];
       const col=nat?(typeof displayColor==="function"?displayColor(nat):nat.color):"#888";
       const typ=buildingModelId(b.kind, b.level||1);
-      const scl=18.5*figS*(b.kind==="wonder"?1.3:b.kind==="silo"||b.kind==="uni"?1.12:1);
+      const scl=11.5*figS*(b.kind==="wonder"?1.3:b.kind==="silo"||b.kind==="uni"?1.12:1); // v1.7: smaller buildings
       const ghost=(b.buildLeft||0)>0 || b.on===false || (b.hp||0)<=0;
       let phase=0;
       if(b.kind==="oilwell") phase=t*2.4;
       else if(b.kind==="radar_stn") phase=t*1.5;
       else if(b.kind==="factory") phase=t;
       out.push({typ,x:scr.x,y:scr.y,z:0,scl,rot:0,bob:0,col,ghost,bld:b.id,phase,anim:0});
-      const rad=20*figS;
+      const rad=13*figS;
       state._bldHits.push({bid:b.id,x:scr.x-rad,y:scr.y-rad*1.6,w:rad*2,h:rad*2.2});
     }
     return out;
@@ -13055,7 +13174,7 @@ function installHQCollectors(){
       for(const b of state.bases){
         if(typeof ensureBaseMods==="function") ensureBaseMods(b);
         const p=provinces[b.pid]; if(!p)continue;
-        const wx=p.cx+(b.kind==="nav"?14:-16), wy=p.cy+(b.kind==="nav"?10:-16);
+        const _bw=baseWorldPos(b), wx=_bw.x, wy=_bw.y;
         const c=typeof scrOf==="function"?scrOf(wx,wy):null;
         if(!c||!c.vis)continue;
         const damaged=(b.hp||100)/(b.maxHp||100);
@@ -13884,10 +14003,11 @@ installCompat();
     draining=true;
     let ok=false; try{ ok=buyUnit(n,job.type,job.pid,true); }finally{ draining=false; }
     Q.shift();
-    if(!ok) feedback("A queued unit couldn't start (not enough money?) and was dropped.","war",false);
+    if(!ok) feedback("A queued unit couldn't start (not enough money, steel or oil) and was dropped.","war",false);
   },600);
   window.__cfTrainQueue=Q;
 })();
+try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||[]).map(b=>({kind:b.kind,owner:b.owner,wx:b.wx,wy:b.wy})),buildings:(state.buildings||[]).map(b=>({kind:b.kind,owner:b.owner,wx:b.wx,wy:b.wy}))}); } }catch(e){}
 
 /* ===== v1.6 graphics: title fit, distinct neighbor colors, live hover card ===== */
 (function installV16Graphics(){
@@ -13970,13 +14090,17 @@ installCompat();
             let dx=0,dy=0; for(const j of (p.sea||[])){ const q=provinces[j]; if(q){dx+=q.cx-p.cx;dy+=q.cy-p.cy;} }
             let L=Math.hypot(dx,dy); if(L<1){dx=1;dy=0.6;L=Math.hypot(dx,dy);} dx/=L; dy/=L;
             const px=-dy, py=dx; const rot=Math.atan2(dx,dy);
+            const _sh=baseShift(b); const c0=typeof scrOf==="function"?scrOf(p.cx+14+_sh.dx,p.cy+10+_sh.dy):{x:p.cx,y:p.cy,vis:true};
+            if(!c0||!c0.vis) return;
+            const c1=typeof scrOf==="function"?scrOf(p.cx+14+_sh.dx+dx*20,p.cy+10+_sh.dy+dy*20):{x:c0.x+dx,y:c0.y+dy};
+            let sx=(c1.x-c0.x), sy=(c1.y-c0.y); const sl=Math.hypot(sx,sy)||1; sx/=sl; sy/=sl;
+            const u=12*figS;                       // matches the smaller v1.7 naval base
             slots[bi].forEach((k,i)=>{
-              const off=22+ (i>>1)*9, side=(i%2?1:-1)*((i+1)>>1)*7;
-              const wx=p.cx+14+dx*off+px*side, wy=p.cy+10+dy*off+py*side;
-              const scr=typeof scrOf==="function"?scrOf(wx,wy):{x:wx,y:wy,vis:true};
-              if(!scr||!scr.vis) return;
-              if(scr.x<-40||scr.y<-40||scr.x>view.cssW+40||scr.y>view.cssH+40) return;
-              out.push({typ:k,x:scr.x,y:scr.y,scl:8.5*figS,rot:rot+Math.PI/2,bob:0.6,col,base:false,phase:t+i,anim:0});
+              const row=i>>1, side=(i===0?0:(i%2?1:-1))*1.0;
+              const along=u*(1.6+row*1.1);
+              const x=c0.x+sx*along-sy*side*u, y=c0.y+sy*along+sx*side*u;
+              if(x<-40||y<-40||x>view.cssW+40||y>view.cssH+40) return;
+              out.push({typ:k,x,y,scl:u*0.8,rot:Math.atan2(sx,sy)+Math.PI/2,bob:0.6,col,base:false,phase:t+i,anim:0});
             });
           });
         }
@@ -13984,6 +14108,44 @@ installCompat();
       return out;
     };
   }
+})();
+
+/* ===== v1.7: drag your own buildings and bases to a new spot inside their province ===== */
+(function(){
+  let cand=null, drag=false;
+  function findOwn(sx,sy){
+    const inH=h=>h&&sx>=h.x&&sx<=h.x+h.w&&sy>=h.y&&sy<=h.y+h.h;
+    for(const h of (state._bldHits||[]).slice().reverse()){ if(!inH(h)) continue;
+      const b=(state.buildings||[]).find(x=>x.id===h.bid); if(b&&b.owner===state.player) return b; }
+    for(const h of (state._baseHits||[]).slice().reverse()){ if(!inH(h)) continue;
+      const b=(state.bases||[]).find(x=>x.id===h.bid); if(b&&b.owner===state.player) return b; }
+    return null;
+  }
+  const local=e=>{ const r=canvas.getBoundingClientRect(); return {sx:e.clientX-r.left, sy:e.clientY-r.top}; };
+  window.addEventListener("mousedown",e=>{
+    if(e.target!==canvas||e.button!==0||e.altKey||e.shiftKey||state.phase!=="play"||state.globeOn||state.buildDrag) return;
+    if(typeof toWorld!=="function") return;
+    const {sx,sy}=local(e);
+    const onUnit=(state._unitHits||[]).some(h=>h&&sx>=h.x&&sx<=h.x+h.w&&sy>=h.y&&sy<=h.y+h.h);
+    if(onUnit) return;                // units on top win: let the normal click select them
+    const b=findOwn(sx,sy); if(!b) return;
+    cand={b,sx,sy}; drag=false;
+    e.stopPropagation();           // keep the map from panning or box-selecting while you grab a building
+  },true);
+  window.addEventListener("mousemove",e=>{
+    if(!cand) return;
+    const {sx,sy}=local(e);
+    if(!drag && Math.hypot(sx-cand.sx,sy-cand.sy)<6) return;
+    drag=true; canvas.style.cursor="grabbing";
+    const pid=typeof hitProv==="function"?hitProv(sx,sy):-1;
+    if(pid===cand.b.pid){ const w=toWorld(sx,sy); cand.b.wx=w.x; cand.b.wy=w.y; if(typeof bumpMap==="function") bumpMap(); }
+    e.stopPropagation();
+  },true);
+  window.addEventListener("mouseup",e=>{
+    if(!cand) return;
+    const was=drag; cand=null; drag=false; canvas.style.cursor="";
+    if(was){ state._handledClick=true; e.stopPropagation(); }
+  },true);
 })();
 
 /* ===== v1.6 balance (logic): longer peace, starter garrison, fair AI ramp (alerts live in alert_ops.js) ===== */
@@ -14111,6 +14273,313 @@ installCompat();
       if(declareWar(best,P.id)) lastPlayerWar=t;
     }
   }
+})();
+
+/* ===== v1.7 Trade (logic): trade agreements, steel/oil market, AI trade offers ===== */
+(function installTrade(){
+  const PACT_MONTHS=24, MAX_PACTS_P=5, MAX_PACTS_AI=3, SIGN_FEE_MUL=1.5;
+  const BASE={steel:55, oil:75};
+  function T(){
+    if(!state.tradeSt) state.tradeSt={deals:[], price:{steel:BASE.steel, oil:BASE.oil}, offer:null, nextId:1};
+    return state.tradeSt;
+  }
+  const alive=i=>nations[i]&&nations[i].alive;
+  function monthlyIncome(n){ return Math.max(1,(n&&n.ledger&&n.ledger.income)||Math.pow(Math.max(1,n.gdp||1),0.72)*1.15); }
+  function dealsOf(id){ return T().deals.filter(d=>d.a===id||d.b===id); }
+  function partnerOf(d,id){ return d.a===id?d.b:d.a; }
+  function hasPact(a,b){ return T().deals.some(d=>(d.a===a&&d.b===b)||(d.a===b&&d.b===a)); }
+  function pactBonus(id,pid){
+    const me=nations[id], o=nations[pid]; if(!me||!o) return 0;
+    const mi=monthlyIncome(me), oi=monthlyIncome(o);
+    let b=0.06*mi*Math.max(0.25,Math.min(1.5,Math.sqrt(oi/mi)));
+    if(typeof techMul==="function") b*=techMul(me,"trade",1);
+    if(me.sanction>0||o.sanction>0) b*=0.5;
+    if((me.wars||[]).length) b*=0.8;
+    return b;
+  }
+  function signFee(id,pid){ return Math.round(pactBonus(id,pid)*SIGN_FEE_MUL); }
+  function canPact(a,b){
+    const A=nations[a],B=nations[b];
+    if(!A||!B||!A.alive||!B.alive||a===b) return "Pick another country.";
+    if(atWar(a,b)) return "You can't trade with a country you're at war with.";
+    if(hasPact(a,b)) return "You already have a trade agreement.";
+    const lim=a===state.player?MAX_PACTS_P:MAX_PACTS_AI;
+    if(dealsOf(a).length>=lim) return "You already have "+lim+" trade agreements, the most you can hold.";
+    if(dealsOf(b).length>=(b===state.player?MAX_PACTS_P:MAX_PACTS_AI)+1) return B.name+" has no room for another trade partner.";
+    if(rel(a,b)<-30) return B.name+" refuses to trade with you while relations are this bad.";
+    return null;
+  }
+  function aiAccepts(aiId,fromId){
+    const A=nations[aiId]; const r=rel(aiId,fromId);
+    if(r<-30) return false;
+    let p=0.55+r/150;
+    if(A.personality==="peaceful") p+=0.15; else if(A.personality==="expansionist") p-=0.1;
+    if(nations[fromId].sanction>0) p-=0.3;
+    if((A.wars||[]).some(w=>allied(w,fromId))) p-=0.4;
+    return Math.random()<Math.max(0.05,Math.min(0.95,p));
+  }
+  function signPact(a,b,silent){
+    const t=T();
+    t.deals.push({id:t.nextId++,a,b,left:PACT_MONTHS});
+    addRel(a,b,8);
+    if(!silent){
+      const msg=nations[a].name+" and "+nations[b].name+" signed a trade agreement.";
+      log("ally",msg);
+      if(a===state.player||b===state.player) notify(msg,"ally","important");
+    }
+  }
+  function endPact(d,why){
+    const t=T(); t.deals=t.deals.filter(x=>x!==d);
+    if(d.a===state.player||d.b===state.player){
+      const o=nations[partnerOf(d,state.player)];
+      const msg="Trade agreement with "+(o?o.name:"a partner")+" "+why+".";
+      log("sys",msg); notify(msg,"war","important");
+    }
+  }
+  function proposePact(target){
+    const me=state.player, err=canPact(me,target);
+    if(err){ feedback(err,"war",true); return; }
+    const fee=signFee(me,target), P=nations[me];
+    if((P.money||0)<fee){ feedback("Signing costs "+fmt(fee)+" cr. You don't have enough.","war",true); return; }
+    if(aiAccepts(target,me)){
+      P.money-=fee; signPact(me,target);
+      try{ SFX.ally(); }catch(e){}
+    } else {
+      addRel(me,target,-2);
+      feedback(nations[target].name+" turned down your trade agreement. Better relations help.","war",true);
+      T().cool=T().cool||{}; T().cool[target]=(state.tick||0)+6;
+    }
+    renderPanel(true);
+  }
+
+  /* ---- Market: buy/sell steel and oil ---- */
+  function priceOf(res,side){
+    const p=T().price[res]; const P=nations[state.player];
+    let v=side==="buy"?p*1.08:p*0.85;
+    if(P&&P.sanction>0) v*=side==="buy"?1.5:0.6;
+    if(side==="buy" && typeof techMul==="function" && P) v/=Math.min(1.3,techMul(P,"trade",1));
+    return Math.max(1,Math.round(v));
+  }
+  function trade(res,qty,side){
+    const P=nations[state.player]; if(!P) return;
+    const t=T();
+    if(side==="buy"){
+      const cost=priceOf(res,"buy")*qty;
+      if((P.money||0)<cost){ feedback("Buying "+qty+" "+res+" costs "+fmt(cost)+" cr. You don't have enough.","war",true); return; }
+      P.money-=cost; P[res]=Math.min(9999,(P[res]||0)+qty);
+      t.price[res]*=1+0.012*qty;
+    } else {
+      if((P[res]||0)<qty){ feedback("You only have "+Math.floor(P[res]||0)+" "+res+".","war",true); return; }
+      const gain=priceOf(res,"sell")*qty;
+      P[res]-=qty; P.money+=gain;
+      t.price[res]=Math.max(BASE[res]*0.4,t.price[res]*(1-0.01*qty));
+    }
+    try{ SFX.click(); }catch(e){}
+    if(typeof refreshHUD==="function") refreshHUD();
+    renderPanel(true);
+  }
+
+  /* ---- Monthly tick ---- */
+  function monthTrade(){
+    if(state.phase!=="play") return;
+    const t=T();
+    for(const r of ["steel","oil"]) t.price[r]+= (BASE[r]-t.price[r])*0.06 + (Math.random()-0.5)*BASE[r]*0.03;
+    for(const d of t.deals.slice()){
+      if(!alive(d.a)||!alive(d.b)){ endPact(d,"ended because a partner collapsed"); continue; }
+      if(atWar(d.a,d.b)){ endPact(d,"was torn up by war"); continue; }
+      for(const id of [d.a,d.b]){
+        const n=nations[id], bonus=pactBonus(id,partnerOf(d,id));
+        n.money=(n.money||0)+bonus;
+        if(n.ledger){ n.ledger.pacts=(n.ledger.pacts||0)+bonus; n.ledger.net=(n.ledger.net||0)+bonus; }
+      }
+      if(state.tick%3===0) addRel(d.a,d.b,1);
+      d.left--;
+      if(d.left<=0){
+        const pl=d.a===state.player||d.b===state.player;
+        if(!pl && Math.random()<0.6 && rel(d.a,d.b)>0){ d.left=PACT_MONTHS; continue; }
+        endPact(d,"expired. Sign a new one in the Trade tab to keep the income");
+      }
+    }
+    // AI-AI agreements among friendly nations
+    if(Math.random()<0.35){
+      const pool=nations.filter(n=>n.alive&&n.id!==state.player&&!(typeof mpIsHuman==="function"&&mpIsHuman(n.id)));
+      const A=pool[Math.floor(Math.random()*pool.length)];
+      if(A){
+        const cands=neighNats(A.id).filter(b=>b!==state.player&&!canPact(A.id,b)&&rel(A.id,b)>-5);
+        const B=cands[Math.floor(Math.random()*cands.length)];
+        if(B!=null && aiAccepts(B,A.id)) signPact(A.id,B,true);
+      }
+    }
+    // AI offers the player a deal now and then
+    const P=nations[state.player];
+    if(P&&P.alive&&!t.offer&&(state.tick||0)>=4&&Math.random()<0.07&&dealsOf(P.id).length<MAX_PACTS_P){
+      const cands=[...new Set([...neighNats(P.id),...nations.filter(n=>n.alive).sort((x,y)=>(y.gdp||0)-(x.gdp||0)).slice(0,25).map(n=>n.id)])]
+        .filter(o=>o!==P.id&&!canPact(o,P.id)&&!canPact(P.id,o)&&rel(o,P.id)>=0);
+      const o=cands[Math.floor(Math.random()*cands.length)];
+      if(o!=null){
+        t.offer={from:o,until:(state.tick||0)+6};
+        const msg=nations[o].name+" offers you a trade agreement worth about "+fmt(pactBonus(P.id,o))+" cr a month. Open the Trade tab to answer.";
+        log("ally",msg); notify(msg,"ally","important");
+      }
+    }
+    if(t.offer&&((state.tick||0)>t.offer.until||!alive(t.offer.from)||atWar(t.offer.from,state.player))) t.offer=null;
+    if(state.tab==="trade") renderPanel(true);
+  }
+  if(typeof gameTick==="function"){
+    const _gt=gameTick;
+    gameTick=function(){ const r=_gt.apply(this,arguments); try{ monthTrade(); }catch(e){ console.warn("trade",e); } return r; };
+  }
+
+
+  /* ---- Direct swaps: credits / steel / oil for another nation's goods ---- */
+  const GOODS=["credits","steel","oil"];
+  const unitVal=g=>g==="credits"?1:T().price[g];
+  function stock(n,g){ return g==="credits"?(n.money||0):(n[g]||0); }
+  function addStock(n,g,v){ if(g==="credits") n.money=(n.money||0)+v; else n[g]=Math.max(0,Math.min(9999,(n[g]||0)+v)); }
+  function needMul(n,g){ if(g==="credits") return (n.money||0)<monthlyIncome(n)*3?1.3:1; const st=n[g]||0; return st<15?1.6:st<50?1.25:st>300?0.7:1; }
+  function swapVerdict(aiId,give,gq,get,gq2){
+    // give/gq = what the player gives, get/gq2 = what the player asks for
+    const A=nations[aiId], P=nations[state.player];
+    if(!A||!A.alive) return {ok:false,why:"That country is gone."};
+    if(atWar(aiId,state.player)) return {ok:false,why:"You can't trade with an enemy."};
+    if(give===get) return {ok:false,why:"Pick two different goods."};
+    if(!(gq>0)||!(gq2>0)) return {ok:false,why:"Enter amounts above zero."};
+    if(stock(P,give)<gq) return {ok:false,why:"You don't have "+fmt(gq)+" "+give+"."};
+    if(stock(A,get)<gq2) return {ok:false,why:A.name+" only has "+fmt(stock(A,get))+" "+get+"."};
+    if(get!=="credits" && stock(A,get)-gq2<10) return {ok:false,why:A.name+" can't spare that much "+get+"."};
+    if(rel(aiId,state.player)<-30) return {ok:false,why:A.name+" won't deal with you while relations are this bad."};
+    const valIn=gq*unitVal(give)*needMul(A,give);
+    const valOut=gq2*unitVal(get)*(get==="credits"?1:Math.max(1,needMul(A,get)));
+    const want=1.12-rel(aiId,state.player)/300+(P.sanction>0?0.3:0);
+    return {ok:valIn>=valOut*want, ratio:valIn/(valOut*want), why:A.name+" wants a better deal. Offer more or ask for less."};
+  }
+  function doSwap(aiId,give,gq,get,gq2){
+    const v=swapVerdict(aiId,give,gq,get,gq2);
+    if(!v.ok){ feedback(v.why,"war",true); T().lastSwap={ok:false,msg:v.why}; renderPanel(true); return; }
+    const A=nations[aiId], P=nations[state.player];
+    addStock(P,give,-gq); addStock(A,give,gq); addStock(A,get,-gq2); addStock(P,get,gq2);
+    addRel(aiId,state.player,2);
+    const msg="You traded "+fmt(gq)+" "+give+" to "+A.name+" for "+fmt(gq2)+" "+get+".";
+    log("ally",msg); T().lastSwap={ok:true,msg};
+    try{ SFX.ally(); }catch(e){}
+    if(typeof refreshHUD==="function") refreshHUD();
+    renderPanel(true);
+  }
+  function openTradeWith(id){
+    T().partner=id; state.tab="trade";
+    document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x.dataset.t==="trade"));
+    renderPanel(true);
+  }
+  function swapHtml(P){
+    const t=T(); let pid=t.partner;
+    if(pid==null||!alive(pid)||pid===P.id) pid=(state.selected>=0&&state.selected!==P.id&&alive(state.selected))?state.selected:null;
+    if(pid==null) return `<div class="res"><h4>Swap goods</h4><div class="empty">Click a country on the map, or press Trade on its Diplo page, to swap goods with it.</div></div>`;
+    const o=nations[pid], f=t.form||{give:"credits",gq:1000,get:"steel",gq2:15};
+    const opt=(sel)=>GOODS.map(g=>`<option value="${g}"${g===sel?" selected":""}>${g}</option>`).join("");
+    const v=swapVerdict(pid,f.give,f.gq,f.get,f.gq2);
+    const hint=v.ok?`<span style="color:var(--green)">${o.name} would likely accept.</span>`:`<span style="color:var(--red)">${v.why}</span>`;
+    return `<div class="res"><h4>Swap goods with ${o.name}</h4>
+      <div class="small" style="margin-bottom:6px">They have ${fmt(o.money||0)} cr, ${Math.floor(o.steel||0)} steel and ${Math.floor(o.oil||0)} oil. They pay more for what they're short on. Relations ${Math.round(rel(P.id,pid))}.</div>
+      <div class="row" style="align-items:center;gap:6px;flex-wrap:wrap"><span>You give</span><input id="swGq" type="number" min="1" value="${f.gq}" style="width:80px"><select id="swGive">${opt(f.give)}</select>
+      <span>for</span><input id="swGq2" type="number" min="1" value="${f.gq2}" style="width:80px"><select id="swGet">${opt(f.get)}</select></div>
+      <div class="small" style="margin:6px 0">${hint}</div>
+      <div class="row"><button class="btn green" id="swGo">Offer swap</button><button class="btn" id="swFair">Fair price</button></div>
+      ${t.lastSwap?`<div class="small" style="margin-top:6px">${t.lastSwap.msg}</div>`:""}</div>`;
+  }
+  function bindSwap(P){
+    const t=T(); const pid=t.partner!=null&&alive(t.partner)&&t.partner!==P.id?t.partner:(state.selected>=0&&state.selected!==P.id?state.selected:null);
+    if(pid==null||!document.getElementById("swGo")) return;
+    const read=()=>({give:$("swGive").value,gq:Math.max(0,Math.floor(+$("swGq").value||0)),get:$("swGet").value,gq2:Math.max(0,Math.floor(+$("swGq2").value||0))});
+    ["swGive","swGet","swGq","swGq2"].forEach(id=>{const el=$(id); if(el) el.onchange=()=>{t.form=read(); t.lastSwap=null; renderPanel(true);};});
+    $("swGo").onclick=()=>{const f=read(); t.form=f; doSwap(pid,f.give,f.gq,f.get,f.gq2);};
+    $("swFair").onclick=()=>{const f=read(); const A=nations[pid];
+      f.gq=Math.max(1,Math.ceil(f.gq2*unitVal(f.get)*Math.max(1,needMul(A,f.get))*(1.15-rel(pid,state.player)/300+(P.sanction>0?0.3:0))/(unitVal(f.give)*needMul(A,f.give))));
+      t.form=f; t.lastSwap=null; renderPanel(true);};
+  }
+  if(typeof renderDiplo==="function"){
+    const _rd=renderDiplo;
+    renderDiplo=function(box,n){
+      const r=_rd.apply(this,arguments);
+      try{
+        if(n&&state.player>=0&&n.id!==state.player&&n.alive&&!atWar(n.id,state.player)&&box){
+          const d=document.createElement("div"); d.className="row"; d.style.marginTop="8px";
+          d.innerHTML=`<button class="btn green" id="dipTrade" style="font-size:14px;padding:10px 14px">Trade with ${n.name}${hasPact(state.player,n.id)?" (agreement active)":""}</button>`;
+          const head=box.querySelector(".head"); if(head&&head.nextSibling) box.insertBefore(d,head.nextSibling); else box.appendChild(d);
+          d.querySelector("#dipTrade").onclick=()=>openTradeWith(n.id);
+        }
+      }catch(e){console.warn("diplo trade",e);}
+      return r;
+    };
+  }
+
+  /* ---- Trade tab UI ---- */
+  function renderTrade(box){
+    const P=nations[state.player];
+    if(!P||state.player<0){ box.innerHTML=`<div class="empty">Pick a country to start trading.</div>`; return; }
+    const t=T(), mine=dealsOf(P.id);
+    const total=mine.reduce((s,d)=>s+pactBonus(P.id,partnerOf(d,P.id)),0);
+    let h=`<div class="head"><div class="flag" style="background:${P.color}"></div><div><h2>Trade</h2><div class="sub">${mine.length}/${MAX_PACTS_P} agreements · ${fmtDelta(total)} cr/month</div></div></div>`;
+    if(t.offer&&t.offer.from!=null&&alive(t.offer.from)){
+      const o=nations[t.offer.from];
+      h+=`<div class="res"><h4>${o.name} offers a trade agreement</h4><div class="small">About ${fmtDelta(pactBonus(P.id,o.id))} cr a month for ${PACT_MONTHS} months, with no signing fee.</div><div class="row"><button class="btn green" id="trAcc">Accept</button><button class="btn" id="trRef">Decline</button></div></div>`;
+    }
+    h+=swapHtml(P);
+    h+=`<div class="res"><h4>Market</h4><div class="small" style="margin-bottom:6px">Buy steel and oil for tanks, planes and ships, or sell what you don't need. Big orders move the price.${P.sanction>0?" <b>Sanctions make trading much worse.</b>":""}</div>`;
+    for(const r of ["steel","oil"]){
+      h+=`<div class="item" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><b style="min-width:84px;text-transform:capitalize">${r} ${Math.floor(P[r]||0)}</b><span class="small" style="min-width:120px">buy ${priceOf(r,"buy")} · sell ${priceOf(r,"sell")}</span>
+        <button class="btn" data-tr="${r}|5|buy" style="flex:0 0 auto;min-width:0">Buy 5</button><button class="btn" data-tr="${r}|25|buy" style="flex:0 0 auto;min-width:0">Buy 25</button>
+        <button class="btn" data-tr="${r}|5|sell" style="flex:0 0 auto;min-width:0">Sell 5</button><button class="btn" data-tr="${r}|25|sell" style="flex:0 0 auto;min-width:0">Sell 25</button></div>`;
+    }
+    h+=`</div><div class="res"><h4>Your trade agreements</h4>`;
+    h+=mine.length?mine.map(d=>{const o=nations[partnerOf(d,P.id)];return `<div class="item" style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:${o.color}"></span><span style="flex:1">${o.name}</span><span class="small">${fmtDelta(pactBonus(P.id,o.id))}/mo · ${d.left} mo left</span><button class="btn" data-trx="${d.id}" style="flex:0 0 auto;min-width:0">Cancel</button></div>`;}).join(""):`<div class="empty">No agreements yet. Sign one below for steady extra income.</div>`;
+    h+=`</div><div class="res"><h4>Propose an agreement</h4><div class="small" style="margin-bottom:6px">Each one adds income to both countries for ${PACT_MONTHS} months and improves relations. Bigger economies pay more. Friendly countries say yes more often.</div>`;
+    const cool=t.cool||{};
+    const pool=[...new Set([...(state.selected>=0&&state.selected!==P.id?[state.selected]:[]),...neighNats(P.id),...nations.filter(n=>n.alive).sort((x,y)=>(y.gdp||0)-(x.gdp||0)).slice(0,30).map(n=>n.id)])]
+      .filter(id=>id!==P.id&&alive(id)&&!hasPact(P.id,id)&&!atWar(P.id,id)).slice(0,14);
+    h+=pool.map(id=>{const o=nations[id],err=canPact(P.id,id),cd=(cool[id]||0)>(state.tick||0),r=Math.round(rel(P.id,id));
+      return `<div class="item" style="display:flex;align-items:center;gap:6px"><span class="dot" style="background:${o.color}"></span><span style="flex:1">${o.name} <span class="small">(relations ${r>0?"+":""}${r})</span></span><span class="small">${fmtDelta(pactBonus(P.id,id))}/mo · fee ${fmt(signFee(P.id,id))}</span><button class="btn${err||cd?"":" green"}" data-trp="${id}" ${err||cd?`disabled title="${cd?"They just said no. Try again in a few months.":err}"`:""} style="flex:0 0 auto;min-width:0">Propose</button></div>`;}).join("")||`<div class="empty">No partners available right now.</div>`;
+    h+=`</div>`;
+    box.innerHTML=h;
+    box.querySelectorAll("[data-tr]").forEach(b=>b.onclick=()=>{const [r,q,s]=b.dataset.tr.split("|");trade(r,+q,s);});
+    box.querySelectorAll("[data-trp]").forEach(b=>b.onclick=()=>proposePact(+b.dataset.trp));
+    box.querySelectorAll("[data-trx]").forEach(b=>b.onclick=()=>{const d=T().deals.find(x=>x.id===+b.dataset.trx); if(d){ addRel(d.a,d.b,-10); endPact(d,"was cancelled"); renderPanel(true);} });
+    bindSwap(P);
+    const acc=document.getElementById("trAcc"), ref=document.getElementById("trRef");
+    if(acc) acc.onclick=()=>{const o=t.offer.from; t.offer=null; const e=canPact(P.id,o); if(e) feedback(e,"war",true); else signPact(P.id,o); renderPanel(true);};
+    if(ref) ref.onclick=()=>{addRel(P.id,t.offer.from,-3); t.offer=null; renderPanel(true);};
+  }
+  if(typeof renderPanel==="function"){
+    const _rp=renderPanel;
+    renderPanel=function(force){
+      if(state.tab==="trade"){ const box=$("pbody"); if(box){ renderTrade(box); return; } }
+      return _rp(force);
+    };
+  }
+  // Tab button, right after Diplo
+  function addTab(){
+    const tabs=document.getElementById("tabs"); if(!tabs||tabs.querySelector('[data-t="trade"]')) return;
+    const b=document.createElement("button"); b.dataset.t="trade"; b.textContent="Trade";
+    const diplo=tabs.querySelector('[data-t="diplo"]');
+    if(diplo&&diplo.nextSibling) tabs.insertBefore(b,diplo.nextSibling); else tabs.appendChild(b);
+    b.onclick=()=>{state.tab="trade";tabs.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));renderPanel(true);};
+  }
+  addTab();
+
+  /* ---- Save / load / new game ---- */
+  if(typeof snapshot==="function"){
+    const _s=snapshot;
+    snapshot=function(){ const s=_s.apply(this,arguments); if(s) s.tradeSt=JSON.parse(JSON.stringify(T())); return s; };
+  }
+  if(typeof applySnap==="function"){
+    const _a=applySnap;
+    applySnap=function(s){ const r=_a.apply(this,arguments); state.tradeSt=(s&&s.tradeSt)||null; T(); return r; };
+  }
+  if(typeof newCampaign==="function"){
+    const _n=newCampaign;
+    newCampaign=function(){ state.tradeSt=null; return _n.apply(this,arguments); };
+  }
+  const C=window.CROWNFALL||(window.CROWNFALL={});
+  C.trade={state:T, propose:proposePact, market:trade, bonus:pactBonus, swap:doSwap, verdict:swapVerdict, open:openTradeWith};
 })();
 
 })();
