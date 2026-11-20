@@ -12888,7 +12888,7 @@ void main(){
   p=vec3(c*p.x+s*p.z, p.y, -s*p.x+c*p.z);
   n=vec3(c*n.x+s*n.z, n.y, -s*n.x+c*n.z);
   p.y+=iBob;
-  if(uOutline>0.5) p+=normalize(n+vec3(0.001))*0.045;
+  if(uOutline>0.5) p+=normalize(n+vec3(0.001))*0.075;
   p*=iScl;
   vec3 base=mix(aCol, iCol, clamp(aAcc,0.0,1.0));
   n=normalize(n);
@@ -13247,6 +13247,8 @@ function installHQCollectors(){
         }
       }
     }
+    // v2.2: a small readability bump at normal zoom (still Tiny); bases/marks keep their size
+    if(typeof combatZoomedIn!=="function"||combatZoomedIn()) for(const f of figs) if(f.uid!=null&&!f.base&&!f.mark&&f.scl) f.scl*=1.15;
     return gfxMergeStacks(figs);
   };
 
@@ -15216,7 +15218,8 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     const land2=()=>{ GFX21.tint=true; try{ land(); } finally{ GFX21.tint=false; } };
     if(typeof GFX18!=="undefined"){ GFX18.cb=land2; paintLand(c,1,true); if(GFX18.cb){ GFX18.cb=null; land2(); } } else land2();
     if(!moving&&GFX18.gpaths){ try{ const all=new Path2D(); for(const gp of GFX18.gpaths.values()) all.addPath(gp);
-      const pt=c.createPattern(GFX21.landNoise(),"repeat"); c.save(); c.globalCompositeOperation="soft-light"; c.globalAlpha=0.45; c.fillStyle=pt; c.fill(all,"evenodd"); c.restore(); }catch(e){} }
+      const pt=c.createPattern(GFX21.landNoise(),"repeat"); c.save(); c.globalCompositeOperation="soft-light"; c.globalAlpha=0.35; c.fillStyle=pt; c.fill(all,"evenodd");
+      const hp=c.createPattern(GFX21.hillTile(),"repeat"); try{ hp.setTransform(new DOMMatrix().scaleSelf(0.6,0.6)); }catch(e){} c.globalCompositeOperation="overlay"; c.globalAlpha=0.5; c.fillStyle=hp; c.fill(all,"evenodd"); c.restore(); }catch(e){} }
     if(state.player>=0){
       // one combined path, blurred once (was one blur per province)
       const all=new Path2D();
@@ -15277,7 +15280,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   const c=sp.getContext("2d");
   const cx=W/2, cy=H/2;
   const g=c.createRadialGradient(cx,cy,0,cx,cy,10*K);
-  g.addColorStop(0,"rgba(0,0,0,0.38)"); g.addColorStop(1,"rgba(0,0,0,0)");
+  g.addColorStop(0,"rgba(0,0,0,0.55)"); g.addColorStop(0.6,"rgba(0,0,0,0.28)"); g.addColorStop(1,"rgba(0,0,0,0)");
   c.fillStyle=g; c.beginPath(); c.ellipse(cx,cy,8.5*K,2.8*K,0,0,Math.PI*2); c.fill();
   Unit3D.drawShadow=function(ctx,x,y,s){
     const w=W/K*s, h=H/K*s;
@@ -15330,9 +15333,10 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
       try{ raw.call(this, tc, typ, ox, oy, S, rb/16*TAU, 0, col, 1, pb/8*TAU, ab/4); } finally{ Unit3D._spriteMode=false; }
       const sil=document.createElement("canvas"); sil.width=w; sil.height=h; const sc=sil.getContext("2d");
       sc.drawImage(tmp,0,0); sc.globalCompositeOperation="source-in"; sc.fillStyle="rgba(8,10,14,1)"; sc.fillRect(0,0,w,h);
-      const o=Math.max(1,D*0.5);
-      c.globalAlpha=0.42;
-      for(const [dx,dy] of [[o,0],[-o,0],[0,o],[0,-o]]) c.drawImage(sil,dx,dy);
+      const o=Math.max(1.2,D*0.75);
+      c.globalAlpha=0.32; c.drawImage(sil,o*1.4,o*2.2);                       // drop shadow
+      c.globalAlpha=0.9;
+      for(const [dx,dy] of [[o,0],[-o,0],[0,o],[0,-o],[o*0.7,o*0.7],[-o*0.7,o*0.7],[o*0.7,-o*0.7],[-o*0.7,-o*0.7]]) c.drawImage(sil,dx,dy);
       c.globalAlpha=1; c.drawImage(tmp,0,0);
       e={cv, ox:ox/D, oy:oy/D, w:w/D, h:h/D, sb};
       if(cache.size>2500) cache.clear();
@@ -15376,11 +15380,103 @@ const GFX21=(function(){
   // all land as one path (province shapes never change, so this is built once)
   let land=null, landN=0;
   X.land=()=>{ if(land&&landN===provinces.length) return land; land=new Path2D(); for(const p of provinces) if(p.path) land.addPath(p.path); landN=provinces.length; return land; };
-  // coastal shallow-water band, drawn under the land
-  X.coast=(c,scale)=>{ const L=X.land(), k=Math.max(0.25,Math.min(1,scale*1.4)); c.save(); c.lineJoin="round";
-    c.lineWidth=18*k/scale; c.strokeStyle="rgba(70,160,200,0.10)"; c.stroke(L);
-    c.lineWidth=8*k/scale; c.strokeStyle="rgba(110,200,225,0.14)"; c.stroke(L);
-    c.lineWidth=Math.max(1.2,2.6*k)/scale; c.strokeStyle="rgba(170,225,240,0.18)"; c.stroke(L); c.restore(); };
+  /* v2.2: baked hillshade relief (world-anchored). Height = terrain mask (mountains high, plains low,
+     blurred) x ridged noise; lit from the north-west. One 1440x720 grey image, built once. */
+  let rel=null;
+  X.relief=()=>{ if(rel) return rel; const t0=performance.now();
+    const W=1440,H=720, WW=(typeof RAW!=="undefined"&&RAW.w)||7200, WH=(typeof RAW!=="undefined"&&RAW.h)||3600;
+    const m=document.createElement("canvas"); m.width=W; m.height=H; const mc=m.getContext("2d");
+    mc.setTransform(W/WW,0,0,H/WH,0,0);
+    const TV={mountain:255,forest:120,desert:95,urban:40,plains:60};
+    for(const p of provinces){ if(!p.path) continue; const v=TV[p.terrain]||60; mc.fillStyle=`rgb(${v},${v},${v})`; mc.fill(p.path); }
+    const md=mc.getImageData(0,0,W,H).data;
+    const b=document.createElement("canvas"); b.width=W; b.height=H; const bc=b.getContext("2d");
+    bc.filter="blur(7px)"; bc.drawImage(m,0,0); bc.filter="none"; const bd=bc.getImageData(0,0,W,H).data;
+    const nz=X.landNoise(), N=nz.width, nd=nz.getContext("2d").getImageData(0,0,N,N).data;
+    const smp=(x,y)=>{ x=((x%N)+N)%N; y=((y%N)+N)%N; const x0=x|0,y0=y|0,x1=(x0+1)%N,y1=(y0+1)%N,tx=x-x0,ty=y-y0;
+      const a=nd[(y0*N+x0)*4],b2=nd[(y0*N+x1)*4],c2=nd[(y1*N+x0)*4],d=nd[(y1*N+x1)*4];
+      return ((a+(b2-a)*tx)*(1-ty)+(c2+(d-c2)*tx)*ty)/255; };
+    const hgt=new Float32Array(W*H);
+    for(let y=0;y<H;y++) for(let x=0;x<W;x++){ const i=y*W+x; const mk=bd[i*4]/255;
+      const r1=1-Math.abs(2*smp(x*0.55,y*0.55)-1), r2=1-Math.abs(2*smp(x*1.7+77,y*1.7+31)-1), f=smp(x*0.25+19,y*0.25+5);
+      const mt=Math.max(0,(mk-0.3)/0.7);
+      hgt[i]=(0.30+mt*2.6)*(r1*r1*r1*0.9+r2*r2*0.35) + f*0.5; }
+    // normalise the slope so the shading has a fixed, clearly visible contrast
+    const sl=new Float32Array(W*H); let s2=0,cnt=0;
+    for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const i=y*W+x; if(md[i*4+3]===0) continue;
+      const v=(hgt[i-W-1]-hgt[i+W+1])+(hgt[i-1]-hgt[i+1])*0.5; sl[i]=v; s2+=v*v; cnt++; }
+    const sd=Math.sqrt(s2/Math.max(1,cnt))||1;
+    const out=mc.createImageData(W,H), od=out.data;
+    for(let y=1;y<H-1;y++) for(let x=1;x<W-1;x++){ const i=y*W+x; if(md[i*4+3]===0) continue;
+      const mk=bd[i*4]/255, mt=Math.max(0,(mk-0.3)/0.7);
+      let v=128+(sl[i]/sd)*30*(0.7+mt*0.9) - mt*18 + (1-mk)*8;
+      v=v<30?30:v>225?225:v; od[i*4]=od[i*4+1]=od[i*4+2]=v; od[i*4+3]=255; }
+    const r=document.createElement("canvas"); r.width=W; r.height=H; r.getContext("2d").putImageData(out,0,0);
+    rel={cv:r,WW,WH}; X.reliefMs=Math.round(performance.now()-t0); return rel; };
+  // seamless 512px hillshade tile (ridged noise, lit from the north-west): the visible relief at normal zoom
+  let ht=null;
+  X.hillTile=()=>{ if(ht) return ht; const N=512, nz=X.landNoise(), M=nz.width, nd=nz.getContext("2d").getImageData(0,0,M,M).data;
+    const smp=(x,y)=>{ x=((x%M)+M)%M; y=((y%M)+M)%M; const x0=x|0,y0=y|0,x1=(x0+1)%M,y1=(y0+1)%M,tx=x-x0,ty=y-y0;
+      const a=nd[(y0*M+x0)*4],b=nd[(y0*M+x1)*4],c=nd[(y1*M+x0)*4],d=nd[(y1*M+x1)*4]; return ((a+(b-a)*tx)*(1-ty)+(c+(d-c)*tx)*ty)/255; };
+    const h=new Float32Array(N*N);
+    for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const r0=smp(x*0.5,y*0.5), r1=1-Math.abs(2*smp(x*1.5+31,y*1.5+9)-1), r2=1-Math.abs(2*smp(x*3+101,y*3+57)-1);
+      h[y*N+x]=r0*0.5+r1*r1*r1*(0.4+r0)*0.9+r2*r2*0.25; }
+    const at=(x,y)=>h[(((y%N)+N)%N)*N+(((x%N)+N)%N)];
+    const sl=new Float32Array(N*N); let s2=0;
+    for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const v=(at(x-1,y-1)-at(x+1,y+1))+(at(x-1,y)-at(x+1,y))*0.5; sl[y*N+x]=v; s2+=v*v; }
+    const sd=Math.sqrt(s2/(N*N))||1;
+    const cv=document.createElement("canvas"); cv.width=cv.height=N; const g=cv.getContext("2d"); const im=g.createImageData(N,N);
+    for(let i=0;i<N*N;i++){ let v=128+(sl[i]/sd)*34-(h[i]-0.6)*20; v=v<35?35:v>220?220:v; im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v; im.data[i*4+3]=255; }
+    g.putImageData(im,0,0); ht=cv; return ht; };
+  const hpats=new WeakMap();
+  X.drawRelief=(c,alpha,scale)=>{ const R=X.relief(); c.save(); c.clip(X.land(),"nonzero"); c.globalCompositeOperation="overlay";
+    // big mountain ranges (world image), then the fine hillshade tile, stronger when zoomed in
+    c.globalAlpha=0.6; c.drawImage(R.cv,0,0,R.WW,R.WH);
+    let p=hpats.get(c); if(!p){ p=c.createPattern(X.hillTile(),"repeat"); hpats.set(c,p); }
+    try{ p.setTransform(new DOMMatrix().scaleSelf(1.1,1.1)); }catch(e){}
+    const z=scale||1; c.globalAlpha=Math.max(0.25,Math.min(0.85,0.25+z*0.35)); c.fillStyle=p; c.fillRect(-1e5,-1e5,2e5,2e5);
+    c.restore(); };
+  /* v2.2 perf: coastline-only paths (segments used by exactly one province), simplified per zoom.
+     Stroking the full land path (every inner border too) with wide round strokes cost ~30 ms a pass. */
+  let chains=null; const cps=new Map();
+  function coastChains(){ if(chains) return chains; chains=[]; const cnt=new Map(), K=(a,b)=>{ const s1=a.x+","+a.y, s2=b.x+","+b.y; return s1<s2?s1+"|"+s2:s2+"|"+s1; };
+    const rings=[]; for(const p of provinces){ for(const r of (p.rings||[])) rings.push(r); for(const r of (p.holes||[])) rings.push(r); }
+    for(const r of rings){ const n=r.length; for(let i=0;i<n;i++){ const k=K(r[i],r[(i+1)%n]); cnt.set(k,(cnt.get(k)||0)+1); } }
+    for(const r of rings){ const n=r.length; if(n<2) continue; const co=i=>cnt.get(K(r[i],r[(i+1)%n]))===1;
+      let st=-1; for(let i=0;i<n;i++) if(!co(i)){ st=i; break; }
+      if(st<0){ chains.push(r.concat([r[0]])); continue; }
+      let cur=null; for(let t=1;t<=n;t++){ const i=(st+t)%n; if(co(i)){ if(!cur){ cur=[r[i]]; chains.push(cur); } cur.push(r[(i+1)%n]); } else cur=null; } }
+    return chains; }
+  // coast chains bucketed into 450-unit world tiles, simplified per zoom: only on-screen tiles are stroked
+  const TS=450, tcache=new Map();
+  function tiles(tol){ let T=tcache.get(tol); if(T) return T; T=new Map(); const t2=tol*tol;
+    const get=(tx,ty)=>{ const k=tx+"|"+ty; let e=T.get(k); if(!e){ e={tx,ty,P:new Path2D()}; T.set(k,e); } return e; };
+    for(const ch of coastChains()){ if(ch.length<2) continue; let lx=ch[0].x, ly=ch[0].y, cur=null;
+      for(let i=1;i<ch.length;i++){ const q=ch[i], dx=q.x-lx, dy=q.y-ly; if(i<ch.length-1&&dx*dx+dy*dy<t2) continue;
+        const e=get(Math.floor((lx+q.x)/2/TS),Math.floor((ly+q.y)/2/TS));
+        if(e!==cur){ e.P.moveTo(lx,ly); cur=e; } e.P.lineTo(q.x,q.y); lx=q.x; ly=q.y; } }
+    if(tcache.size>10) tcache.clear(); tcache.set(tol,T); return T; }
+  X.coastPath=(scale,px,c,margin)=>{ const tol=Math.pow(2,Math.round(Math.log2(Math.max(0.05,(px||1)/scale))));
+    const T=tiles(tol), P=new Path2D(); let x0=-1e9,y0=-1e9,x1=1e9,y1=1e9;
+    if(c){ const m=c.getTransform(), W=c.canvas.width, H=c.canvas.height, g=(margin||0);
+      x0=(-m.e)/m.a-g; x1=(W-m.e)/m.a+g; y0=(-m.f)/m.d-g; y1=(H-m.f)/m.d+g; }
+    for(const e of T.values()){ if((e.tx+1)*TS<x0||e.tx*TS>x1||(e.ty+1)*TS<y0||e.ty*TS>y1) continue; P.addPath(e.P); }
+    return P; };
+  X.coast=(c,scale)=>{ const k=Math.max(0.12,Math.min(1,scale*1.4)), mg=80*k/scale; c.save(); c.lineJoin="round";
+    const far=scale<0.5, Lw=X.coastPath(scale,far?5:3,c,mg), Lf=far?Lw:X.coastPath(scale,0.8,c,mg);
+    // shallow teal shelf fading out to the deep navy (stacked strokes = cheap gradient), bright surf line
+    for(const [w,a] of (far?[[60,0.14],[26,0.2]]:[[70,0.10],[48,0.12],[30,0.15],[16,0.18],[7,0.22]])){ c.lineWidth=w*k/scale; c.strokeStyle=`rgba(46,150,160,${a})`; c.stroke(w>20?Lw:Lf); }
+    c.lineWidth=Math.max(1.2,2.6*k)/scale; c.strokeStyle="rgba(190,240,240,0.32)"; c.stroke(Lf); c.restore(); };
+  // soft wave lines offshore (two contours cut out of fat strokes), half resolution, under the land
+  let wt=null;
+  X.waves=(c,scale)=>{ const cv=c.canvas, T=c.getTransform(), k=Math.max(0.35,Math.min(1,scale*1.4)), L=X.coastPath(scale,2.5,c,40*k/scale);
+    const hw=Math.ceil(cv.width/2), hh=Math.ceil(cv.height/2);
+    if(!wt) wt=document.createElement("canvas"); if(wt.width!==hw||wt.height!==hh){ wt.width=hw; wt.height=hh; }
+    const g=wt.getContext("2d"); g.setTransform(1,0,0,1,0,0); g.clearRect(0,0,hw,hh); g.setTransform(new DOMMatrix([0.5,0,0,0.5,0,0]).multiply(T)); g.lineJoin="round"; g.lineCap="round";
+    for(const [d,a,dash] of [[30,0.24,[22,12]],[15,0.38,null]]){
+      g.globalCompositeOperation="source-over"; g.setLineDash(dash?dash.map(v=>v*k/scale):[]); g.lineWidth=(2*d*k+2.2)/scale; g.strokeStyle=`rgba(200,240,248,${a})`; g.stroke(L);
+      g.setLineDash([]); g.globalCompositeOperation="destination-out"; g.lineWidth=(2*d*k-2.2)/scale; g.strokeStyle="#000"; g.stroke(L); }
+    c.save(); c.setTransform(1,0,0,1,0,0); c.globalCompositeOperation="destination-over"; c.drawImage(wt,0,0,hw*2,hh*2); c.restore(); };
   // terrain texture over the land fills (soft-light keeps every country's colour, adds relief)
   const pats=new WeakMap();
   X.texture=(c,scale,alpha)=>{ let p=pats.get(c); if(!p){ p=c.createPattern(X.landNoise(),"repeat"); pats.set(c,p); }
@@ -15392,7 +15488,7 @@ const GFX21=(function(){
     const k=w+"|"+h+"|"+dpr;
     if(oc.k!==k){ const W=Math.max(1,w*dpr|0), H=Math.max(1,h*dpr|0); const cv=oc.cv&&oc.cv.width===W&&oc.cv.height===H?oc.cv:document.createElement("canvas"); cv.width=W; cv.height=H;
       const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
-      const lg=g.createLinearGradient(0,0,0,h); lg.addColorStop(0,"#1b4d6c"); lg.addColorStop(0.45,"#123a55"); lg.addColorStop(1,"#0a2236");
+      const lg=g.createLinearGradient(0,0,0,h); lg.addColorStop(0,"#0f3654"); lg.addColorStop(0.5,"#0a2944"); lg.addColorStop(1,"#051629");
       g.fillStyle=lg; g.fillRect(0,0,w,h);
       const rg=g.createRadialGradient(w*0.45,h*0.38,h*0.05,w*0.5,h*0.5,Math.max(w,h)*0.75);
       rg.addColorStop(0,"rgba(90,170,200,0.10)"); rg.addColorStop(0.6,"rgba(0,0,0,0)"); rg.addColorStop(1,"rgba(0,4,12,0.38)");
@@ -15415,6 +15511,7 @@ const GFX21=(function(){
       const [r1,g1,b1]=h<60?[C2,Xc,0]:h<120?[Xc,C2,0]:h<180?[0,C2,Xc]:h<240?[0,Xc,C2]:h<300?[Xc,0,C2]:[C2,0,Xc];
       const hx=v=>Math.round((v+m)*255).toString(16).padStart(2,"0");
       v="#"+hx(r1)+hx(g1)+hx(b1); tc.set(c,v); return v; }; }
+  try{ (window.CROWNFALL||(window.CROWNFALL={})).gfx=X; }catch(e){}
   return X;
 })();
 const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKey:"", adj:null, gpaths:null, gpKey:""};
@@ -15469,8 +15566,12 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
       c.fillStyle=pat; c.fill(p.path,"evenodd");
     }
     // v2.1: terrain texture, then a soft shadow just inside each border (only in the cached picture)
-    GFX21.texture(c,scale);
-    if(forCache){ c.lineWidth=16/scale; c.strokeStyle="rgba(0,0,0,0.13)";
+    try{ GFX21.drawRelief(c,null,scale); }catch(e){ if(!G.rw){G.rw=1;console.warn("relief",e);} }
+    GFX21.texture(c,scale,0.28);
+    if(forCache){ // faint dotted province lines inside your own country
+      const me=state.player; if(me>=0){ c.save(); c.setLineDash([2.2/scale,3/scale]); c.lineWidth=1/scale; c.strokeStyle="rgba(255,255,255,0.42)";
+        for(const p of provinces) if(p.owner===me&&p.path) c.stroke(p.path); c.restore(); } }
+    if(forCache){ c.lineWidth=16/scale; c.strokeStyle="rgba(0,0,0,0.16)";
       for(const [oid,path] of NP){ const n=nations[oid]; if(n&&n.alive) G.edge(c,path,path); } }
     // country outline: dark casing, then each country's own colour just inside its border
     c.lineWidth=Math.max(1.6,2.2*Math.min(1,scale*2))/scale; c.strokeStyle="rgba(6,8,14,0.85)";
@@ -15479,6 +15580,12 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
       c.lineWidth=3.6/scale;
       for(const [oid,path] of NP){ const n=nations[oid]; if(!n||!n.alive) continue;
         c.strokeStyle=light(displayColor(n),0.35); G.edge(c,path,path); }
+      // v2.2 bevel: light catches the north-west inner edge, shade on the south-east
+      const o=1.3/scale; c.lineWidth=2.4/scale;
+      for(const [oid,path] of NP){ const n=nations[oid]; if(!n||!n.alive) continue;
+        c.save(); c.clip(path,"evenodd");
+        c.translate(o,o); c.strokeStyle="rgba(255,255,255,0.30)"; c.stroke(path);
+        c.translate(-2*o,-2*o); c.strokeStyle="rgba(0,0,0,0.34)"; c.stroke(path); c.restore(); }
       c.lineWidth=1.1/scale; c.strokeStyle="rgba(6,8,14,0.9)";
       for(const [oid,path] of NP){ const n=nations[oid]; if(n&&n.alive) c.stroke(path); }
     }
@@ -15713,12 +15820,15 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     state._natLabelRects=[];
     for(const L of LC.list){
       if(L.prov){ ctx.font=`600 ${L.fs}px "Segoe UI",sans-serif`; ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.6)"; ctx.strokeText(L.name,L.sx,L.sy); ctx.fillStyle="rgba(255,255,255,0.85)"; ctx.fillText(L.name,L.sx,L.sy); continue; }
-      ctx.font=`700 ${L.fs}px Georgia,serif`;
-      ctx.fillStyle=L.foe?"rgba(60,8,8,0.6)":"rgba(8,12,20,0.5)";
-      ctx.fillRect(L.sx-L.pw/2,L.sy-L.ph/2-8,L.pw,L.ph);
+      // v2.2: engraved serif small caps with a soft halo instead of a dark box
+      const fs2=Math.max(9,L.fs*0.82); ctx.font=`700 ${fs2}px Georgia,"Times New Roman",serif`;
+      try{ ctx.letterSpacing=(fs2*0.14).toFixed(1)+"px"; }catch(e){}
       state._natLabelRects.push({x:L.sx-L.pw/2+sdx,y:L.sy-L.ph/2-8+sdy,w:L.pw,h:L.ph});
-      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.55)"; ctx.strokeText(L.name,L.sx,L.sy-8);
-      ctx.fillStyle="rgba(255,255,255,0.96)"; ctx.fillText(L.name,L.sx,L.sy-8);
+      const nm=L.U||(L.U=String(L.name).toUpperCase()); ctx.lineJoin="round";
+      ctx.lineWidth=7; ctx.strokeStyle=L.foe?"rgba(70,8,6,0.30)":"rgba(6,10,18,0.28)"; ctx.strokeText(nm,L.sx,L.sy-8);
+      ctx.lineWidth=3.2; ctx.strokeStyle=L.foe?"rgba(60,6,4,0.78)":"rgba(6,10,18,0.72)"; ctx.strokeText(nm,L.sx,L.sy-8);
+      ctx.fillStyle=L.foe?"#ffd9cf":"#f7efd9"; ctx.fillText(nm,L.sx,L.sy-8);
+      try{ ctx.letterSpacing="0px"; }catch(e){}
       if(L.army){ ctx.font=`600 ${Math.max(9,L.fs*0.7)}px "Segoe UI",sans-serif`; ctx.fillStyle="rgba(246,227,176,0.92)"; ctx.fillText(L.army,L.sx,L.sy+L.fs*0.55-6); }
     }
     ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -15812,6 +15922,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
         c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H);
         c.setTransform(dpr*scale,0,0,dpr*scale,dpr*(ox+m),dpr*(oy+m));
         paintLand(c,scale,true);
+        if(scale>=0.3) try{ GFX21.waves(c,scale); }catch(e){}
         c.save(); c.globalCompositeOperation="destination-over"; GFX21.coast(c,scale); c.restore();
         MC.key=base; MC.ox=ox; MC.oy=oy; MC.m=m; __CF_MSTAT.repaint++;
       } else __CF_MSTAT.blit++;
