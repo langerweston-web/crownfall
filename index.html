@@ -16253,6 +16253,46 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     if(ok){ emit({nation:n.id,kind:"recruit",from:pid!=null?pid:-1,to:pid!=null?pid:-1}); finishPlayer(); }
     return ok;
   };
+  // military / naval bases cost your action too
+  if(typeof placeBase==="function"){
+    const _pb=placeBase;
+    placeBase=function(nid,pid,kind,silent,instant){
+      if(!on()||nid!==state.player||silent||instant)return _pb.apply(this,arguments);
+      if(!playerTurn())return (blocked(),null);
+      const b=_pb.apply(this,arguments);
+      if(b){ emit({nation:nid,kind:"build",from:pid,to:pid,result:{what:(b.kind==="nav"?"Naval":"Military")+" base",text:"founded a "+(b.kind==="nav"?"naval":"military")+" base"}}); finishPlayer(); }
+      return b;
+    };
+  }
+  if(typeof upgradeBase==="function"){
+    const _ub=upgradeBase;
+    upgradeBase=function(id,silent){
+      const b=typeof baseById==="function"?baseById(id):null;
+      if(!on()||silent||!b||b.owner!==state.player)return _ub.apply(this,arguments);
+      if(!playerTurn())return blocked();
+      const ok=_ub.apply(this,arguments);
+      if(ok){ emit({nation:b.owner,kind:"build",from:b.pid,to:b.pid,result:{what:"Base upgrade",text:"upgraded a base to level "+b.pendingLevel}}); finishPlayer(); }
+      return ok;
+    };
+  }
+  // any building, fort or building upgrade costs your action too
+  function gate(fname,ownerOf,label){
+    let f; try{ f=eval(fname); }catch(e){ return; } if(typeof f!=="function")return;
+    const w=function(){
+      const own=ownerOf.apply(null,arguments), silent=arguments[label.silentIdx];
+      if(!on()||own!==state.player||silent)return f.apply(this,arguments);
+      if(!playerTurn()){ blocked(); return label.fail; }
+      const r=f.apply(this,arguments);
+      if(r){ const pid=label.pid.apply(null,arguments); emit({nation:own,kind:"build",from:pid,to:pid,result:{what:label.what(r,arguments),text:label.text(r,arguments)}}); finishPlayer(); }
+      return r;
+    };
+    eval(fname+"=w");
+  }
+  const bname=k=>(typeof BUILDINGS!=="undefined"&&BUILDINGS[k]&&BUILDINGS[k].name)||k;
+  const bld=id=>(state.buildings||[]).find(b=>b.id===id);
+  gate("placeBuilding",(nid)=>nid,{silentIdx:3,fail:null,pid:(n,p)=>p,what:(r,a)=>bname(a[2]),text:(r,a)=>"began a "+bname(a[2])});
+  gate("upgradeBuilding",(id)=>{const b=bld(id);return b?b.owner:-1;},{silentIdx:1,fail:false,pid:(id)=>{const b=bld(id);return b?b.pid:-1;},what:()=>"Upgrade",text:(r,a)=>{const b=bld(a[0]);return "upgraded a "+(b?bname(b.kind):"building");}});
+  gate("buildFort",(pid,nid)=>nid,{silentIdx:99,fail:false,pid:(p)=>p,what:()=>"Fort",text:()=>"began fortifications"});
   function finishPlayer(){ const a=act(); a.done=true; refresh(); setTimeout(aiPhase,700); }
 
   // ---- AI turns ----
@@ -16527,6 +16567,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     if(o.kind==="attack") return `⚔ ${who} attacked ${to}${res?" — "+res:""}`;
     if(o.kind==="move") return `➜ ${who} moved ${from?from+" → ":""}${to}`;
     if(o.kind==="recruit") return `＋ ${who} recruited${to?" in "+to:""}`;
+    if(o.kind==="build") return `🏗 ${who} ${(o.result&&o.result.text)||o.text||"built"}${to&&!((o.result&&o.result.text)||o.text)?" in "+to:""}`;
     return `⏸ ${who} held`;
   }
   function onAct(o){
@@ -16537,7 +16578,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const C=window.CROWNFALL, a=C&&C.actionState?C.actionState():null;
     const show=!!(a&&a.on&&state.phase==="play");
     if(!show){bar.style.display="none";log.style.display="none";return;}
-    if(a.phase==="player"&&!a.usedAction) bar.innerHTML=`<b>Your turn — pick 1 action.</b> Right-click a province next to your army to attack or move, or recruit a unit. Building, research and trade are free.`;
+    if(a.phase==="player"&&!a.usedAction) bar.innerHTML=`<b>Your turn — pick 1 action.</b> Attack or move (right-click a province next to your army), recruit a unit, or buy a base. Research and trade are free.`;
     else if(a.phase==="player") bar.innerHTML=`Action used. Press <b>End Turn</b>.`;
     else bar.innerHTML=`<span class="ai">${esc(a.actorName||"Enemy")}'s turn…</span>`;
     bar.style.display="block";
