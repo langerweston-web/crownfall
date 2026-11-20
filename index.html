@@ -14370,6 +14370,217 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   document.head.appendChild(st);
 })();
 
+/* ===== v2.0 prep (graphics): event bus + turn banner + action animations =====
+   Works with logic's action_ops.js, which CALLS the hooks:
+     window.CF_onTurnStart(nationId)
+     window.CF_onAction({nation, nationName, kind:"attack"|"move"|"recruit"|"hold", from, to, result})
+   The same two names also SUBSCRIBE when given a function:
+     CF_onAction(fn) / CF_onTurnStart(fn)  -> returns unsubscribe()
+   Assigning window.CF_onAction = fn (or CF_onTurnStart) later does NOT replace the bus: the setter
+   adds fn as a listener, so nobody's hook can knock out anyone else's.
+   Generic bus: CF_on(evt, fn) -> unsubscribe, CF_off(evt, fn), CF_emit(evt, data).
+   Event data (both names kept, so either style works):
+     action:    {kind, type(=kind), nation, owner(=nation), nationName, byPlayer, from, to, result, unit, label}
+                kind: attack | move | recruit | hold.  result (attacks): {won, win, captured, atkLoss, defLoss, text}
+     build:     same shape, kind = building name; from your placeBase/placeBuilding (own channel: CF_on("build", fn))
+     turnStart: {nation, nationName, isPlayer, turn, year, month}
+   Direct visuals: CF_anim(kind, {from, to, pid, unit, label, result, nation}), CF_banner(text, sub, ms).
+   Also on window.CROWNFALL.events. ===== */
+(function(){
+  const L=new Map();
+  const CF_on=function(evt,fn){ if(typeof fn!=="function") return ()=>{}; let s=L.get(evt); if(!s){s=new Set();L.set(evt,s);} s.add(fn); return ()=>s.delete(fn); };
+  const CF_off=function(evt,fn){ const s=L.get(evt); if(s) s.delete(fn); };
+  const CF_emit=function(evt,data){ const s=L.get(evt); if(!s) return 0; let n=0; for(const fn of [...s]){ try{ fn(data); n++; }catch(e){ console.warn("CF listener for "+evt+" failed:",e); } } return n; };
+  const nmOf=id=>(nations[id]&&nations[id].name)||"?";
+  // de-dupe: the same action reported twice within 500 ms (our wrapper + action_ops) only fires once
+  const recent=new Map();
+  function dup(key,ms){ const now=performance.now(); for(const [k,t] of recent) if(now-t>2000) recent.delete(k); if(recent.has(key)&&now-recent.get(key)<ms) return true; recent.set(key,now); return false; }
+  function normAction(o){
+    const kind=o.kind||o.type, nation=o.nation!=null?o.nation:o.owner;
+    return Object.assign({},o,{kind,type:kind,nation,owner:nation,nationName:o.nationName||nmOf(nation),byPlayer:nation===state.player});
+  }
+  let depth=0;
+  function emitAction(o,auto){ if(!o||depth>2) return 0; const d=normAction(o); if((auto||o._auto)&&!d.byPlayer) return 0; delete d._auto;
+    if(d.kind!=="hold"&&dup("a|"+d.kind+"|"+d.nation+"|"+d.to,500)) return 0;
+    depth++; try{ return CF_emit("action",d); } finally{ depth--; } }
+  const turnSeen=new Set();
+  function emitTurn(nation){
+    if(nation==null) nation=state.player;
+    const turn=state.turnNo||1, key=nation+"|"+turn+"|"+state.tick;
+    if(turnSeen.has(key)) return 0; turnSeen.add(key); if(turnSeen.size>400) turnSeen.clear();
+    return CF_emit("turnStart",{nation,nationName:nmOf(nation),isPlayer:nation===state.player,turn,year:state.year,month:state.month});
+  }
+  function emitBuild(o){ const d=normAction(o); if(!d.byPlayer) return 0; if(dup("b|"+d.nation+"|"+d.to+"|"+d.kind,500)) return 0; return CF_emit("build",d); }
+  const onAction=function(x){ return typeof x==="function"?CF_on("action",x):emitAction(x); };
+  const onTurnStart=function(x){ return typeof x==="function"?CF_on("turnStart",x):emitTurn(typeof x==="object"&&x?x.nation:x); };
+  const def=(name,val,setEvt)=>{ try{ Object.defineProperty(window,name,{configurable:true,enumerable:true,get:()=>val,
+      set:fn=>{ if(typeof fn==="function"&&fn!==val&&setEvt) CF_on(setEvt,fn); }}); }catch(e){ window[name]=val; } };
+  def("CF_on",CF_on); def("CF_off",CF_off); def("CF_emit",CF_emit);
+  def("CF_onAction",onAction,"action"); def("CF_onTurnStart",onTurnStart,"turnStart");
+
+  // ---------- overlay canvas ----------
+  const wrap=document.getElementById("mapwrap")||document.body;
+  const cv=document.createElement("canvas"); cv.id="cfFxLayer";
+  cv.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:6";
+  wrap.appendChild(cv);
+  const cx=cv.getContext("2d");
+  const fx=[];
+  const proj=(wx,wy)=>{ try{ const p=scrOf(wx,wy); return p&&p.vis!==false?p:null; }catch(e){ return null; } };
+  const provPt=pid=>{ const p=provinces[pid]; return p?{x:p.cx,y:p.cy}:null; };
+  const ease=t=>1-Math.pow(1-t,3);
+  function add(e){ e.t0=performance.now(); fx.push(e); if(fx.length>60) fx.shift(); kick(); }
+  function arrow(c,a,b,k,col,w,dash){
+    const x=a.x+(b.x-a.x)*k, y=a.y+(b.y-a.y)*k;
+    c.save(); c.lineCap="round"; c.strokeStyle=col; c.lineWidth=w; if(dash){c.setLineDash(dash); c.lineDashOffset=-performance.now()/30;}
+    c.beginPath(); c.moveTo(a.x,a.y); c.lineTo(x,y); c.stroke(); c.setLineDash([]);
+    const ang=Math.atan2(b.y-a.y,b.x-a.x), s=w*3.2;
+    c.fillStyle=col; c.beginPath(); c.moveTo(x+Math.cos(ang)*s,y+Math.sin(ang)*s);
+    c.lineTo(x+Math.cos(ang+2.5)*s,y+Math.sin(ang+2.5)*s); c.lineTo(x+Math.cos(ang-2.5)*s,y+Math.sin(ang-2.5)*s); c.closePath(); c.fill(); c.restore();
+  }
+  const DRAW={
+    attack(e,t){ // red arrow lunges in, then crossed swords + shock ring at the target
+      const a=proj(e.a.x,e.a.y), b=proj(e.b.x,e.b.y); if(!b) return;
+      const k=ease(Math.min(1,t/0.45));
+      if(a&&t<0.9){ cx.globalAlpha=t<0.6?1:1-(t-0.6)/0.3; arrow(cx,a,b,k,"rgba(20,0,0,.6)",7); arrow(cx,a,b,k,"#ff4a3a",4); cx.globalAlpha=1; }
+      if(t>0.4){ const u=(t-0.4)/0.6;
+        cx.strokeStyle=`rgba(255,90,60,${1-u})`; cx.lineWidth=3; cx.beginPath(); cx.arc(b.x,b.y,8+u*34,0,Math.PI*2); cx.stroke();
+        cx.save(); cx.translate(b.x,b.y-4); cx.scale(1+0.3*(1-u),1+0.3*(1-u)); cx.globalAlpha=Math.min(1,(1-u)*2);
+        cx.font="700 22px 'Segoe UI Emoji','Noto Color Emoji',sans-serif"; cx.textAlign="center"; cx.textBaseline="middle";
+        cx.lineWidth=4; cx.strokeStyle="rgba(0,0,0,.6)"; cx.strokeText("⚔",0,0); cx.fillStyle="#ffe2c0"; cx.fillText("⚔",0,0); cx.restore();
+        if(e.label){ const y=b.y-26-ease(u)*14; cx.globalAlpha=u<0.75?1:1-(u-0.75)/0.25;
+          const r=e.result, col=e.label==="Captured!"?"#ffd36a":e.label==="Won"?"#ffc68a":e.label==="Lost"?"#9fc6ff":"#ffd0b0";
+          cx.font="800 13px 'Segoe UI',sans-serif"; cx.textAlign="center"; cx.textBaseline="middle";
+          cx.lineWidth=3; cx.strokeStyle="rgba(0,0,0,.7)"; cx.strokeText(e.label,b.x,y); cx.fillStyle=col; cx.fillText(e.label,b.x,y);
+          if(r&&(r.atkLoss||r.defLoss)){ const f=v=>typeof fmt==="function"?fmt(v):v; const s2="−"+f(r.atkLoss)+" / −"+f(r.defLoss);
+            cx.font="600 10.5px 'Segoe UI',sans-serif"; cx.strokeText(s2,b.x,y+13); cx.fillStyle="#e8e2d6"; cx.fillText(s2,b.x,y+13); }
+          cx.globalAlpha=1; } }
+    },
+    move(e,t){ // dashed gold trail grows from origin to destination, ring at the destination
+      const a=proj(e.a.x,e.a.y), b=proj(e.b.x,e.b.y); if(!b) return;
+      const k=ease(Math.min(1,t/0.6)); cx.globalAlpha=t<0.7?1:1-(t-0.7)/0.3;
+      if(a) arrow(cx,a,b,k,"#f3d27a",3,[7,6]);
+      if(t>0.5){ const u=(t-0.5)/0.5; cx.strokeStyle=`rgba(243,210,122,${1-u})`; cx.lineWidth=2.5; cx.beginPath(); cx.ellipse(b.x,b.y,6+u*16,(6+u*16)*0.55,0,0,Math.PI*2); cx.stroke(); }
+      cx.globalAlpha=1;
+    },
+    recruit(e,t){ // green rings rise from the base and a "+1 unit" tag floats up
+      const b=proj(e.b.x,e.b.y); if(!b) return;
+      for(let i=0;i<3;i++){ const u=t*1.3-i*0.15; if(u<0||u>1) continue; cx.strokeStyle=`rgba(110,230,130,${1-u})`; cx.lineWidth=2.5; cx.beginPath(); cx.ellipse(b.x,b.y-u*10,6+u*20,(6+u*20)*0.5,0,0,Math.PI*2); cx.stroke(); }
+      const y=b.y-14-ease(t)*26; cx.globalAlpha=t<0.7?1:1-(t-0.7)/0.3;
+      cx.font="700 12px 'Segoe UI',sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; const s="+ "+(e.label||"Unit");
+      cx.lineWidth=3; cx.strokeStyle="rgba(0,0,0,.65)"; cx.strokeText(s,b.x,y); cx.fillStyle="#9cf2a8"; cx.fillText(s,b.x,y); cx.globalAlpha=1;
+    },
+    build(e,t){ // gold square stamps down, dust ring, "Built: X" tag
+      const b=proj(e.b.x,e.b.y); if(!b) return;
+      const d=Math.min(1,t/0.35), s=14+(1-ease(d))*18;
+      cx.globalAlpha=t<0.75?1:1-(t-0.75)/0.25;
+      cx.strokeStyle="#f3c65a"; cx.lineWidth=2.5; cx.strokeRect(b.x-s/2,b.y-s/2-6,s,s);
+      if(t>0.3){ const u=(t-0.3)/0.7; cx.strokeStyle=`rgba(230,200,140,${1-u})`; cx.beginPath(); cx.ellipse(b.x,b.y+2,8+u*24,(8+u*24)*0.45,0,0,Math.PI*2); cx.stroke(); }
+      const y=b.y-22-ease(t)*16; cx.font="700 12px 'Segoe UI',sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; const s2="Built: "+(e.label||"building");
+      cx.lineWidth=3; cx.strokeStyle="rgba(0,0,0,.65)"; cx.strokeText(s2,b.x,y); cx.fillStyle="#ffe39a"; cx.fillText(s2,b.x,y); cx.globalAlpha=1;
+    }
+  };
+  DRAW.hold=function(e,t){ // shield pops up over the capital with a "holds" tag
+    const b=proj(e.b.x,e.b.y); if(!b) return;
+    const k=Math.min(1,t/0.25), s=(0.6+0.4*ease(k))*1; cx.globalAlpha=t<0.75?1:1-(t-0.75)/0.25;
+    cx.save(); cx.translate(b.x,b.y-18); cx.scale(s,s);
+    cx.beginPath(); cx.moveTo(0,-11); cx.lineTo(9,-7); cx.lineTo(8,3); cx.quadraticCurveTo(5,9,0,12); cx.quadraticCurveTo(-5,9,-8,3); cx.lineTo(-9,-7); cx.closePath();
+    cx.fillStyle="rgba(70,110,170,.95)"; cx.fill(); cx.lineWidth=2; cx.strokeStyle="#cfe0ff"; cx.stroke();
+    cx.beginPath(); cx.moveTo(0,-7); cx.lineTo(0,8); cx.moveTo(-5,-1); cx.lineTo(5,-1); cx.strokeStyle="rgba(230,240,255,.85)"; cx.lineWidth=1.6; cx.stroke(); cx.restore();
+    cx.font="700 11.5px 'Segoe UI',sans-serif"; cx.textAlign="center"; cx.textBaseline="middle"; const s2=(e.label?e.label+" ":"")+"holds";
+    cx.lineWidth=3; cx.strokeStyle="rgba(0,0,0,.65)"; cx.strokeText(s2,b.x,b.y+2); cx.fillStyle="#cfe0ff"; cx.fillText(s2,b.x,b.y+2); cx.globalAlpha=1;
+  };
+  const DUR={attack:1.3,move:1.0,recruit:1.1,build:1.1,hold:0.95};
+  let running=false;
+  function kick(){ if(!running){ running=true; requestAnimationFrame(loop); } }
+  function loop(){
+    const r=wrap.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+    const W=Math.max(1,r.width*dpr|0), H=Math.max(1,r.height*dpr|0);
+    if(cv.width!==W||cv.height!==H){ cv.width=W; cv.height=H; }
+    cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,W,H); cx.setTransform(dpr,0,0,dpr,0,0);
+    const now=performance.now();
+    for(let i=fx.length-1;i>=0;i--){ const e=fx[i], t=(now-e.t0)/1000/(DUR[e.type]||1.2); if(t>=1){ fx.splice(i,1); continue; }
+      try{ DRAW[e.type]&&DRAW[e.type](e,t); }catch(err){ fx.splice(i,1); } }
+    cx.globalAlpha=1;
+    if(fx.length) requestAnimationFrame(loop); else { running=false; cx.setTransform(1,0,0,1,0,0); cx.clearRect(0,0,W,H); }
+  }
+  const unitName=t=>{ try{ return (typeof unitKind==="function"&&unitKind(t).name)||t; }catch(e){ return t; } };
+  function anim(type,d){
+    if(!DRAW[type]||!d) return false;
+    const to=d.at||(d.to!=null?provPt(d.to):d.pid!=null?provPt(d.pid):null); if(!to) return false;
+    const from=d.from!=null?provPt(d.from):d.fromAt||null;
+    add({type,a:from||to,b:to,label:d.label!=null?d.label:(type==="recruit"?unitName(d.unit||"rifle"):type==="build"?"building":""),result:d.result||null});
+    return true;
+  }
+  window.CF_anim=anim;
+  // animate the player's own actions, enemy actions during their turns, and anything aimed at the player
+  CF_on("action",d=>{ const me=state.player; if(!d) return;
+    const tgtOwner=d.to!=null&&d.to>=0&&provinces[d.to]?provinces[d.to].owner:-1;
+    const foe=me>=0&&d.nation!==me&&typeof atWar==="function"&&atWar(me,d.nation);
+    if(!(d.byPlayer||foe||tgtOwner===me)) return;
+    if(d.kind==="hold"){ const cap=provinces.find(p=>p.owner===d.nation&&p.capital)||provinces.find(p=>p.owner===d.nation); if(cap) anim("hold",{pid:cap.id,label:d.nationName}); return; }
+    const r=d.result||null;
+    let label=d.label;
+    if(d.kind==="attack"){ const won=r&&(r.won!=null?r.won:r.win); label=!r?"":r.captured?"Captured!":won===true?"Won":won===false?"Lost":""; }
+    if(d.kind==="recruit"&&!d.unit&&r&&r.str) label=(typeof fmt==="function"?fmt(r.str):r.str)+" troops";
+    anim(d.kind,{from:d.from>=0?d.from:null,to:d.to>=0?d.to:null,pid:d.pid,unit:d.unit,label,result:r,at:d.at});
+  });
+
+  CF_on("build",d=>anim("build",{to:d.to,label:d.kind,at:d.at}));
+
+  // ---------- turn banner ----------
+  const ban=document.createElement("div"); ban.id="cfTurnBanner";
+  ban.innerHTML='<div class="t"></div><div class="s"></div>';
+  wrap.appendChild(ban);
+  const st=document.createElement("style");
+  st.textContent=`#cfTurnBanner{position:absolute;left:50%;top:16%;transform:translate(-50%,-14px);z-index:30;pointer-events:none;opacity:0;
+  padding:10px 34px 9px;border-radius:12px;text-align:center;background:linear-gradient(180deg,rgba(18,24,36,.94),rgba(10,14,22,.94));
+  border:1px solid rgba(231,197,106,.7);box-shadow:0 10px 30px rgba(0,0,0,.55),inset 0 1px 0 rgba(255,255,255,.08);transition:opacity .35s,transform .35s}
+#cfTurnBanner.on{opacity:1;transform:translate(-50%,0)}
+#cfTurnBanner .t{font:800 26px Georgia,serif;letter-spacing:.08em;color:#f3d98e;text-shadow:0 2px 6px rgba(0,0,0,.6)}
+#cfTurnBanner.ai{border-color:rgba(226,90,74,.75);padding:7px 26px 6px}
+#cfTurnBanner.ai .t{font-size:19px;color:#ffb3a6}
+#cfTurnBanner .s{font:600 12.5px "Segoe UI",sans-serif;color:#cdd5e2;margin-top:2px;letter-spacing:.04em}`;
+  document.head.appendChild(st);
+  let banT=0;
+  window.CF_banner=function(text,sub,ms){ ban.querySelector(".t").textContent=text||""; ban.querySelector(".s").textContent=sub||"";
+    ban.classList.add("on"); clearTimeout(banT); banT=setTimeout(()=>ban.classList.remove("on"),ms||1500); };
+  CF_on("turnStart",d=>{ const M=(typeof MONTHS!=="undefined"&&MONTHS[d.month])||"";
+    if(d.isPlayer){ ban.classList.remove("ai"); window.CF_banner("Turn "+d.turn+" · Your move", (M?M+" ":"")+d.year+" · do one thing, or End Turn to pass"); }
+    else { ban.classList.add("ai"); window.CF_banner(d.nationName+"'s turn","Enemy move",750); } });
+
+  // ---------- automatic emits ----------
+  const ownerOfIds=ids=>{ const id=Array.isArray(ids)?ids[0]:ids; const u=typeof unitById==="function"?unitById(id):null; return u?{owner:u.owner,from:u.pid}:null; };
+  const wrapFn=(get,set,after)=>{ const f=get(); if(typeof f!=="function") return; set(function(){ const pre=after.pre?after.pre.apply(this,arguments):null; const r=f.apply(this,arguments); try{ after.post(r,arguments,pre); }catch(e){} return r; }); };
+  wrapFn(()=>orderMove,v=>orderMove=v,{pre:ids=>ownerOfIds(ids), post:(r,a,pre)=>{ if(r===false||!pre) return; const dest=a[1]; const p=provinces[dest]; if(!p) return;
+    const atk=p.owner!==pre.owner&&typeof atWar==="function"&&atWar(pre.owner,p.owner);
+    emitAction({_auto:1,type:atk?"attack":"move",owner:pre.owner,byPlayer:pre.owner===state.player,from:pre.from,to:dest,ids:[].concat(a[0])}); }});
+  if(typeof orderAttackBase==="function") wrapFn(()=>orderAttackBase,v=>orderAttackBase=v,{pre:ids=>ownerOfIds(ids), post:(r,a,pre)=>{ if(r===false||!pre) return;
+    const b=typeof baseById==="function"?baseById(a[1]):null; if(!b) return; emitAction({_auto:1,type:"attack",owner:pre.owner,byPlayer:pre.owner===state.player,from:pre.from,to:b.pid,ids:[].concat(a[0])}); }});
+  if(typeof focusAttack==="function") wrapFn(()=>focusAttack,v=>focusAttack=v,{post:(r,a)=>{ if(r===false) return; const me=state.player; const cap=provinces.find(p=>p.owner===me&&p.capital);
+    emitAction({_auto:1,type:"attack",owner:me,byPlayer:true,from:cap?cap.id:null,to:a[0]}); }});
+  wrapFn(()=>buyUnit,v=>buyUnit=v,{post:(r,a)=>{ if(!r) return; const n=a[0]; emitAction({_auto:1,type:"recruit",owner:n&&n.id,byPlayer:!!n&&n.id===state.player,to:a[2],pid:a[2],unit:a[1]}); }});
+  wrapFn(()=>placeBase,v=>placeBase=v,{post:(r,a)=>{ if(!r) return; let at=null; try{ if(typeof baseWorldPos==="function"&&typeof r==="object") at=baseWorldPos(r); }catch(e){}
+    emitBuild({type:"build",owner:a[0],byPlayer:a[0]===state.player,to:a[1],pid:a[1],kind:a[2]==="nav"?"Naval base":"Military base",at}); }});
+  if(typeof placeBuilding==="function") wrapFn(()=>placeBuilding,v=>placeBuilding=v,{post:(r,a)=>{ if(!r) return; const k=a[2];
+    const nm=(typeof BUILDINGS!=="undefined"&&BUILDINGS[k]&&BUILDINGS[k].name)||k; let at=null; try{ if(typeof bldgWorldPos==="function"&&r&&typeof r==="object") at=bldgWorldPos(r); }catch(e){}
+    emitBuild({type:"build",owner:a[0],byPlayer:a[0]===state.player,to:a[1],pid:a[1],kind:nm,at}); }});
+
+  // turnStart for the player whenever a new turn begins (turn-based mode), including turn 1.
+  // action_ops also calls CF_onTurnStart(id) for each enemy turn and for yours; duplicates are dropped.
+  let lastTurn=null;
+  setInterval(()=>{ try{
+    if(state.phase!=="play"){ lastTurn=null; return; }
+    const tm=state.turnMode!==false&&!(typeof mpActive==="function"&&mpActive());
+    if(!tm||!state.paused) return;
+    const a=state._act; if(a&&a.phase==="ai") return;
+    const n=state.turnNo||1;
+    if(n!==lastTurn){ lastTurn=n; emitTurn(state.player); }
+  }catch(e){} },150);
+
+  const C=window.CROWNFALL||(window.CROWNFALL={});
+  C.events={on:CF_on,off:CF_off,emit:CF_emit,onAction,onTurnStart,anim,banner:window.CF_banner};
+})();
+
 /* ===== v1.6 balance (logic): longer peace, starter garrison, fair AI ramp (alerts live in alert_ops.js) ===== */
 (function(){
   // 1) Two-year peace. A month is 0.7 s at 1x, so one year vanished in ~2 s at 4x.
@@ -16312,7 +16523,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   const pn=id=>(typeof provinces!=="undefined"&&provinces[id]&&provinces[id].name)||"";
   const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
   function line(o){
-    const who=o.nation===state.player?"You":(o.nationName||"?"), to=pn(o.to), from=pn(o.from), res=o.result?(typeof o.result==="string"?o.result:(o.result.won===true?"won":o.result.won===false?"lost":(o.result.text||""))):"";
+    const who=o.nation===state.player?"You":(o.nationName||"?"), to=pn(o.to), from=pn(o.from), res=o.result?(typeof o.result==="string"?o.result:(o.result.text||(o.result.won===true?"won":o.result.won===false?"lost":""))):"";
     if(o.kind==="attack") return `⚔ ${who} attacked ${to}${res?" — "+res:""}`;
     if(o.kind==="move") return `➜ ${who} moved ${from?from+" → ":""}${to}`;
     if(o.kind==="recruit") return `＋ ${who} recruited${to?" in "+to:""}`;
