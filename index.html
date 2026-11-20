@@ -15998,8 +15998,9 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     }
     if(typeof spawnBattleFX==="function"){ try{ spawnBattleFX(dp,share>0.6); }catch(e){} }
     for(const n of [att,defN]) if(n&&typeof recountArmy==="function")recountArmy(n);
-    const res={win,captured,atkLoss:Math.round(aL),defLoss:Math.round(dL),defender:defN.id,defenderName:defN.name};
+    const res={win,won:win,captured,atkLoss:Math.round(aL),defLoss:Math.round(dL),defender:defN.id,defenderName:defN.name};
     const txt=att.name+" attacked "+dp.name+" ("+defN.name+"): "+(captured?"captured it":win?"broke through, one more win takes it":"pushed back")+". Losses "+fm(aL)+" vs "+fm(dL)+".";
+    res.text=captured?"captured it":win?"won, 1 more to take it":"lost";
     log("war",txt);
     if(attId===state.player||defN.id===state.player) notify(txt,"war",defN.id===state.player&&captured?"important":"info");
     if(typeof checkFallen==="function")checkFallen();
@@ -16064,12 +16065,39 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
       for(const j of moveAdj(here,n.id)){
         const q=provinces[j]; if(!q||q.owner!==P)continue;
         const r=estimate(stacks[k],q);
-        if(r>1.25&&(!best||r>best.r))best={r,from:+k,to:j,us:stacks[k]};
+        if(r>1.15&&(!best||r>best.r))best={r,from:+k,to:j,us:stacks[k]};
       }
     }
     if(best){ const res=fight(n.id,best.us,best.to); return {kind:"attack",from:best.from,to:best.to,result:res}; }
-    // 2) a threatened border province: raise troops there
+    // 2) pick a target and a staging province next to it; gather armies there
     const myP=nProvs(n.id);
+    let plan=null;
+    for(const p of myP){
+      for(const j of moveAdj(p,n.id)){
+        const q=provinces[j]; if(!q||q.owner!==P)continue;
+        const {defs,militia}=defenseOf(q); const d=defs.reduce((s,u)=>s+u.str,0)+militia;
+        const here=(stacks[p.id]||[]).reduce((s,u)=>s+u.str,0);
+        const sc=-d+here*0.5;
+        if(!plan||sc>plan.sc)plan={sc,stage:p,target:q};
+      }
+    }
+    const gather=()=>{
+      if(!plan)return null;
+      const others=Object.keys(stacks).map(Number).filter(k=>k!==plan.stage.id)
+        .map(k=>({k,str:stacks[k].reduce((s,u)=>s+u.str,0)})).sort((x,y)=>y.str-x.str);
+      for(const o of others){
+        const lead=stacks[o.k][0];
+        const step=pathStep(lead,plan.stage.id);
+        const sp=provinces[step];
+        if(step>=0&&sp&&(sp.owner===n.id||allied(n.id,sp.owner))){
+          moveUnitsTo(stacks[o.k],step);
+          return {kind:"move",from:o.k,to:step};
+        }
+      }
+      return null;
+    };
+    if(plan&&mine.length&&estimate(mine,plan.target)>1.3){ const g=gather(); if(g)return g; }
+    // 3) a threatened border province: raise troops there
     let threat=null;
     for(const p of myP){
       let foe=0; for(const j of moveAdj(p))for(const u of unitsAt(j,P))foe+=u.str;
@@ -16079,19 +16107,8 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
       if(gap>0&&(!threat||gap>threat.gap))threat={p,gap};
     }
     if(threat){ const got=raise(n,threat.p,threat.gap); if(got){ notify(n.name+" raised "+fm(got)+" troops in "+threat.p.name+".","war","info"); return {kind:"recruit",from:threat.p.id,to:threat.p.id,result:{str:got}}; } }
-    // 3) march an army one province toward your border
-    const border=myP.filter(p=>moveAdj(p).some(j=>provinces[j]&&provinces[j].owner===P));
-    if(border.length){
-      const back=mine.filter(u=>!border.some(b=>b.id===u.pid)).sort((a,b)=>b.str-a.str);
-      for(const u of back){
-        const goal=border.reduce((b,p)=>{const d=Math.hypot(p.cx-provinces[u.pid].cx,p.cy-provinces[u.pid].cy);return !b||d<b.d?{p,d}:b;},null).p;
-        const step=pathStep(u,goal.id);
-        if(step>=0&&provinces[step]&&(provinces[step].owner===n.id||allied(n.id,provinces[step].owner))){
-          const from=u.pid; moveUnitsTo(stacks[from]||[u],step);
-          return {kind:"move",from,to:step};
-        }
-      }
-    }
+    { const g=gather(); if(g)return g; }
+    const border=plan?[plan.stage]:myP.filter(p=>moveAdj(p).some(j=>provinces[j]&&provinces[j].owner===P));
     // 4) nothing to do on the front: recruit at the border (or capital)
     const site=border[0]||myP.find(p=>p.capital)||myP[0];
     if(site){ const got=raise(n,site,Math.max(2000,gdpOf(n)*0.15)); if(got)return {kind:"recruit",from:site.id,to:site.id,result:{str:got}}; }
@@ -16278,6 +16295,57 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     for(const id of ["b1","b2","b4"]){ const b=document.getElementById(id); if(b) b.style.display=tm?"none":""; }
   }
   setInterval(lay,300);
+})();
+// v2.0: one-action turn bar + log of what each country did (uses logic's actionState / CF_onAction)
+(function(){
+  const st=document.createElement("style");
+  st.textContent=`#actBar{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:9;display:none;max-width:min(560px,70vw);background:rgba(14,24,40,.95);border:1px solid var(--gold2,#c9a24a);border-radius:12px;padding:7px 14px;color:#eee;font:13px/1.4 system-ui;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.45);pointer-events:none}
+#actBar b{color:#e7c56a}#actBar .ai{color:#ff9a8a}
+#actLog{position:absolute;left:12px;bottom:14px;z-index:9;display:none;width:250px;max-width:30vw;background:rgba(14,16,22,.88);border:1px solid #444;border-radius:10px;padding:6px 10px;color:#ddd;font:12px/1.45 system-ui;pointer-events:auto}
+#actLog .h{color:#e7c56a;font-weight:600;margin-bottom:2px;display:flex;justify-content:space-between}#actLog .h span{cursor:pointer;opacity:.7}
+#actLog .r{cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#actLog .r:hover{color:#fff}#actLog .me{color:#9fd39f}#actLog .foe{color:#ffb4a8}`;
+  document.head.appendChild(st);
+  const host=document.getElementById("mapwrap")||document.body;
+  const bar=document.createElement("div"); bar.id="actBar"; host.appendChild(bar);
+  const log=document.createElement("div"); log.id="actLog"; host.appendChild(log);
+  const items=[]; let logHidden=false;
+  const pn=id=>(typeof provinces!=="undefined"&&provinces[id]&&provinces[id].name)||"";
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+  function line(o){
+    const who=o.nation===state.player?"You":(o.nationName||"?"), to=pn(o.to), from=pn(o.from), res=o.result?(typeof o.result==="string"?o.result:(o.result.won===true?"won":o.result.won===false?"lost":(o.result.text||""))):"";
+    if(o.kind==="attack") return `⚔ ${who} attacked ${to}${res?" — "+res:""}`;
+    if(o.kind==="move") return `➜ ${who} moved ${from?from+" → ":""}${to}`;
+    if(o.kind==="recruit") return `＋ ${who} recruited${to?" in "+to:""}`;
+    return `⏸ ${who} held`;
+  }
+  function onAct(o){
+    if(!o)return; items.unshift({t:line(o),pid:o.to!=null?o.to:o.from,me:o.nation===state.player,turn:state.turnNo||1}); items.length=Math.min(items.length,8);
+    logHidden=false; draw();
+  }
+  function draw(){
+    const C=window.CROWNFALL, a=C&&C.actionState?C.actionState():null;
+    const show=!!(a&&a.on&&state.phase==="play");
+    if(!show){bar.style.display="none";log.style.display="none";return;}
+    if(a.phase==="player"&&!a.usedAction) bar.innerHTML=`<b>Your turn — pick 1 action.</b> Right-click a province next to your army to attack or move, or recruit a unit. Building, research and trade are free.`;
+    else if(a.phase==="player") bar.innerHTML=`Action used. Press <b>End Turn</b>.`;
+    else bar.innerHTML=`<span class="ai">${esc(a.actorName||"Enemy")}'s turn…</span>`;
+    bar.style.display="block";
+    if(items.length&&!logHidden){
+      log.innerHTML=`<div class="h">What happened<span id="actLogX">✕</span></div>`+items.map((it,i)=>`<div class="r ${it.me?"me":"foe"}" data-i="${i}">${esc(it.t)}</div>`).join("");
+      log.style.display="block";
+    } else log.style.display="none";
+  }
+  log.addEventListener("click",e=>{
+    if(e.target.id==="actLogX"){logHidden=true;draw();return;}
+    const r=e.target.closest(".r"); if(!r)return; const it=items[+r.dataset.i]; if(!it||it.pid==null)return;
+    const p=provinces[it.pid]; if(!p)return; state.selectedProv=it.pid;
+    if(p.cx!=null){ if(state.globeOn&&typeof globeLookAt==="function") globeLookAt(p.cx,p.cy,true); else { const R=$("mapwrap").getBoundingClientRect(); view.ts=Math.min(Math.max(view.scale,1.6),view.maxS||99); view.tox=R.width/2-p.cx*view.ts; view.toy=R.height/2-p.cy*view.ts; } }
+    if(typeof renderPanel==="function") renderPanel(true);
+  });
+  if(typeof window.CF_on==="function") window.CF_on("action",onAct);
+  else { const prev=window.CF_onAction; window.CF_onAction=function(o){ if(typeof prev==="function"){try{prev(o)}catch(e){}} onAct(o); }; }
+  setInterval(draw,400);
+  if(window.CROWNFALL) window.CROWNFALL.actionLog=()=>items.map(i=>i.t);
 })();
 
 })();
