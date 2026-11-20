@@ -15497,6 +15497,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   function endTurn(){
     if(state.phase!=="play")return; ensure();
     if(!on()){ state.paused=!state.paused; updateSpeed(); return; }
+    if(window.__cfActPass&&window.__cfActPass())return; // action turns
     if(!state.paused&&state.turnLeft>0)return; // already playing
     const wa=document.getElementById("warAlert"); if(wa&&wa.style.display==="block")return; // read the alert first
     state.turnLeft=state.turnLen; state.paused=false; updateSpeed();
@@ -15677,7 +15678,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   }
   const _ac=applyCap;
   applyCap=function(p,att,def,fromInvasion){
-    if(!p||!att||!def||p.owner!==def.id) return _ac.apply(this,arguments);
+    if(state._actCap||!p||!att||!def||p.owner!==def.id) return _ac.apply(this,arguments);
     const need=stagesNeeded(att,def);
     p._cq=p._cq||{}; const k=String(att.id); p._cq[k]=(p._cq[k]||0)+1;
     if(p._cq[k]<need){
@@ -15695,6 +15696,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   if(typeof retreatDefenders==="function"){
     const _rd=retreatDefenders;
     retreatDefenders=function(p,def,att){
+      if(state._actCap) return _rd.apply(this,arguments);
       if(p&&def&&att&&p.owner===def.id){ const need=stagesNeeded(att,def), cur=((p._cq&&p._cq[String(att.id)])||0)+1;
         if(cur<need){ for(const u of unitsAt(p.id,def.id)) u.str*=0.85; return; } } // line breaks, army holds
       return _rd.apply(this,arguments);
@@ -15878,6 +15880,280 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   }
   setInterval(()=>{ try{tick();}catch(e){} },500);
   if(window.CROWNFALL) window.CROWNFALL.warMap=v=>{ if(v)mode=v; key=""; tick(); return {mode,active:active()}; };
+})();
+
+/* ===== action_ops (logic): action turns. Everyone takes a turn and does ONE thing.
+   Your turn: one action (attack or move an army one province, or recruit), or End Turn to pass.
+   Then each AI country at war with you takes one action you can watch. Then a month passes.
+   Battles resolve instantly when someone attacks: real losses, no hidden fighting between turns.
+   Hooks for UI (optional, define them anywhere):
+     window.CF_onTurnStart(nationId)
+     window.CF_onAction({nation, nationName, kind:"attack"|"move"|"recruit"|"hold", from, to, result})
+       result for attacks: {win, captured, atkLoss, defLoss, defender, defenderName} ===== */
+(function(){
+  const isMP=()=>(typeof mpActive==="function"&&mpActive())||(typeof MP!=="undefined"&&MP&&MP.mode&&MP.mode!=="hotseat");
+  const on=()=>state&&state.turnMode!==false&&!isMP()&&state.phase==="play";
+  const A=state._act={phase:"player",actor:-1,done:false};
+  function act(){ if(!state._act)state._act={phase:"player",actor:-1,done:false}; return state._act; }
+  const gdpOf=n=>Math.max(1,(n&&(n.gdp||n.baseGdp))||1);
+  const human=id=>id===state.player||(typeof mpIsHuman==="function"&&mpIsHuman(id));
+  const nm=id=>(nations[id]&&nations[id].name)||"?";
+  const fm=v=>typeof fmt==="function"?fmt(Math.round(v)):String(Math.round(v));
+  function hook(name,arg){ try{ if(typeof window[name]==="function") window[name](arg); }catch(e){ console.warn(name,e); } }
+  function emit(o){ o.nationName=nm(o.nation); hook("CF_onAction",o); }
+
+  // ---- starting armies scale with country size (AI used to start with no troops at all) ----
+  function seedAI(){
+    for(const n of nations){
+      if(!n.alive||human(n.id))continue;
+      if(unitsOf(n.id).length)continue;
+      n.army=Math.round(clamp(gdpOf(n)*0.55,1500,45000));
+      if(typeof seedUnits==="function") seedUnits(n);
+    }
+  }
+  const _sa=startAs;
+  startAs=function(){ const r=_sa.apply(this,arguments); try{ seedAI(); const a=act(); a.phase="player"; a.done=false; a.actor=-1; }catch(e){ console.warn(e); } return r; };
+
+  // ---- player's war is decided by actions only: no hidden monthly fighting against the player ----
+  const _aw=atWar;
+  atWar=function(a,b){ if(state&&state._noPW&&(a===state.player||b===state.player))return false; return _aw(a,b); };
+  const _tfb=tickFieldBattles;
+  tickFieldBattles=function(){ if(!on())return _tfb.apply(this,arguments); state._noPW=true; try{ return _tfb.apply(this,arguments); } finally{ state._noPW=false; } };
+  const _afr=autoFrontFor;
+  autoFrontFor=function(n){
+    if(!on())return _afr.apply(this,arguments);
+    if(n&&n.id===state.player)return;
+    state._noPW=true; try{ return _afr.apply(this,arguments); } finally{ state._noPW=false; }
+  };
+  function freezePlayerWar(){
+    const P=state.player;
+    for(const u of (state.units||[])){
+      const tp=provinces[u.dest];
+      if(u.owner===P || (tp&&tp.owner===P) || (provinces[u.assault]&&provinces[u.assault].owner===P)){
+        u.dest=-1; u.wps=null; u.route=null; u.assault=-1;
+      }
+    }
+  }
+
+  // ---- unit slide animation (works while paused) ----
+  const anims=[];
+  function slide(u,pid){
+    const p=provinces[pid]; if(!p)return;
+    const x0=u.ax!=null?u.ax:p.cx, y0=u.ay!=null?u.ay:p.cy;
+    anims.push({u,x0,y0,x1:p.cx,y1:p.cy,t0:performance.now()});
+    u.tx=p.cx; u.ty=p.cy; u.facing=Math.atan2(p.cy-y0,p.cx-x0);
+  }
+  (function loop(){
+    const now=performance.now();
+    for(let i=anims.length-1;i>=0;i--){
+      const a=anims[i], t=Math.min(1,(now-a.t0)/650), e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+      a.u.ax=a.x0+(a.x1-a.x0)*e; a.u.ay=a.y0+(a.y1-a.y0)*e;
+      if(t>=1)anims.splice(i,1);
+    }
+    requestAnimationFrame(loop);
+  })();
+  function moveUnitsTo(us,pid){ for(const u of us){ u.fromPid=u.pid; u.pid=pid; u.dest=-1; u.wps=null; u.route=null; slide(u,pid); } }
+
+  // ---- instant battle ----
+  function defenseOf(dp){
+    const defN=nations[dp.owner];
+    const defs=unitsAt(dp.id).filter(u=>u.owner===dp.owner||allied(u.owner,dp.owner));
+    const militia=Math.sqrt(Math.max(1000,dp.pop||0))*1.05*(dp.dev||1)*0.62*((defN&&defN.tech)||1);
+    return {defs,militia};
+  }
+  function estimate(us,dp){
+    const {defs,militia}=defenseOf(dp);
+    const dT=defs.length?dominantType(defs):"rifle", aT=dominantType(us);
+    let a=0,d=militia; for(const u of us)a+=unitPower(u,dT,true); for(const u of defs)d+=unitPower(u,aT,false);
+    return a/((d*defModOf(dp,false))+1);
+  }
+  function fight(attId,us,pid){
+    const dp=provinces[pid], att=nations[attId], defN=nations[dp.owner];
+    const {defs,militia}=defenseOf(dp);
+    const dT=defs.length?dominantType(defs):"rifle", aT=dominantType(us);
+    let atk=0,def=militia*(defN.tech||1);
+    for(const u of us)atk+=unitPower(u,dT,true);
+    for(const u of defs)def+=unitPower(u,aT,false);
+    def*=defModOf(dp,false);
+    if(typeof combinedArmsMul==="function"){ try{ const cm=combinedArmsMul(us,defs); atk*=cm.atk; def*=cm.def; }catch(e){} }
+    atk*=0.88+Math.random()*0.24; def*=0.88+Math.random()*0.24;
+    const share=atk/(atk+def+1);
+    let aL=0,dL=0;
+    for(const u of us){ const l=u.str*0.32*(1-share); u.str=Math.max(0,u.str-l); aL+=l; }
+    for(const u of defs){ const l=u.str*0.38*share; u.str=Math.max(0,u.str-l); dL+=l; }
+    const win=atk>def*1.1;
+    let captured=false;
+    if(win){
+      const last=nProvs(dp.owner).length<=1;
+      dp._aw=dp._aw||{}; const k=String(attId); dp._aw[k]=(dp._aw[k]||0)+1;
+      if(!last||dp._aw[k]>=2){
+        dp._aw={};
+        state._actCap=true;
+        try{ retreatDefenders(dp,defN,att); applyCap(dp,att,defN,false); } finally{ state._actCap=false; }
+        captured=dp.owner===attId;
+        if(captured) moveUnitsTo(us.filter(u=>u.str>0),pid);
+      } else {
+        for(const u of defs)u.str*=0.8;
+      }
+    }
+    if(typeof spawnBattleFX==="function"){ try{ spawnBattleFX(dp,share>0.6); }catch(e){} }
+    for(const n of [att,defN]) if(n&&typeof recountArmy==="function")recountArmy(n);
+    const res={win,captured,atkLoss:Math.round(aL),defLoss:Math.round(dL),defender:defN.id,defenderName:defN.name};
+    const txt=att.name+" attacked "+dp.name+" ("+defN.name+"): "+(captured?"captured it":win?"broke through, one more win takes it":"pushed back")+". Losses "+fm(aL)+" vs "+fm(dL)+".";
+    log("war",txt);
+    if(attId===state.player||defN.id===state.player) notify(txt,"war",defN.id===state.player&&captured?"important":"info");
+    if(typeof checkFallen==="function")checkFallen();
+    if(typeof bumpMap==="function")bumpMap();
+    return res;
+  }
+
+  // ---- player's one action ----
+  function playerTurn(){ const a=act(); return on()&&a.phase==="player"&&!a.done; }
+  function blocked(){ feedback(act().phase==="ai"?"Wait: the other countries are taking their turns.":"You've used your action this turn.","war",true); return false; }
+  const _om=orderMove;
+  orderMove=function(ids,dest,manual){
+    if(!on()||!manual)return _om.apply(this,arguments);
+    if(!playerTurn())return blocked();
+    const dp=provinces[dest]; if(!dp)return false;
+    const P=state.player;
+    const us=(ids||[]).map(unitById).filter(u=>u&&u.owner===P&&u.str>0&&u.type!=="air"&&u.pid!==dest);
+    const adj=us.filter(u=>moveAdj(provinces[u.pid],P).includes(dest));
+    if(!us.length)return false;
+    if(!adj.length){ feedback("One province per turn: right-click a province next to your army.","war",true); return false; }
+    const from=adj[0].pid;
+    if(dp.owner!==P&&_aw(P,dp.owner)){
+      const res=fight(P,adj,dest);
+      emit({nation:P,kind:"attack",from,to:dest,result:res});
+    } else if(dp.owner===P||allied(P,dp.owner)||canEnterProv(P,dest)){
+      if(dp.owner!==P&&!allied(P,dp.owner)&&!_aw(P,dp.owner)) return _om.apply(this,arguments);
+      moveUnitsTo(adj,dest);
+      feedback("Moved to "+dp.name+".","good",false);
+      emit({nation:P,kind:"move",from,to:dest});
+    } else { return _om.apply(this,arguments); }
+    finishPlayer();
+    return true;
+  };
+  const _bu=buyUnit;
+  buyUnit=function(n,type,pid,silent){
+    if(!on()||!n||n.id!==state.player||silent)return _bu.apply(this,arguments);
+    if(!playerTurn())return blocked();
+    const ok=_bu.apply(this,arguments);
+    if(ok){ emit({nation:n.id,kind:"recruit",from:pid!=null?pid:-1,to:pid!=null?pid:-1}); finishPlayer(); }
+    return ok;
+  };
+  function finishPlayer(){ const a=act(); a.done=true; refresh(); setTimeout(aiPhase,700); }
+
+  // ---- AI turns ----
+  function raise(n,p,want){
+    const d=n._raise||(n._raise={t:state.tick,used:0});
+    if(state.tick-d.t>=12){d.t=state.tick;d.used=0;}
+    const cap=Math.max(3000,gdpOf(n)*0.6);
+    const str=Math.round(Math.min(want,cap-d.used,Math.max(1500,gdpOf(n)*0.25),Math.max(0,(n.money||0)/0.03)+1500));
+    if(str<500)return 0;
+    spawnUnit(n.id,p.id,str,"rifle",{supplied:true}); d.used+=str;
+    n.money=Math.max(0,(n.money||0)-str*0.03); recountArmy(n); return str;
+  }
+  function aiAct(n){
+    const P=state.player;
+    const mine=unitsOf(n.id).filter(u=>u.type!=="air");
+    const stacks={}; for(const u of mine)(stacks[u.pid]=stacks[u.pid]||[]).push(u);
+    // 1) attack the best target if we have the edge
+    let best=null;
+    for(const k in stacks){
+      const here=provinces[k]; if(!here)continue;
+      for(const j of moveAdj(here,n.id)){
+        const q=provinces[j]; if(!q||q.owner!==P)continue;
+        const r=estimate(stacks[k],q);
+        if(r>1.25&&(!best||r>best.r))best={r,from:+k,to:j,us:stacks[k]};
+      }
+    }
+    if(best){ const res=fight(n.id,best.us,best.to); return {kind:"attack",from:best.from,to:best.to,result:res}; }
+    // 2) a threatened border province: raise troops there
+    const myP=nProvs(n.id);
+    let threat=null;
+    for(const p of myP){
+      let foe=0; for(const j of moveAdj(p))for(const u of unitsAt(j,P))foe+=u.str;
+      if(!foe)continue;
+      const own=unitsAt(p.id,n.id).reduce((s,u)=>s+u.str,0);
+      const gap=foe*1.1-own;
+      if(gap>0&&(!threat||gap>threat.gap))threat={p,gap};
+    }
+    if(threat){ const got=raise(n,threat.p,threat.gap); if(got){ notify(n.name+" raised "+fm(got)+" troops in "+threat.p.name+".","war","info"); return {kind:"recruit",from:threat.p.id,to:threat.p.id,result:{str:got}}; } }
+    // 3) march an army one province toward your border
+    const border=myP.filter(p=>moveAdj(p).some(j=>provinces[j]&&provinces[j].owner===P));
+    if(border.length){
+      const back=mine.filter(u=>!border.some(b=>b.id===u.pid)).sort((a,b)=>b.str-a.str);
+      for(const u of back){
+        const goal=border.reduce((b,p)=>{const d=Math.hypot(p.cx-provinces[u.pid].cx,p.cy-provinces[u.pid].cy);return !b||d<b.d?{p,d}:b;},null).p;
+        const step=pathStep(u,goal.id);
+        if(step>=0&&provinces[step]&&(provinces[step].owner===n.id||allied(n.id,provinces[step].owner))){
+          const from=u.pid; moveUnitsTo(stacks[from]||[u],step);
+          return {kind:"move",from,to:step};
+        }
+      }
+    }
+    // 4) nothing to do on the front: recruit at the border (or capital)
+    const site=border[0]||myP.find(p=>p.capital)||myP[0];
+    if(site){ const got=raise(n,site,Math.max(2000,gdpOf(n)*0.15)); if(got)return {kind:"recruit",from:site.id,to:site.id,result:{str:got}}; }
+    return {kind:"hold",from:-1,to:-1};
+  }
+  function actors(){ const P=state.player, me=nations[P]; if(!me)return []; return me.wars.filter(id=>nations[id]&&nations[id].alive&&!human(id)); }
+  let busy=false;
+  function aiPhase(){
+    if(busy||!on())return;
+    busy=true;
+    const a=act(); a.phase="ai";
+    freezePlayerWar();
+    const list=actors().slice(0,8);
+    let i=0;
+    const next=()=>{
+      if(!on()){ busy=false; return; }
+      if(i>=list.length){ endRound(); return; }
+      const id=list[i++], n=nations[id];
+      if(!n||!n.alive||!_aw(state.player,id)){ next(); return; }
+      a.actor=id; hook("CF_onTurnStart",id); refresh();
+      let r; try{ r=aiAct(n); }catch(e){ console.warn("aiAct",e); r={kind:"hold",from:-1,to:-1}; }
+      if(r.kind==="move") log("war",n.name+" moved troops to "+(provinces[r.to]?provinces[r.to].name:"?")+".");
+      if(r.kind==="hold") log("war",n.name+" held its lines.");
+      emit(Object.assign({nation:id},r));
+      setTimeout(next,r.kind==="hold"?250:900);
+    };
+    next();
+  }
+  function endRound(){
+    const a=act();
+    freezePlayerWar();
+    try{ gameTick(); }catch(e){ console.warn("tick",e); }
+    freezePlayerWar();
+    state.paused=true; state.turnLeft=0;
+    a.phase="player"; a.done=false; a.actor=-1; busy=false;
+    hook("CF_onTurnStart",state.player);
+    refresh();
+  }
+  // End Turn = pass (or skip straight to the AI if you already acted)
+  function pass(){
+    if(!on())return false;
+    const a=act();
+    if(a.phase!=="player"||busy)return true;
+    const wa=document.getElementById("warAlert"); if(wa&&wa.style.display==="block")return true;
+    a.done=true; refresh(); setTimeout(aiPhase,80); return true;
+  }
+  window.__cfActPass=pass;
+  function refresh(){
+    try{ if(typeof updateSpeed==="function")updateSpeed(); }catch(e){}
+    const b=document.getElementById("bTurn"), a=act(); if(!b||!on())return;
+    const l=document.getElementById("bTurnLen"); if(l)l.style.display="none";
+    if(a.phase==="ai"){ b.textContent=(a.actor>=0?nm(a.actor):"Enemy")+"'s turn…"; b.disabled=true; b.style.opacity=0.65; }
+    else if(a.done){ b.textContent="…"; b.disabled=true; }
+    else { b.textContent="End Turn "+(state.turnNo||1)+" ▶"; b.disabled=false; b.style.opacity=1; b.title="Your turn: do ONE thing (right-click to attack/move one province, or recruit), or press to pass."; }
+  }
+  const _us=updateSpeed;
+  updateSpeed=function(){ const r=_us.apply(this,arguments); if(on()){ const a=act(), b=document.getElementById("bTurn"), l=document.getElementById("bTurnLen"); if(l)l.style.display="none";
+      if(b&&a.phase==="ai"){ b.textContent=(a.actor>=0?nm(a.actor):"Enemy")+"'s turn…"; b.disabled=true; b.style.opacity=0.65; } } return r; };
+  if(window.CROWNFALL){
+    window.CROWNFALL.actionState=()=>{ const a=act(); return {on:on(),phase:a.phase,actor:a.actor,actorName:a.actor>=0?nm(a.actor):null,usedAction:!!a.done,turn:state.turnNo||1}; };
+    window.CROWNFALL.passTurn=pass;
+  }
 })();
 
 
