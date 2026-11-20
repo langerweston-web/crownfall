@@ -13043,7 +13043,8 @@ function installHQDraw(){
       if(!this.ok||!this.gl||!this.prog||this.loc.aCol==null){ _draw(now); return; }
       if(typeof unitStyle==="function" && unitStyle()==="nato"){ this._clear(); return; }
       const gl=this.gl;
-      if(this.w!==view.cssW||this.h!==view.cssH) this.resize();
+      if(this.w!==view.cssW||this.h!==view.cssH){ this.resize(); this._blank=false; }
+      if(this._blank&&typeof collectUnitFigures==="function"&&!hqAnyBig(now)) return;   // v2.6: canvas already empty
       gl.viewport(0,0,this.canv.width,this.canv.height);
       gl.clearColor(0,0,0,0);
       gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
@@ -13057,9 +13058,11 @@ function installHQDraw(){
         groups[typ].push(x,y,z,col[0],col[1],col[2],scl,rot,bob,phase||0,anim||0,0);
       };
       const figs=typeof collectUnitFigures==="function"?collectUnitFigures(now):[];
+      let nGL=0;
       for(const f of figs){
         if(f.ghost) continue;
-        add(f.typ,f.x,f.y,0,this._hex(f.col),f.scl,f.rot,f.bob,f.phase,f.anim);
+        if(f.scl<HQ_TINY) continue;     // v2.6: tiny figures are cached 2D sprites (drawAndHit), not 3D draws
+        add(f.typ,f.x,f.y,0,this._hex(f.col),f.scl,f.rot,f.bob,f.phase,f.anim); nGL++;
       }
       gl.useProgram(this.prog);
       gl.uniform2f(this.loc.uRes, view.cssW, view.cssH);
@@ -13099,8 +13102,17 @@ function installHQDraw(){
         if(this.is2) gl.drawArraysInstanced(gl.TRIANGLES, 0, mesh.n, instN);
         else this.ext.drawArraysInstancedANGLE(gl.TRIANGLES, 0, mesh.n, instN);
       }
+      this._blank=nGL===0;
     };
   }
+}
+/* v2.6: figures smaller than this (globe / zoomed-out map) are drawn from the 2D sprite cache:
+   they are a few pixels tall, and hundreds of them cost the software-WebGL path ~90 ms a frame. */
+var HQ_TINY=3.4;
+var _hqBigT=-1, _hqBig=false;
+function hqAnyBig(now){
+  if(now-_hqBigT<250) return _hqBig; _hqBigT=now;
+  const figs=collectUnitFigures(now); _hqBig=figs.some(f=>!f.ghost&&f.scl>=HQ_TINY); return _hqBig;
 }
 
 /* v1.7.1: keep bases (and the troops parked by them) off the big country-name labels. */
@@ -13278,8 +13290,9 @@ function installHQCollectors(){
           const s=Math.max(0.7,(f.scl||8)/10);
           const yb=f.typ&&String(f.typ).indexOf("bld_")==0?4:2;
           this.drawShadow(ctx, f.x, f.y+yb, s*(String(f.typ||"").indexOf("bld_")==0?1.35:1));
-          if(!useGL || f.ghost){
-            this.drawMesh(ctx, f.typ||"rifle", f.x, f.y, f.scl||9, f.rot||0, f.bob||0, f.col, f.ghost?0.55:1, f.phase, f.anim);
+          if(!useGL || f.ghost || (f.scl||9)<HQ_TINY){
+            const spr=useGL&&!f.ghost; if(spr) this._forceSprite=true;
+            try{ this.drawMesh(ctx, f.typ||"rifle", f.x, f.y, f.scl||9, f.rot||0, f.bob||0, f.col, f.ghost?0.55:1, f.phase, f.anim); } finally{ if(spr) this._forceSprite=false; }
           }
         }
       }
@@ -14277,10 +14290,19 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   // 3) Hover card: refresh while it is showing, so it follows conquests without the mouse moving.
   if(typeof showTooltip==="function"){
     const _show=showTooltip; let last=null;
-    showTooltip=function(sx,sy,pid){ last=[sx,sy,pid]; return _show(sx,sy,pid); };
+    // v2.6: no hover card while you drag the map or turn the globe (it used to sit on top, or pop up mid-drag)
+    let down=null, drag=false;
+    const hideTip=()=>{ try{ if(tipEl) tipEl.style.display="none"; state.hover=-1; }catch(e){} };
+    window.addEventListener("pointerdown",e=>{ if(e.target===canvas){ down=[e.clientX,e.clientY]; drag=false; } },true);
+    window.addEventListener("pointermove",e=>{ if(!down||!e.buttons) return;
+      if(!drag&&Math.abs(e.clientX-down[0])+Math.abs(e.clientY-down[1])>5){ drag=true; hideTip(); } else if(drag&&tipEl&&tipEl.style.display!=="none") hideTip(); },true);
+    const up=()=>{ down=null; if(drag) setTimeout(()=>{ drag=false; },0); };
+    window.addEventListener("pointerup",up,true); window.addEventListener("pointercancel",up,true); window.addEventListener("blur",up);
+    try{ (window.CROWNFALL||(window.CROWNFALL={})).mapDragging=()=>drag; }catch(e){}
+    showTooltip=function(sx,sy,pid){ last=[sx,sy,pid]; if(drag){ hideTip(); return; } return _show(sx,sy,pid); };
     setInterval(()=>{
       try{
-        if(!last||!tipEl||tipEl.style.display==="none"||state.hover!==last[2]) return;
+        if(drag||!last||!tipEl||tipEl.style.display==="none"||state.hover!==last[2]) return;
         _show(last[0],last[1],last[2]);
       }catch(e){}
     },400);
@@ -15166,8 +15188,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
   if(typeof drawGlobeFrame!=="function") return;
   let gver=0;
   if(typeof invalidateLand==="function"){ const f=invalidateLand; invalidateLand=function(){ gver++; return f.apply(this,arguments); }; }
-  const gc={cv:null,key:"",t:0};
-  function paintDisc(c,w,h,moving){
+  function paintDisc(c,w,h,moving,noBlur){
     const cx=w/2, cy=h/2+4, R=globe.r;
     const bg=c.createLinearGradient(0,0,0,h); bg.addColorStop(0,"#050814"); bg.addColorStop(1,"#070d17");
     c.fillStyle=bg; c.fillRect(0,0,w,h);
@@ -15231,33 +15252,58 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
       const all=new Path2D();
       for(const p of provinces) if(p.owner===state.player&&p._gVis&&p._gPath) all.addPath(p._gPath);
       c.lineWidth=2.4; c.strokeStyle="rgba(236,201,112,0.95)";
-      if(!moving){ c.shadowColor="rgba(236,201,112,0.55)"; c.shadowBlur=8; }
-      c.stroke(all); c.shadowBlur=0;
+      if(!moving&&!noBlur){ c.shadowColor="rgba(236,201,112,0.55)"; c.shadowBlur=8; c.stroke(all); c.shadowBlur=0; }
+      else { c.save(); c.globalAlpha=0.35; c.lineWidth=6; c.stroke(all); c.restore(); c.stroke(all); }   // v2.6: blur-free glow while turning
     }
     c.restore();
   }
+  /* (v2.6: this vector globe is now only the fallback; the projected-texture globe in GFX25 below replaces it.)
+     v2.6: the globe never drops detail while it turns. Moving frames are the same full-detail picture
+     (texture, hills, borders, names) painted at an adaptive lower resolution (names stay sharp: they are
+     drawn on top at full resolution); once the globe has been still for 150 ms the full-resolution
+     picture is painted once and reused (no repaint while idle; it refreshes only when owners, colours or
+     wars change). "Moving" comes from the camera itself, not globe.dirty (hover hit-tests cleared that
+     flag, so every drag frame used to repaint the full-resolution globe, blur included). */
+  const gm={cv:null,q:0.7,key:"",lastKey:"",moveT:-1e9,lastT:0,ema:16,sigT:-1e9,sig:"",n:0};
+  function gsig(now){
+    if(now-gm.sigT<400) return gm.sig; gm.sigT=now;
+    let a=0; for(let i=0;i<provinces.length;i++) a=(a*31+provinces[i].owner*7+(provinces[i].nukeScar?3:0))|0;
+    let s=a+"|"+state.player+"|"+(typeof perfIsLite==="function"&&perfIsLite()?1:0);
+    for(const n of nations){ if(n.alive){ s+=","+displayColor(n); if(n.wars&&n.wars.length) s+=":"+n.wars.join("."); } }
+    return gm.sig=s;
+  }
+  const GS=window.__CF_GSTAT={rebuild:0,moving:0,still:0,q:0.7};
   drawGlobeFrame=function(){
     const {cssW:w,cssH:h,dpr}=view;
     if(!w)return;
     if(!globe.r) globeFit();
-    const moving=!!globe.dirty;
     if(globe.dirty) buildGlobePaths();
-    const key=[globe.lon.toFixed(3),globe.lat.toFixed(3),globe.r.toFixed(2),w|0,h|0,dpr,gver,state.mapVer||0,state.player].join("|");
     const now=performance.now();
+    const camKey=[globe.lon.toFixed(3),globe.lat.toFixed(3),globe.r.toFixed(2),w|0,h|0,dpr].join("|");
+    if(camKey!==gm.lastKey){ gm.lastKey=camKey; gm.moveT=now; }
+    const moving=now-gm.moveT<150;
+    const dtF=now-(gm.lastT||now); gm.lastT=now;
     const W=Math.max(1,w*dpr|0), H=Math.max(1,h*dpr|0);
     if(moving){
-      ctx.setTransform(dpr,0,0,dpr,0,0); paintDisc(ctx,w,h,true); gc.key=""; (window.__CF_GSTAT=window.__CF_GSTAT||{rebuild:0,moving:0}).moving++;
+      // adaptive resolution: aim for ~30+ fps while turning, sharpen back up when there is headroom
+      if(dtF>0&&dtF<400){ gm.ema=gm.ema*0.7+dtF*0.3; if(gm.ema>30) gm.q=Math.max(0.4,gm.q*0.9); else if(gm.ema<20) gm.q=Math.min(1,gm.q*1.05); }
+      const q=(typeof perfIsLite==="function"&&perfIsLite())?Math.min(gm.q,0.6):gm.q;
+      const mw=Math.max(1,Math.ceil(W*q)), mh=Math.max(1,Math.ceil(H*q));
+      if(!gm.mv||gm.mv.width!==mw||gm.mv.height!==mh){ gm.mv=document.createElement("canvas"); gm.mv.width=mw; gm.mv.height=mh; }
+      const c=gm.mv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,mw,mh);
+      c.setTransform(dpr*q,0,0,dpr*q,0,0); paintDisc(c,w,h,false,true);
+      ctx.setTransform(1,0,0,1,0,0); ctx.imageSmoothingEnabled=true; ctx.drawImage(gm.mv,0,0,mw,mh,0,0,mw/q,mh/q);
+      gm.key=""; GS.moving++; GS.q=+q.toFixed(2);
     } else {
-      if(!gc.cv||gc.cv.width!==W||gc.cv.height!==H){ gc.cv=document.createElement("canvas"); gc.cv.width=W; gc.cv.height=H; gc.key=""; }
-      // v2.5: was a full repaint every 1.5 s; now only when owners / colours / wars actually change (checked every 0.5 s)
-      if(now-gc.st>500||gc.st==null){ gc.st=now; let a=0; for(let i=0;i<provinces.length;i++) a=(a*31+provinces[i].owner*7+(provinces[i].nukeScar?3:0))|0;
-        let s=""+a; for(const n of nations){ if(n.alive){ s+=","+displayColor(n); if(n.wars&&n.wars.length) s+=":"+n.wars.join("."); } } gc.sig=s; }
-      if(gc.key!==key || gc.sig!==gc.psig){ gc.psig=gc.sig;
-        const c=gc.cv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H);
-        c.setTransform(dpr,0,0,dpr,0,0); paintDisc(c,w,h,false); gc.key=key; gc.t=now; (window.__CF_GSTAT=window.__CF_GSTAT||{rebuild:0,moving:0}).rebuild++;
-      }
-      ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(gc.cv,0,0);
+      if(!gm.cv||gm.cv.width!==W||gm.cv.height!==H){ gm.cv=document.createElement("canvas"); gm.cv.width=W; gm.cv.height=H; gm.key=""; }
+      const key=camKey+"|"+gver+"|"+(state.mapVer||0)+"|"+gsig(now);
+      if(gm.key!==key){
+        const c=gm.cv.getContext("2d"); c.setTransform(1,0,0,1,0,0); c.clearRect(0,0,W,H);
+        c.setTransform(dpr,0,0,dpr,0,0); paintDisc(c,w,h,false,false); gm.key=key; GS.rebuild++;
+      } else GS.still++;
+      ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(gm.cv,0,0);
     }
+    gm.moving=moving;
     ctx.setTransform(dpr,0,0,dpr,0,0);
     for(const p of provinces){
       if(!(p.flash>0))continue;
@@ -15278,6 +15324,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     drawParticlesGlobe();
     drawMinimap();
   };
+  try{ (window.CROWNFALL||(window.CROWNFALL={})).globeMoving=()=>!!gm.moving; }catch(e){}
 })();
 /* ===== gfx_perf_ops: unit shadows. Every figure built a new radial gradient every frame
    (thousands per frame with a few hundred units, on the flat map and the globe). Now one shadow
@@ -15318,7 +15365,7 @@ try{ if(window.CROWNFALL){ window.CROWNFALL.getPlaced=()=>({bases:(state.bases||
     b={R,y0,y1}; bounds.set(typ,b); return b;
   }
   Unit3D.drawMesh=function(ctx, typ, px, py, scl, rot, bob, col, alpha, phase, anim){
-    const useGL=typeof UnitGL!=="undefined"&&UnitGL.ok;
+    const useGL=typeof UnitGL!=="undefined"&&UnitGL.ok&&!Unit3D._forceSprite;
     if(useGL || !(scl>0)) return raw.apply(this,arguments);
     const b=bnd(typ); if(!b) return;
     const dpr=Math.min(2,(typeof view!=="undefined"&&view.dpr)||1);
@@ -15578,10 +15625,11 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     try{ GFX21.drawRelief(c,null,scale); }catch(e){ if(!G.rw){G.rw=1;console.warn("relief",e);} }
     const lite25=(typeof perfIsLite==="function"&&perfIsLite());
     if(!lite25) GFX21.texture(c,scale,0.28);
-    if(forCache){ // faint dotted province lines inside your own country
+    const tx26=!!G.texMode;   // v2.6: globe texture bake skips the hairline/blur-scale extras (invisible at globe size)
+    if(forCache&&!tx26){ // faint dotted province lines inside your own country
       const me=state.player; if(me>=0){ c.save(); c.setLineDash([2.2/scale,3/scale]); c.lineWidth=1/scale; c.strokeStyle="rgba(255,255,255,0.42)";
         for(const p of provinces) if(p.owner===me&&p.path) c.stroke(p.path); c.restore(); } }
-    if(forCache&&!lite25){ c.lineWidth=16/scale; c.strokeStyle="rgba(0,0,0,0.16)";
+    if(forCache&&!lite25&&!tx26){ c.lineWidth=16/scale; c.strokeStyle="rgba(0,0,0,0.16)";
       for(const [oid,path] of NP){ const n=nations[oid]; if(n&&n.alive) G.edge(c,path,path); } }
     // country outline: dark casing, then each country's own colour just inside its border
     c.lineWidth=Math.max(1.6,2.2*Math.min(1,scale*2))/scale; c.strokeStyle="rgba(6,8,14,0.85)";
@@ -15592,7 +15640,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
         c.strokeStyle=light(displayColor(n),0.35); G.edge(c,path,path); }
       // v2.2 bevel: light catches the north-west inner edge, shade on the south-east
       const o=1.3/scale; c.lineWidth=2.4/scale;
-      if(!lite25) for(const [oid,path] of NP){ const n=nations[oid]; if(!n||!n.alive) continue;
+      if(!lite25&&!tx26) for(const [oid,path] of NP){ const n=nations[oid]; if(!n||!n.alive) continue;
         c.save(); c.clip(path,"evenodd");
         c.translate(o,o); c.strokeStyle="rgba(255,255,255,0.30)"; c.stroke(path);
         c.translate(-2*o,-2*o); c.strokeStyle="rgba(0,0,0,0.34)"; c.stroke(path); c.restore(); }
@@ -15867,6 +15915,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
 /* ===== gfx v1.8: globe names that don't pile up (you and enemies first, then bigger countries) ===== */
 (function(){
   if(typeof drawGlobeOverlays!=="function") return;
+  const TW=new Map();
   drawGlobeOverlays=function(){
     const {cssW:w,cssH:h,dpr}=view;
     ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -15904,9 +15953,9 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const placed=[], maxN=Math.max(10,Math.round(w*h/24000));
     for(const L of c){
       if(placed.length>=maxN) break;
-      const fs=clamp(10+L.z*4,9,16);
+      const fs=Math.round(clamp(10+L.z*4,9,16)*2)/2;   // v2.6: half-pixel steps so widths can be cached
       ctx.font=`700 ${fs}px Georgia,serif`;
-      const tw=ctx.measureText(L.nat.name).width;
+      const mk=fs+"|"+L.nat.name; let tw=TW.get(mk); if(tw===undefined){ tw=ctx.measureText(L.nat.name).width; if(TW.size>4000) TW.clear(); TW.set(mk,tw); }
       // v2.3: the name sits above the capital pin (pin + bar reach ~36 px above the capital)
       const ly=L.sy-38-fs/2;
       const r={x:L.sx-tw/2-4,y:ly-fs/2-3,w:tw+8,h:fs+6};
@@ -16019,12 +16068,22 @@ const GFX25=(function(){
   const inMargin=(L,g)=>Math.abs(g.ox-L.ox)<=g.m-2&&Math.abs(g.oy-L.oy)<=g.m-2;
   // content snapshot: what the cached LAND / GLOW pictures depend on
   let snapCk=null, snapCur=null;
+  /* v2.6: country colours as the map paints them. The war map recolours countries only inside
+     paintLand (logic's war_ops wraps it), so asking displayColor() outside it gave the normal colours
+     and a war-map switch looked like "nothing changed" to the caches. Ask from inside paintLand. */
+  let colCv=null;
+  function paintCols(){
+    let out=null; const get=()=>{ out=[]; for(const nt of nations){ let k="x"; if(nt.alive){ try{ k=displayColor(nt); }catch(e){ k="?"; } } out[nt.id]=k; } };
+    try{ if(!colCv){ colCv=document.createElement("canvas"); colCv.width=colCv.height=1; }
+      GFX18.cb=get; paintLand(colCv.getContext("2d"),1,true); }catch(e){} finally{ GFX18.cb=null; }
+    if(!out) get(); return out; }
+  X.paintCols=paintCols;
   function snapshot(ck){
     if(snapCk===ck&&snapCur) return snapCur;
     const G=GFX18, n=provinces.length, own=new Int32Array(n), occ=new Uint8Array(n); let nuke=0;
     for(let i=0;i<n;i++){ const p=provinces[i]; own[i]=p.owner; try{ occ[i]=G.occupied(p)?1:0; }catch(e){} if(p.nukeScar) nuke+=i+1; }
-    let col="", war="";
-    for(const nt of nations){ if(!nt.alive){ col+="x,"; continue; } try{ col+=displayColor(nt)+","; }catch(e){ col+="?,"; } if(nt.wars&&nt.wars.length) war+=nt.id+":"+nt.wars.join(".")+";"; }
+    let col="", war=""; const pc=paintCols();
+    for(const nt of nations){ if(!nt.alive){ col+="x,"; continue; } col+=pc[nt.id]+","; if(nt.wars&&nt.wars.length) war+=nt.id+":"+nt.wars.join(".")+";"; }
     snapCur={own,occ,sig:col+"|"+war+"|"+nuke+"|"+state.player+"|"+lite()}; snapCk=ck; return snapCur;
   }
   function pxRects(L,ids,pad){
@@ -16151,6 +16210,216 @@ const GFX25=(function(){
       for(const p of provinces){ if(p.flash>0) p.flash=Math.max(0,p.flash-0.03); }
       const dt=performance.now()-now; if(dt>X.stat.maxMs) X.stat.maxMs=dt;
     };
+  }
+
+  // ---- v2.6) globe drawn from a projected map texture ----
+  /* The globe used to re-stroke every province, a clipped inner band per country, two texture fills and
+     a blurred gold border for every frame it turned (~135 ms per frame without a GPU, 3-9 fps). Now
+     the flat map (relief, hills, coast surf, borders, stripes, war colours) is baked once into a
+     world texture and projected onto the sphere per pixel, lit per pixel. Turning only re-samples
+     pixels (a few ms). Province changes repaint just their boxes in the texture. Names, units, hover,
+     fronts and flashes are still drawn on top as before. */
+  const GT={lv:{},tab:null,tkey:"",img:null,disc:null,still:null,stillKey:"",q:1,ema:16,moveT:-1e9,lastCam:"",lastT:0,moving:false,
+            stat:{texFull:0,texDirty:0,tab:0,frames:0,still:0,move:0,ms:0,texMs:0,q:1}};
+  X.globe=GT;
+  const PER=7200;   // world x units per 360 degrees (lonlat(): lon=(wx/20-180))
+  P.gtex=function(c,L){ setT(c,L); const ls=L.scale*L.thick;
+    if(!lite()&&L.big) try{ GFX21.waves(c,Math.max(0.3,ls)); }catch(e){}
+    GFX18.texMode=true; try{ paintLand(c,ls,true); } finally{ GFX18.texMode=false; }
+    c.save(); c.globalCompositeOperation="destination-over"; try{ GFX21.coast(c,ls); }catch(e){}
+    c.fillStyle="rgb(16,58,88)"; c.fillRect(-10,-10,WW+20,WH+20); c.restore(); };
+  function texLevel(big){
+    const id=big?"big":"small"; let L=GT.lv[id];
+    const Tw=big?4096:2048, s=Tw/PER;
+    if(!L){ const cv=document.createElement("canvas"); cv.width=Math.ceil(WW*s); cv.height=Math.ceil(WH*s); cv.getContext("2d",{willReadFrequently:true});   // read back on every bake: keep it in CPU memory
+      L=GT.lv[id]={cv,w:WW*s,h:WH*s,m:0,R:1,dpr:1,scale:s,ox:0,oy:0,ck:null,snap:null,thick:big?0.5:1,big,Tw:cv.width,Th:cv.height,Pw:Math.round(PER*s),px:null}; }
+    return L; }
+  function texRead(L,r){ const c=L.cv.getContext("2d");
+    if(!L.px||r==="full"){ L.px=new Uint32Array(c.getImageData(0,0,L.Tw,L.Th).data.buffer); return; }
+    for(const q of r){ const d=new Uint32Array(c.getImageData(q[0],q[1],q[2],q[3]).data.buffer);
+      for(let y=0;y<q[3];y++) L.px.set(d.subarray(y*q[2],(y+1)*q[2]),(q[1]+y)*L.Tw+q[0]); } }
+  // what the texture depends on: owners, occupation, and per country its colour + wars
+  function tsnap(){
+    const G=GFX18, n=provinces.length, own=new Int32Array(n), occ=new Uint8Array(n);
+    for(let i=0;i<n;i++){ const p=provinces[i]; own[i]=p.owner; try{ occ[i]=G.occupied(p)?1:0; }catch(e){} occ[i]|=p.nukeScar?2:0; }
+    const nk=[], pc=paintCols(); for(const nt of nations){ let k="x"; if(nt.alive){ k=pc[nt.id]; if(nt.wars&&nt.wars.length) k+=":"+nt.wars.join("."); } nk[nt.id]=k; }
+    return {own,occ,nk,base:state.player+"|"+lite()+"|"+n};
+  }
+  /* bring one texture level up to date. Province / colour / war changes repaint only the affected
+     provinces' boxes (~10-20 ms). A full bake (first time, player or quality change) is painted in
+     bands, one per frame, into a second canvas while the old one stays on screen. */
+  const BANDS=16;
+  function texSync(L,ck,allowBake){
+    const t0=performance.now();
+    if(L.queue&&L.queue.length&&!L.bake) texWork(L,t0);
+    if(L.ck===ck&&L.px&&!L.bake) return;
+    if(L.bake){ const B=L.bake; if(!allowBake) return;
+      paintRects("gtex",B.L,[B.rows[B.i]]); B.i++;
+      if(B.i>=B.rows.length){ const c=B.L.cv; L.spare=L.cv; L.cv=c; L.px=null; texRead(L,"full"); L.snap=B.snap; L.ck=B.ck; L.bake=null; L.ver=(L.ver||0)+1; GT.stat.texFull++; }
+      GT.stat.texMs=+(performance.now()-t0).toFixed(1); return; }
+    if(L.ck===ck&&L.px) return;
+    const cur=tsnap(), old=L.snap;
+    if(!L.px||!old||old.base!==cur.base){
+      const H=L.Th, rows=[]; for(let i=0;i<BANDS;i++){ const y0=Math.floor(H*i/BANDS), y1=Math.floor(H*(i+1)/BANDS); rows.push([0,y0,L.Tw,y1-y0]); }
+      if(!L.spare||L.spare.width!==L.Tw||L.spare.height!==L.Th){ L.spare=document.createElement("canvas"); L.spare.width=L.Tw; L.spare.height=L.Th; L.spare.getContext("2d",{willReadFrequently:true}); }
+      L.bake={L:Object.assign({},L,{cv:L.spare}),rows,i:0,snap:cur,ck}; L.spare=null; L.queue=[];
+      const bc=L.bake.L.cv.getContext("2d"); bc.setTransform(1,0,0,1,0,0); bc.clearRect(0,0,L.Tw,L.Th);
+      if(allowBake) texSync(L,ck,true); return; }
+    const ids=[]; for(let i=0;i<cur.own.length;i++){ const o=cur.own[i];
+      if(o!==old.own[i]||cur.occ[i]!==old.occ[i]||cur.nk[o]!==old.nk[o]) ids.push(i); }
+    L.ck=ck; L.snap=cur; if(!ids.length) return;
+    const rs=pxRects(L,ids,10);
+    if(ids.length>120||rs.area>L.Tw*L.Th*0.2){ L.snap={base:"rebake"}; L.ck=null; texSync(L,ck,allowBake); return; }   // big recolour (war map, many captures): bake in bands
+    // one clip spanning far-apart boxes rasterises everything in between: group nearby boxes, paint groups separately
+    const cl=[]; for(const r of rs){ let a=[r[0],r[1],r[0]+r[2],r[1]+r[3]], hit=true;
+      while(hit){ hit=false; for(let i=0;i<cl.length;i++){ const q=cl[i]; if(a[0]<q[2]+24&&q[0]<a[2]+24&&a[1]<q[3]+24&&q[1]<a[3]+24){ a=[Math.min(a[0],q[0]),Math.min(a[1],q[1]),Math.max(a[2],q[2]),Math.max(a[3],q[3])]; cl.splice(i,1); hit=true; break; } } }
+      cl.push(a); }
+    L.queue=(L.queue||[]).concat(cl.map(a=>[a[0],a[1],a[2]-a[0],a[3]-a[1]]));
+    GT.stat.texDirty++; texWork(L,t0); }
+  // repaint queued boxes, ~16 ms of work per frame (the rest waits for the next frame)
+  function texWork(L,t0){
+    if(!L.queue||!L.queue.length) return;
+    let n=0; while(L.queue.length&&(n===0||performance.now()-t0<16)){ const r=L.queue.shift(); paintRects("gtex",L,[r]); texRead(L,[r]); n++; }
+    L.ver=(L.ver||0)+1; GT.stat.texMs=+(performance.now()-t0).toFixed(1); }
+  // per-pixel inverse projection table for one latitude / radius / output size (longitude is just an offset)
+  function table(L,bx,by,bw,bh,cx,cy,R,lat){
+    const key=[L.Tw,bx,by,bw,bh,cx.toFixed(2),cy.toFixed(2),R.toFixed(3),lat.toFixed(4)].join("|");
+    if(GT.tab&&GT.tkey===key) return GT.tab;
+    const n=bw*bh; let T=GT.tab;
+    if(!T||T.u.length<n) T={u:new Int32Array(n),v:new Int32Array(n),l:new Uint16Array(n)};
+    const b1=lat*Math.PI/180, sb=Math.sin(b1), cb=Math.cos(b1), sun=globe.sun||{x:-0.5,y:0.5,z:0.7};
+    const ku=L.scale*20*180/Math.PI, kv=L.scale*20*180/Math.PI, v0=90*20*L.scale, iR=1/R, Th=L.Th;
+    for(let j=0;j<bh;j++){ const Y=-(by+j+0.5-cy)*iR, YY=Y*Y; let k=j*bw;
+      for(let i=0;i<bw;i++,k++){ const Xx=(bx+i+0.5-cx)*iR, d=Xx*Xx+YY;
+        if(d>=1){ T.v[k]=-1; continue; }
+        const Z=Math.sqrt(1-d);
+        const sl=Y*cb+Z*sb; const b=Math.asin(sl>1?1:sl<-1?-1:sl);
+        const dl=Math.atan2(Xx,Z*cb-Y*sb);
+        T.u[k]=Math.round(dl*ku*16); let v=((v0-b*kv)*16)|0; T.v[k]=v<0?0:v>=Th*16?-2:v;   // 1/16-texel fixed point
+        let lit=0.42+0.72*Math.max(0,Xx*sun.x+Y*sun.y+Z*sun.z); lit=lit<0.26?0.26:lit>1.15?1.15:lit;
+        T.l[k]=(lit*256)|0; } }
+    GT.tab=T; GT.tkey=key; GT.stat.tab++; return T; }
+  // sample the texture into an ImageData (nearest texel, lit), longitude as a pixel offset
+  // sample the texture into an ImageData, lit per pixel; nearest texel while turning, bilinear when still
+  function sample(L,T,img,n,lon,smooth){
+    const out=new Uint32Array(img.data.buffer), px=L.px, Tw=L.Tw, Th=L.Th, Pw=L.Pw*16, off=Math.round((lon+180)*20*L.scale*16);
+    const tu=T.u, tv=T.v, tl=T.l, deep=0xff000000|(88<<16)|(58<<8)|16;
+    for(let k=0;k<n;k++){ const v=tv[k]; if(v===-1){ out[k]=0; continue; }
+      const l=tl[k]; let r,g,b;
+      if(v===-2){ r=16;g=58;b=88; }
+      else { let u=tu[k]+off; if(u>=Pw) u-=Pw; else if(u<0) u+=Pw;
+        const x=u>>4, y=v>>4;
+        if(!smooth){ const c=x<Tw?px[y*Tw+x]:deep; r=c&255; g=c>>>8&255; b=c>>>16&255; }
+        else { const fx=u&15, fy=v&15, x1=x+1>=Pw>>4?0:x+1, y1=y+1<Th?y+1:y;
+          const c00=x<Tw?px[y*Tw+x]:deep, c10=x1<Tw?px[y*Tw+x1]:deep, c01=x<Tw?px[y1*Tw+x]:deep, c11=x1<Tw?px[y1*Tw+x1]:deep;
+          const w00=(16-fx)*(16-fy), w10=fx*(16-fy), w01=(16-fx)*fy, w11=fx*fy;
+          r=((c00&255)*w00+(c10&255)*w10+(c01&255)*w01+(c11&255)*w11)>>8;
+          g=((c00>>>8&255)*w00+(c10>>>8&255)*w10+(c01>>>8&255)*w01+(c11>>>8&255)*w11)>>8;
+          b=((c00>>>16&255)*w00+(c10>>>16&255)*w10+(c01>>>16&255)*w01+(c11>>>16&255)*w11)>>8; } }
+      r=(r*l)>>8; g=(g*l)>>8; b=(b*l)>>8;
+      if(r>255)r=255; if(g>255)g=255; if(b>255)b=255;
+      out[k]=0xff000000|(b<<16)|(g<<8)|r; } }
+  function sky(c,w,h,cx,cy,R){
+    const dpr=view.dpr||1, key=[w,h,cx,cy,R.toFixed(1),dpr].join("|");
+    if(GT.skyKey!==key){ const W=Math.max(1,w*dpr|0), H=Math.max(1,h*dpr|0);
+      if(!GT.sky||GT.sky.width!==W||GT.sky.height!==H){ GT.sky=document.createElement("canvas"); GT.sky.width=W; GT.sky.height=H; }
+      const k=GT.sky.getContext("2d"); k.setTransform(dpr,0,0,dpr,0,0); sky0(k,w,h,cx,cy,R); GT.skyKey=key; }
+    c.save(); c.setTransform(1,0,0,1,0,0); c.drawImage(GT.sky,0,0); c.restore(); }
+  function sky0(c,w,h,cx,cy,R){
+    const bg=c.createLinearGradient(0,0,0,h); bg.addColorStop(0,"#050814"); bg.addColorStop(1,"#070d17");
+    c.fillStyle=bg; c.fillRect(0,0,w,h);
+    const glow=c.createRadialGradient(cx,cy,R*0.92,cx,cy,R*1.16);
+    glow.addColorStop(0,"rgba(110,190,255,0)"); glow.addColorStop(0.55,"rgba(80,170,255,0.08)");
+    glow.addColorStop(0.85,"rgba(120,200,255,0.28)"); glow.addColorStop(1,"rgba(10,20,40,0)");
+    c.fillStyle=glow; c.beginPath(); c.arc(cx,cy,R*1.16,0,Math.PI*2); c.fill(); }
+  // the sphere picture (device pixels at resolution q) drawn onto c (css transform)
+  function disc(c,w,h,dpr,q,L){
+    const cx=w/2, cy=h/2+4, R=globe.r, k=dpr*q;
+    const W=Math.ceil(w*k), H=Math.ceil(h*k);
+    const bx=Math.max(0,Math.floor((cx-R)*k)-1), by=Math.max(0,Math.floor((cy-R)*k)-1);
+    const bw=Math.max(1,Math.min(W,Math.ceil((cx+R)*k)+1)-bx), bh=Math.max(1,Math.min(H,Math.ceil((cy+R)*k)+1)-by);
+    const tq=performance.now();
+    const T=table(L,bx,by,bw,bh,cx*k,cy*k,R*k,globe.lat);
+    if(!GT.img||GT.img.width!==bw||GT.img.height!==bh) GT.img=new ImageData(bw,bh);
+    sample(L,T,GT.img,bw*bh,globe.lon,!GT.moving);
+
+    if(!GT.disc||GT.disc.width<bw||GT.disc.height<bh){ GT.disc=document.createElement("canvas"); GT.disc.width=Math.max(bw,GT.disc?GT.disc.width:0); GT.disc.height=Math.max(bh,GT.disc?GT.disc.height:0); }
+    GT.disc.getContext("2d").putImageData(GT.img,0,0);
+    c.save(); c.imageSmoothingEnabled=true; c.drawImage(GT.disc,0,0,bw,bh,bx/k,by/k,bw/k,bh/k);
+    const per=(performance.now()-tq)/(bw*bh/(k*k));   // ms per css pixel at q=1
+    if(GT.moving) GT.cpp=GT.cpp?GT.cpp*0.6+per*0.4:per;
+    // soft limb + a touch of rim light
+    c.beginPath(); c.arc(cx,cy,R,0,Math.PI*2); c.lineWidth=1.5; c.strokeStyle="rgba(150,210,255,0.35)"; c.stroke();
+    if(state.player>=0){ const all=new Path2D(); let any=false;
+      for(const p of provinces) if(p.owner===state.player&&p._gVis&&p._gPath){ all.addPath(p._gPath); any=true; }
+      if(any){ c.beginPath(); c.arc(cx,cy,R,0,Math.PI*2); c.clip(); c.lineJoin="round"; c.strokeStyle="rgba(236,201,112,0.95)";
+        if(GT.moving){ c.globalAlpha=0.35; c.lineWidth=6; c.stroke(all); c.globalAlpha=1; c.lineWidth=2.2; c.stroke(all); }
+        else { c.shadowColor="rgba(236,201,112,0.55)"; c.shadowBlur=8; c.lineWidth=2.2; c.stroke(all); c.shadowBlur=0; } } }
+    c.restore(); }
+  if(typeof drawGlobeFrame==="function"&&typeof buildGlobePaths==="function"&&typeof globe!=="undefined"){
+    const prevGlobe=drawGlobeFrame;
+    drawGlobeFrame=function(){
+      if(X.oldGlobe) return prevGlobe.apply(this,arguments);
+      const {cssW:w,cssH:h,dpr}=view; if(!w) return;
+      if(!globe.r) globeFit();
+      if(globe.dirty) buildGlobePaths();
+      const t0=performance.now();
+      const cam=[globe.lon.toFixed(3),globe.lat.toFixed(3),globe.r.toFixed(2),w|0,h|0,dpr].join("|");
+      if(cam!==GT.lastCam){ GT.lastCam=cam; GT.moveT=t0; }
+      const moving=t0-GT.moveT<150; GT.moving=moving;
+      const dtF=t0-(GT.lastT||t0); GT.lastT=t0;
+      // overlays (fronts, selected outline) use one path per country
+      const G=GFX18; G.gpaths=new Map();
+      for(const p of provinces){ if(!p._gVis||!p._gPath) continue; let gp=G.gpaths.get(p.owner); if(!gp){ gp=new Path2D(); G.gpaths.set(p.owner,gp); } gp.addPath(p._gPath); }
+      const ck=lv+"|"+(state.mapVer||0);
+      const L=texLevel(false); texSync(L,ck,!moving||!L.px);   // re-bake bands only while the globe is still
+      // not baked yet (the idle pre-bake did not get a chance): finish it now, a one-off ~0.3 s pause
+      for(let i=0;i<BANDS+2&&!L.px;i++) texSync(L,ck,true);
+      if(!L.px) return prevGlobe.apply(this,arguments);
+      if(moving){
+        // resolution from the measured cost per pixel: the projected disc gets ~8 ms per frame
+        // (less if frames are still slow), so the first frames of a drag are already fast
+        if(dtF>0&&dtF<400) GT.ema=GT.ema*0.7+dtF*0.3;
+        const area=Math.PI*globe.r*globe.r*Math.min(1,(w*h)/(4*globe.r*globe.r)), cpp=GT.cpp||1e-4;
+        GT.bud=Math.max(3,Math.min(12,(GT.bud||6)*(GT.ema>30?0.93:GT.ema<22?1.04:1)));
+        GT.q=Math.max(0.4,Math.min(1,Math.sqrt(GT.bud/(cpp*area))));
+        const q=lite()?Math.min(GT.q,0.75):GT.q;
+        ctx.setTransform(dpr,0,0,dpr,0,0); sky(ctx,w,h,w/2,h/2+4,globe.r); disc(ctx,w,h,dpr,q,L);
+        GT.stillKey=""; GT.stat.move++; GT.stat.q=+q.toFixed(2);
+      } else {
+        const W=Math.max(1,w*dpr|0), H=Math.max(1,h*dpr|0);
+        if(!GT.still||GT.still.width!==W||GT.still.height!==H){ GT.still=document.createElement("canvas"); GT.still.width=W; GT.still.height=H; GT.stillKey=""; }
+        const key=cam+"|"+L.Tw+"|"+L.ver+"|"+state.player;
+        if(GT.stillKey!==key){ const c=GT.still.getContext("2d"); c.setTransform(dpr,0,0,dpr,0,0); sky(c,w,h,w/2,h/2+4,globe.r); disc(c,w,h,dpr,1,L); GT.stillKey=key; GT.stat.frames++; }
+        else GT.stat.still++;
+        ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(GT.still,0,0);
+      }
+      GT.stat.ms=+(performance.now()-t0).toFixed(1);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+      for(const p of provinces){
+        if(!(p.flash>0)) continue;
+        if(p._gVis&&p._gPath){ ctx.fillStyle=`rgba(255,245,210,${Math.min(0.55,p.flash*0.55)})`; ctx.fill(p._gPath,"evenodd"); }
+        p.flash=Math.max(0,p.flash-0.03);
+      }
+      const hover=state.hover>=0?provinces[state.hover]:null;
+      if(hover&&hover._gPath){ ctx.fillStyle="rgba(255,255,255,0.08)"; ctx.fill(hover._gPath,"evenodd"); ctx.lineWidth=2; ctx.strokeStyle="rgba(255,255,255,0.9)"; ctx.stroke(hover._gPath); }
+      if(state.attackTarget>=0){ const tp=provinces[state.attackTarget]; if(tp&&tp._gPath){ ctx.lineWidth=3; ctx.strokeStyle="rgba(255,80,60,0.95)"; ctx.stroke(tp._gPath); } }
+      try{ GFX18.liveGlobe(ctx,performance.now()); }catch(e){}
+      drawGlobeOverlays();
+      drawUnitsGlobe();
+      drawParticlesGlobe();
+      drawMinimap();
+    };
+    // bake the small texture ahead of time while the browser is idle, so the first globe frame is ready
+    const ric=window.requestIdleCallback||(f=>setTimeout(()=>f({timeRemaining:()=>50}),200));
+    const pre=()=>{ try{
+        if(state.phase==="play"&&!state.globeOn&&performance.now()-lastInput>1500&&X.settled!==false){ const L=texLevel(false);
+          if(L.snap&&L.px&&!L.bake&&L.snap.base!==(state.player+"|"+lite()+"|"+provinces.length)) L.ck=null;
+          if(!L.px||L.bake||L.ck===null){ texSync(L,(lv+"|"+(state.mapVer||0)),true); GT.stat.pre=(GT.stat.pre||0)+1; setTimeout(()=>ric(pre),120); return; } }
+      }catch(e){ if(!GT.warned){ GT.warned=1; console.warn("globe prebake",e); } }
+      setTimeout(()=>ric(pre),1500); };
+    setTimeout(()=>ric(pre),3000);
+    try{ const CF=window.CROWNFALL||(window.CROWNFALL={}); CF.globeMoving=()=>!!GT.moving; CF.globeStat=()=>Object.assign({},GT.stat); }catch(e){}
   }
 
   // ---- 4) idle redraw skipping ----
