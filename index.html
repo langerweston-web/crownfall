@@ -16064,12 +16064,12 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   const hasBase=()=>state._tutBase||(state.bases||[]).some(b=>b.owner===state.player&&b.kind==="mil");
   const STEPS=[
     {t:"Pick your country", d:"Click a country, then press <b>Play as</b>.", goal:"Choose a country", ok:()=>state.phase==="play"},
-    {t:"It's turn-based", d:"Time waits for you. Make your moves, then press the green <b>End Turn</b> (top right).", next:true},
+    {t:"It's turn-based", d:"You get <b>one action</b> per turn: build, recruit, attack or move. After it, the other countries move and your next turn starts by itself.", next:true},
     {t:"Build a military base", d:"<b>Drag a Military Base</b> from the bottom bar onto your land.", goal:"Place a Military Base", ok:hasBase},
     {t:"Train troops", d:"Click your base and buy <b>Riflemen</b>.", goal:"Buy any unit", ok:()=>!!state._tutBought},
     {t:"Grow your economy", d:"<b>Drag a Factory</b> from the bottom bar onto your land for more money.", goal:"Place a building", ok:()=>!!state._tutBuilt},
     {t:"Trade", d:"Open the <b>Trade</b> tab on the right.", goal:"Open the Trade tab", ok:()=>state.tab==="trade"},
-    {t:"End your turn", d:"Press the green <b>End Turn</b> and watch the month play out.", goal:"End a turn", ok:()=>!!state._tutEnded},
+    {t:"Skip a turn", d:"Nothing to do? Press the green <b>End Turn</b> to pass and let the others move.", goal:"End a turn", ok:()=>!!state._tutEnded},
     {t:"Armies and war", d:"Click troops, then <b>right-click</b> to move or attack. The box at the top left always tells you what to do next.", next:true, last:true}
   ];
   TUT_STEPS.length=0; STEPS.forEach(s=>TUT_STEPS.push(s));
@@ -16429,30 +16429,33 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   function defenseOf(dp){
     const defN=nations[dp.owner];
     const defs=unitsAt(dp.id).filter(u=>u.owner===dp.owner||allied(u.owner,dp.owner));
-    const militia=Math.sqrt(Math.max(1000,dp.pop||0))*1.05*(dp.dev||1)*0.62*((defN&&defN.tech)||1);
-    return {defs,militia};
+    const militia=Math.sqrt(Math.max(1000,dp.pop||0))*1.05*(dp.dev||1)*0.62*0.5*((defN&&defN.tech)||1); // militia halved: it was beating equal armies
+    // militia matters most when a province is empty; with an army there it only helps a little
+    return {defs,militia:defs.some(u=>u.str>0)?militia*0.35:militia};
   }
+  // forts and terrain still help, but half as much as in real-time battles
+  function softMod(dp){ const m=defModOf(dp,false)||1; return 1+(m-1)*0.5; }
   function estimate(us,dp){
     const {defs,militia}=defenseOf(dp);
     const dT=defs.length?dominantType(defs):"rifle", aT=dominantType(us);
     let a=0,d=militia; for(const u of us)a+=unitPower(u,dT,true); for(const u of defs)d+=unitPower(u,aT,false);
-    return a/((d*defModOf(dp,false))+1);
+    return a/((d*softMod(dp))+1);
   }
   function fight(attId,us,pid){
     const dp=provinces[pid], att=nations[attId], defN=nations[dp.owner];
     const {defs,militia}=defenseOf(dp);
     const dT=defs.length?dominantType(defs):"rifle", aT=dominantType(us);
-    let atk=0,def=militia*(defN.tech||1);
+    let atk=0,def=militia; // militia already scales with tech
     for(const u of us)atk+=unitPower(u,dT,true);
     for(const u of defs)def+=unitPower(u,aT,false);
-    def*=defModOf(dp,false);
+    def*=softMod(dp);
     if(typeof combinedArmsMul==="function"){ try{ const cm=combinedArmsMul(us,defs); atk*=cm.atk; def*=cm.def; }catch(e){} }
-    atk*=0.88+Math.random()*0.24; def*=0.88+Math.random()*0.24;
+    atk*=0.8+Math.random()*0.4; def*=0.8+Math.random()*0.4;
     const share=atk/(atk+def+1);
     let aL=0,dL=0;
     for(const u of us){ const l=u.str*0.32*(1-share); u.str=Math.max(0,u.str-l); aL+=l; }
     for(const u of defs){ const l=u.str*0.38*share; u.str=Math.max(0,u.str-l); dL+=l; }
-    const win=atk>def*1.1;
+    const win=atk>def;
     let captured=false;
     if(win){
       const last=nProvs(dp.owner).length<=1;
@@ -16479,6 +16482,27 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     return res;
   }
 
+
+  // odds preview for the UI: CROWNFALL.attackOdds(unitIds, provinceId)
+  function oddsFor(ids,pid){
+    const dp=provinces[pid]; if(!dp)return null;
+    const P=state.player;
+    const us=(ids||[]).map(unitById).filter(u=>u&&u.str>0&&u.type!=="air");
+    if(!us.length)return null;
+    const {defs,militia}=defenseOf(dp);
+    const dT=defs.length?dominantType(defs):"rifle", aT=dominantType(us);
+    let a=0,d=militia; for(const u of us)a+=unitPower(u,dT,true); for(const u of defs)d+=unitPower(u,aT,false);
+    const mod=softMod(dp); d*=mod;
+    if(typeof combinedArmsMul==="function"){ try{ const cm=combinedArmsMul(us,defs); a*=cm.atk; d*=cm.def; }catch(e){} }
+    // win chance with the +-12% roll on both sides
+    let w=0; const N=400; for(let i=0;i<N;i++){ if(a*(0.8+Math.random()*0.4)>d*(0.8+Math.random()*0.4))w++; }
+    const chance=Math.round(w/N*100);
+    const atkMen=us.reduce((s,u)=>s+u.str,0), defMen=defs.reduce((s,u)=>s+u.str,0);
+    const last=nProvs(dp.owner).length<=1;
+    return {chance,attack:Math.round(a),defense:Math.round(d),atkMen:Math.round(atkMen),defMen:Math.round(defMen),militia:Math.round(militia),fortMul:+mod.toFixed(2),needsTwoWins:last,
+      label:chance>=70?"likely win":chance>=40?"even fight":chance>=15?"risky":"likely loss",
+      text:"Attack "+fm(a)+" vs defense "+fm(d)+" ("+fm(defMen)+" troops + militia"+(mod>1.05?", fort x"+mod.toFixed(1):"")+"): "+chance+"% to win"+(last?", capital needs 2 wins":"")};
+  }
   // ---- player's one action ----
   function playerTurn(){ const a=act(); return on()&&a.phase==="player"&&!a.done; }
   function blocked(){ feedback(act().phase==="ai"?"Wait: the other countries are taking their turns.":"You've used your action this turn.","war",true); return false; }
@@ -16679,7 +16703,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   updateSpeed=function(){ const r=_us.apply(this,arguments); if(on()){ const a=act(), b=document.getElementById("bTurn"), l=document.getElementById("bTurnLen"); if(l)l.style.display="none";
       if(b&&a.phase==="ai"){ b.textContent=(a.actor>=0?nm(a.actor):"Enemy")+"'s turn…"; b.disabled=true; b.style.opacity=0.65; } } return r; };
   if(window.CROWNFALL){
-    window.CROWNFALL.actionState=()=>{ const a=act(); return {on:on(),phase:a.phase,actor:a.actor,actorName:a.actor>=0?nm(a.actor):null,usedAction:!!a.done,turn:state.turnNo||1}; };
+    window.CROWNFALL.attackOdds=oddsFor; window.CROWNFALL.actionState=()=>{ const a=act(); return {on:on(),phase:a.phase,actor:a.actor,actorName:a.actor>=0?nm(a.actor):null,usedAction:!!a.done,turn:state.turnNo||1}; };
     window.CROWNFALL.passTurn=pass;
   }
 })();
@@ -16858,6 +16882,24 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
   else { const prev=window.CF_onAction; window.CF_onAction=function(o){ if(typeof prev==="function"){try{prev(o)}catch(e){}} onAct(o); }; }
   setInterval(draw,400);
   if(window.CROWNFALL) window.CROWNFALL.actionLog=()=>items.map(i=>i.t);
+})();
+// v2.2.2: keep action bar + move log clear of the tutorial card and the bottom build bar
+(function(){
+  const vis=e=>e&&e.offsetParent&&getComputedStyle(e).display!=="none"&&e.offsetWidth>0;
+  const hit=(a,b)=>!(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom);
+  function lift(el,obs){
+    if(!vis(el))return; let bot=14; el.style.bottom=bot+"px";
+    for(let k=0;k<6;k++){
+      const r=el.getBoundingClientRect(); let moved=false;
+      for(const o of obs){ if(!vis(o)||o===el)continue; const q=o.getBoundingClientRect(); if(hit(r,q)){ bot+=r.bottom-q.top+8; el.style.bottom=bot+"px"; moved=true; break; } }
+      if(!moved)break;
+    }
+  }
+  setInterval(()=>{
+    const $$=id=>document.getElementById(id);
+    const bar=$$("actBar"), log=$$("actLog"), tut=$$("tutor"), ab=$$("actionBar");
+    lift(tut,[ab]); lift(bar,[ab,tut]); lift(log,[ab,tut,bar]);
+  },350);
 })();
 
 })();
