@@ -15774,19 +15774,32 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
     const placed=[], out=[];
     const hit=r=>placed.some(q=>r.x<q.x+q.w&&r.x+r.w>q.x&&r.y<q.y+q.h&&r.y+r.h>q.y);
     const maxN=Math.max(8,Math.round(w*h/26000));
+    // v2.3: keep-out boxes around every capital pin (pin + its bar), so names never sit on a pin
+    const PK={l:15,t:36,b:27};
+    const pins=[];
+    if(scale>=0.28) for(const p of provinces){ if(!p.capital) continue;   // pins are only drawn from 0.28 up const n=nations[p.owner]; if(!n||!n.alive) continue;
+      const x=p.cx*scale+ox, y=p.cy*scale+oy; if(x<-40||y<-60||x>w+40||y>h+60) continue;
+      pins.push({x:x-PK.l,y:y-PK.t,w:PK.l*2,h:PK.t+PK.b,cy:y}); }
+    const onPin=r=>pins.find(q=>r.x<q.x+q.w&&r.x+r.w>q.x&&r.y<q.y+q.h&&r.y+r.h>q.y);
     ctx.save(); ctx.setTransform(1,0,0,1,0,0);
     for(const c of cands){
       if(out.length>=maxN) break;
       const fs=clamp(Math.sqrt(c.area)/18, c.mine||c.foe?10:8.5, 18);
       ctx.font=`700 ${fs}px Georgia,serif`;
       const name=c.g.n.name, tw=ctx.measureText(name).width;
-      const sx=clamp(c.sx,tw/2+8,w-tw/2-8), sy=clamp(c.sy,fs+4,h-fs-6);
+      const sx=clamp(c.sx,tw/2+8,w-tw/2-8); let sy=clamp(c.sy,fs+4,h-fs-6);
       const showArmy=fs>=11&&(c.mine||c.foe);
       const pw=tw+10, ph=fs+4+(showArmy?fs*0.75:0);
-      const r={x:sx-pw/2-3,y:sy-(fs+4)/2-8-3,w:pw+6,h:ph+6};
-      if(!c.mine&&hit(r)) continue;
+      const top0=-(fs+4)/2-8-3, mk=y=>({x:sx-pw/2-3,y:y+top0,w:pw+6,h:ph+6});
+      let r=mk(sy);
+      // sitting on a capital pin: lift the name (and troop count) clear above it, else drop below it
+      for(let k=0;k<3;k++){ const q=onPin(r); if(!q) break;
+        const up=q.y-3-(top0+ph+6), dn=q.y+q.h+3-top0;
+        const ru=mk(up); sy=(up+top0>2&&!onPin(ru)&&!hit(ru))||dn+top0+ph+6>h-2?up:dn; r=mk(sy); }
+      if(!c.mine&&(hit(r)||onPin(r))) continue;
       placed.push(r);
       out.push({name,sx,sy,fs,pw,ph:fs+4,army:showArmy?fmt(c.g.n.army):null,foe:c.foe});
+      continue;
     }
     // province names when zoomed in: only where they fit and don't collide
     if(scale>0.55){
@@ -15798,7 +15811,7 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
         const sx=p.cx*scale+ox, sy=p.cy*scale+oy+10;
         if(sx<0||sy<0||sx>w||sy>h) continue;
         const tw=ctx.measureText(p.name).width; const r={x:sx-tw/2-2,y:sy-fs/2-2,w:tw+4,h:fs+4};
-        if(hit(r)) continue; placed.push(r);
+        if(hit(r)||onPin(r)) continue; placed.push(r);
         out.push({prov:true,name:p.name,sx,sy,fs});
       }
     }
@@ -15884,11 +15897,13 @@ const GFX18={cb:null, home:null, last:null, chg:new Map(), pats:new Map(), adjKe
       const fs=clamp(10+L.z*4,9,16);
       ctx.font=`700 ${fs}px Georgia,serif`;
       const tw=ctx.measureText(L.nat.name).width;
-      const r={x:L.sx-tw/2-4,y:L.sy-8-fs/2-3,w:tw+8,h:fs+6};
+      // v2.3: the name sits above the capital pin (pin + bar reach ~36 px above the capital)
+      const ly=L.sy-38-fs/2;
+      const r={x:L.sx-tw/2-4,y:ly-fs/2-3,w:tw+8,h:fs+6};
       if(L.pri<1e14&&placed.some(q=>r.x<q.x+q.w&&r.x+r.w>q.x&&r.y<q.y+q.h&&r.y+r.h>q.y)) continue;
       placed.push(r);
-      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.6)"; ctx.strokeText(L.nat.name,L.sx,L.sy-8);
-      ctx.fillStyle="rgba(255,255,255,0.96)"; ctx.fillText(L.nat.name,L.sx,L.sy-8);
+      ctx.lineWidth=3; ctx.strokeStyle="rgba(8,12,20,0.6)"; ctx.strokeText(L.nat.name,L.sx,ly);
+      ctx.fillStyle="rgba(255,255,255,0.96)"; ctx.fillText(L.nat.name,L.sx,ly);
     }
   };
 })();
